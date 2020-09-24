@@ -1,0 +1,82 @@
+# CICD stages
+stages:
+  - unit-tests
+  - functional-tests
+  - deploy
+
+# The test script: Runs the functional, and unit tests of .NET Core
+# 
+# TEST_PROJECT_NAME       # The name of the csharp test project
+.test_script: &test_script
+  image: mcr.microsoft.com/dotnet/core/sdk:3.1
+  tags:
+    - vanilla-dev
+  dependencies: []
+  script:
+    - echo "TEST_PROJECT_NAME=$TEST_PROJECT_NAME"
+    - dotnet restore ./$TEST_PROJECT_PATH/$TEST_PROJECT_NAME/$TEST_PROJECT_NAME.csproj
+    - dotnet test ./$TEST_PROJECT_PATH/$TEST_PROJECT_NAME/$TEST_PROJECT_NAME.csproj
+
+test-library-cache:
+  <<: *test_script
+  stage: unit-tests
+  variables:
+    TEST_PROJECT_PATH: "libs/tests"
+    TEST_PROJECT_NAME: "COLID.Cache.Tests"
+  only:
+    - /^issues\/.*$/
+    - /^hotfixes\/.*$/
+    - develop
+    - release
+    - master
+
+test-library-graph:
+  <<: *test_script
+  stage: unit-tests
+  variables:
+    TEST_PROJECT_PATH: "libs/tests"
+    TEST_PROJECT_NAME: "COLID.Graph.Tests"
+  only:
+    - /^issues\/.*$/
+    - /^hotfixes\/.*$/
+    - develop
+    - release
+    - master
+
+test-registration-units:
+  <<: *test_script
+  stage: unit-tests
+  variables:
+    TEST_PROJECT_PATH: "tests"
+    TEST_PROJECT_NAME: "COLID.RegistrationService.Tests.Unit"
+  only:
+    - /^issues\/.*$/
+    - /^hotfixes\/.*$/
+    - develop
+    - release
+    - master
+
+test-registration-functional:
+  <<: *test_script
+  stage: functional-tests
+  variables:
+    TEST_PROJECT_PATH: "tests"
+    TEST_PROJECT_NAME: "COLID.RegistrationService.Tests.Functional"
+  only:
+    - /^issues\/.*$/
+    - /^hotfixes\/.*$/
+    - develop
+    - release
+    - master
+    
+trigger-deployment:
+  stage: deploy
+  image: curlimages/curl
+  tags:
+    - dind-dev
+  script:
+    - curl -X POST -F token=$DEPLOYMENT_TOKEN -F ref=$CI_COMMIT_REF_NAME $DEPLOYMENT_REPO_URL
+  only:
+    - develop
+    - release
+    - master

@@ -1,0 +1,97 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Setup\Graphs\colid_delete_graph.ttl" />
+    <None Remove="Setup\Graphs\colid_test_graph.ttl" />
+    <None Remove="Setup\Graphs\consumergroup__1.0.ttl" />
+    <None Remove="Setup\Graphs\extended_uri_template__1.0.ttl" />
+    <None Remove="Setup\Graphs\keyword__1.0.ttl" />
+    <None Remove="Setup\Graphs\metadata_graph_configuration.ttl" />
+    <None Remove="Setup\Graphs\pid_enterprise_core_ontology__1.0.ttl" />
+    <None Remove="Setup\Graphs\pid_ontology_oss__5.ttl" />
+    <None Remove="Setup\Graphs\pid_ontology_oss__shacled__5.0.ttl" />
+    <None Remove="Setup\Graphs\pid_ontology_oss__technical__5.0.ttl" />
+    <None Remove="Setup\Graphs\pid_uri_template__1.0.ttl" />
+    <None Remove="Setup\Graphs\pid__metadata__mathematical_model_categories_taxonomy__1.0.ttl" />
+    <None Remove="Setup\Graphs\resources_historic.ttl" />
+    <None Remove="Setup\Graphs\resource__1.0.ttl" />
+    <None Remove="Setup\Graphs\resource__2.0.ttl" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="appsettings.Testing.json">
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="3.1.3" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.6.1" />
+    <PackageReference Include="Moq" Version="4.14.5" />
+    <PackageReference Include="xunit" Version="2.4.1" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.4.1" />
+    <DotNetCliToolReference Include="dotnet-xunit" Version="2.3.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Setup\Graphs\colid_delete_graph.ttl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Setup\Graphs\colid_test_graph.ttl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Setup\Graphs\consumergroup__1.0.ttl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Setup\Graphs\extended_uri_template__1.0.ttl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Setup\Graphs\keyword__1.0.ttl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Setup\Graphs\metadata_graph_configuration.ttl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Setup\Graphs\pid_enterprise_core_ontology__1.0.ttl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Setup\Graphs\pid_ontology_oss__5.ttl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Setup\Graphs\pid_ontology_oss__shacled__5.0.ttl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Setup\Graphs\pid_ontology_oss__technical__5.0.ttl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Setup\Graphs\pid_uri_template__1.0.ttl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Setup\Graphs\pid__metadata__mathematical_model_categories_taxonomy__1.0.ttl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Setup\Graphs\resources_historic.ttl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Setup\Graphs\resource__2.0.ttl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Setup\Graphs\resource__1.0.ttl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Setup\Results\proxy-config.conf">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\COLID.RegistrationService.WebApi\COLID.RegistrationService.WebApi.csproj" />
+    <ProjectReference Include="..\COLID.RegistrationService.Tests.Unit\COLID.RegistrationService.Tests.Unit.csproj" />
+  </ItemGroup>
+</Project>

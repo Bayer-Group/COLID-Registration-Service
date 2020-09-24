@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\libs\COLID.Common\COLID.Common.csproj" />
+    <ProjectReference Include="..\..\libs\COLID.Exception\COLID.Exception.csproj" />
+    <ProjectReference Include="..\..\libs\COLID.Graph\COLID.Graph.csproj" />
+    <ProjectReference Include="..\COLID.RegistrationService.Common\COLID.RegistrationService.Common.csproj" />
+    <ProjectReference Include="..\COLID.RegistrationService.References\COLID.RegistrationService.References.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>COLID.RegistrationService.Tests.Unit</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <RootNamespace>COLID.Common</RootNamespace>
+    <Version>2.0</Version>
+    <Description>The COLID common library containing constants, data models, extensions and more.</Description>
+    <Authors>COLID team</Authors>
+    <Company>Bayer AG</Company>
+    <PackageLicenseExpression>BSD-3-Clause</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+    <PackageProjectUrl>https://github.com/orgs/Bayer-Group/</PackageProjectUrl>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <LangVersion>latest</LangVersion>
+    <NeutralLanguage>en</NeutralLanguage>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
+  </ItemGroup>
+
+</Project>
