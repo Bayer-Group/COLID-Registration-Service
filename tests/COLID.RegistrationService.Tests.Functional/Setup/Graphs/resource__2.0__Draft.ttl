@@ -1,0 +1,18 @@
+﻿<https://pid.bayer.com/kos/19050#d8d8f921-cf1d-43d8-af0e-aaaaaaaaaaaa> <https://pid.bayer.com/kos/19050/hasResourceDefinition> "ID1002"^^<http://www.w3.org/1999/02/22-rdf-syntax-ns#HTML> ;
+                                                                       <https://pid.bayer.com/kos/19050/hasLifecycleStatus> <https://pid.bayer.com/kos/19050/released> ;
+                                                                       <https://pid.bayer.com/kos/19050/hasInformationClassification> <https://pid.bayer.com/kos/19050/Open> ;
+                                                                       <https://pid.bayer.com/kos/19050/lastChangeUser> "simon.lansing.ext@bayer.com" ;
+                                                                       <https://pid.bayer.com/kos/19050/dateCreated> "2019-12-19T14:24:09.669Z"^^<http://www.w3.org/2001/XMLSchema#dateTime> ;
+                                                                       <http://pid.bayer.com/kos/19014/hasPID> <https://pid.bayer.com/URI1010Draft> ;
+                                                                       <https://pid.bayer.com/kos/19050/containsLicensedData> "false"^^<http://www.w3.org/2001/XMLSchema#boolean> ;
+                                                                       <https://pid.bayer.com/kos/19050/hasVersion> "3" ;
+                                                                       <https://pid.bayer.com/kos/19050/hasEntryLifecycleStatus> <https://pid.bayer.com/kos/19050/draft> ;
+                                                                       <https://pid.bayer.com/kos/19050/hasLabel> "test123" ;
+                                                                       <https://pid.bayer.com/kos/19050/lastChangeDateTime> "2019-12-19T14:24:31.160Z"^^<http://www.w3.org/2001/XMLSchema#dateTime> ;
+                                                                       <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://pid.bayer.com/kos/19050/GenericDataset> ;
+                                                                       <https://pid.bayer.com/kos/19050/author> "testuser.ext@bayer.com" ;
+                                                                       <https://pid.bayer.com/kos/19050/isPersonalData> "false"^^<http://www.w3.org/2001/XMLSchema#boolean> ;
+                                                                       <https://pid.bayer.com/kos/19050#hasConsumerGroup> <https://pid.bayer.com/kos/19050#bf2f8eeb-fdb9-4ee1-ad88-e8932fa8753c> .
+
+
+<https://pid.bayer.com/URI1010Draft> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://pid.bayer.com/kos/19014/PermanentIdentifier> .

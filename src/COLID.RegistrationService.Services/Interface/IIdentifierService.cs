@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using COLID.Graph.TripleStore.DataModels.Base;
 using COLID.RegistrationService.Common.DataModel.Validation;
+using COLID.RegistrationService.Common.DataModel.Identifier;
 
 namespace COLID.RegistrationService.Services.Interface
 {
@@ -39,6 +41,17 @@ namespace COLID.RegistrationService.Services.Interface
         ///
         /// <exception cref="ArgumentNullException">if the param is null</exception>
         /// <exception cref="UriFormatException">if the param is not an uri</exception>
-        void DeleteOrphanedIdentifier(string identifierUri);
+        void DeleteOrphanedIdentifier(string identifierUri, bool checkInOrphanedList = true);
+
+        /// <summary>
+        /// Delete an multiple orphaned identifier which matches the given uri. The <paramref name="identifierUris"/>
+        /// will be checken, if it really has no relation, before the identifier will be deleted.
+        /// </summary>
+        ///
+        /// <param name="identifierUris">the uri to check and delete</param>
+        ///
+        /// <exception cref="ArgumentNullException">if the param is null</exception>
+        /// <exception cref="UriFormatException">if the param is not an uri</exception>
+        Task<List<OrphanResultDto>> DeleteOrphanedIdentifierList(List<string> identifierUris);
     }
 }

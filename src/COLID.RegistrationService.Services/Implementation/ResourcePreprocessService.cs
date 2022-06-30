@@ -8,16 +8,15 @@ using COLID.RegistrationService.Repositories.Interface;
 using COLID.RegistrationService.Services.Interface;
 using COLID.RegistrationService.Services.Validation;
 using COLID.RegistrationService.Services.Validation.Models;
-using COLID.StatisticsLog.Services;
 using COLID.RegistrationService.Services.Validation.Validators;
 using COLID.Graph.Metadata.Services;
 using COLID.Graph.Metadata.DataModels.Validation;
-using COLID.RegistrationService.Common.DataModel.Resources;
 using COLID.Graph.TripleStore.Extensions;
 using COLID.Graph.TripleStore.DataModels.Base;
 using COLID.Graph.Metadata.Extensions;
 using Microsoft.Extensions.Logging;
 using COLID.Graph.Metadata.DataModels.Resources;
+using COLID.Graph.TripleStore.DataModels.Resources;
 
 namespace COLID.RegistrationService.Services.Implementation
 {
@@ -52,7 +51,8 @@ namespace COLID.RegistrationService.Services.Implementation
             _identifierValidationService = identifierValidationService;
         }
 
-        public async Task<Tuple<ValidationResult, bool, EntityValidationFacade>> ValidateAndPreProcessResource(string resourceId, ResourceRequestDTO resourceRequestDTO, ResourcesCTO resourcesCTO, ResourceCrudAction resourceCrudAction, bool nestedValidation = false, string consumerGroup = null)
+        public async Task<Tuple<ValidationResult, bool, EntityValidationFacade>> ValidateAndPreProcessResource(string resourceId, ResourceRequestDTO resourceRequestDTO, 
+            ResourcesCTO resourcesCTO, ResourceCrudAction resourceCrudAction, bool nestedValidation = false, string consumerGroup = null, bool changeResourceType = false)
         {
             var requestResource = _mapper.Map<Resource>(resourceRequestDTO);
             requestResource.Id = string.IsNullOrWhiteSpace(resourceId) ? CreateNewResourceId() : resourceId;
@@ -64,18 +64,24 @@ namespace COLID.RegistrationService.Services.Implementation
             var actualConsumerGroup = nestedValidation ? consumerGroup : requestResource.Properties.GetValueOrNull(Graph.Metadata.Constants.Resource.HasConsumerGroup, true);
 
             var validationFacade = new EntityValidationFacade(resourceCrudAction, requestResource, resourcesCTO, resourceRequestDTO.HasPreviousVersion, metadata, actualConsumerGroup);
-
+            if (changeResourceType)
+            {
+                // dirty solution for changing resource type. could be refactored in the future
+                var validationRes = await _validationService.ValidateEntity(requestResource, metadata).ConfigureAwait(true);
+                if (validationRes.Results.Count == 1 && validationRes.Results[0].Path == Graph.Metadata.Constants.Resource.BaseUri)
+                    validationFacade.ResourceCrudAction = ResourceCrudAction.Create;
+            }
             // Remove passed properties for several properties and replace it with repo-resource properties afterwards
             RemoveProperty(Graph.Metadata.Constants.Resource.HasLaterVersion, requestResource);
-            RemoveProperty(Graph.Metadata.Constants.Resource.HasHistoricVersion, requestResource);
+            //RemoveProperty(Graph.Metadata.Constants.Resource.HasHistoricVersion, requestResource);
             RemoveProperty(Graph.Metadata.Constants.Resource.ChangeRequester, requestResource);
 
             if (resourceCrudAction != ResourceCrudAction.Create)
             {
                 UpdatePropertyFromRepositoryResource(Graph.Metadata.Constants.Resource.HasLaterVersion, validationFacade);
-                UpdatePropertyFromRepositoryResource(Graph.Metadata.Constants.Resource.MetadataGraphConfiguration, validationFacade);
+                //validationFacade.RequestResource.Properties.AddOrUpdate(Graph.Metadata.Constants.Resource.MetadataGraphConfiguration, new List<dynamic>() { _metadataConfigService.GetLatestConfiguration().Id });
             }
-            else if (!nestedValidation) // so only new resources get this property, no distribution endpoints
+            if (!nestedValidation) // so only new resources get this property, no distribution endpoints
             {
                 RemoveProperty(Graph.Metadata.Constants.Resource.MetadataGraphConfiguration, requestResource);
                 validationFacade.RequestResource.Properties.AddOrUpdate(Graph.Metadata.Constants.Resource.MetadataGraphConfiguration, new List<dynamic>() { _metadataConfigService.GetLatestConfiguration().Id });
@@ -88,6 +94,8 @@ namespace COLID.RegistrationService.Services.Implementation
             {
                 var property = new KeyValuePair<string, List<dynamic>>(key, requestResource.Properties[key]);
 
+                if (changeResourceType && (property.Key == Graph.Metadata.Constants.RDF.Type))
+                    continue;
                 _entityPropertyValidator.Validate(key, validationFacade);
 
                 await ValidateEndpoint(property, validationFacade);
@@ -113,6 +121,8 @@ namespace COLID.RegistrationService.Services.Implementation
             string validationResourceId = validationFacade.ResourceCrudAction == ResourceCrudAction.Create ? null : resourcesCTO.GetDraftOrPublishedVersion().Id;
             var duplicateResults = _identifierValidationService.CheckDuplicates(requestResource, validationResourceId, resourceRequestDTO.HasPreviousVersion);
 
+            if (changeResourceType)
+                duplicateResults = duplicateResults.ToList().FindAll(r => r.Path != Graph.Metadata.Constants.Resource.hasPID);
             // Check whether forbidden properties are contained in the entity.
             var forbiddenPropertiesResults = _validationService.CheckForbiddenProperties(requestResource);
 
@@ -120,6 +130,8 @@ namespace COLID.RegistrationService.Services.Implementation
             validationResult.Results = validationResult.Results.Concat(validationFacade.ValidationResults).Concat(duplicateResults).Concat(forbiddenPropertiesResults).OrderBy(t => t.ResultSeverity).ToList();
 
             var failed = ProcessFailed(validationResult, resourceCrudAction);
+            // dirty solution for changing resource type (see also above)
+            validationFacade.ResourceCrudAction = changeResourceType ? ResourceCrudAction.Update : validationFacade.ResourceCrudAction;
             if (failed)
             {
                 // Reset the lifecycle Status to the correct value
@@ -225,14 +237,8 @@ namespace COLID.RegistrationService.Services.Implementation
                     }
 
                     var entityRequest = new ResourceRequestDTO() { Properties = parsedValue.Properties };
-
                     var entitiesCTO = new ResourcesCTO() { Draft = repoEntity, Published = repoEntity };
-
-                    // There is an id for the endpoint, but a new id must be assigned to the endpoint if a draft is created from a published entry.
-                    // However, the process must be performed as an update to ensure that certain properties such as identifiers are inherited from the published entry. 
-                    var entityId = validationFacade.ResourcesCTO.HasPublishedAndNoDraft
-                        ? string.Empty
-                        : propertyValue.Id;
+                    var entityId = GetNestedEntityId(key, parsedValue, validationFacade.ResourcesCTO);
 
                     // The consumer group of the parent must be included in the process.
                     Tuple<ValidationResult, bool, EntityValidationFacade> subResult = await ValidateAndPreProcessResource(entityId, entityRequest, entitiesCTO, subEntityCrudAction, true, validationFacade.ConsumerGroup);
@@ -251,6 +257,25 @@ namespace COLID.RegistrationService.Services.Implementation
         private static string CreateNewResourceId()
         {
             return Graph.Metadata.Constants.Entity.IdPrefix + Guid.NewGuid().ToString();
+        }
+
+        /// <summary>
+        /// There is an id for the endpoint, but a new id must be assigned to the endpoint if a draft is created from a published entry.
+        /// However, the process must be performed as an update to ensure that certain properties such as identifiers are inherited from the published entry.
+        /// This does not apply to attachments.
+        /// </summary>
+        /// <param name="key">The property key of the sub entity.</param>
+        /// <param name="subEntity">The sub entity.</param>
+        /// <param name="mainResource">The resource, where the sub entity belongs to.</param>
+        /// <returns>The entity id of the nested entity. Empty, if the subproperty should be saved as a copy with a new id.</returns>
+        private string GetNestedEntityId(string key, Entity subEntity, ResourcesCTO mainResource)
+        {
+           /* if(key != Graph.Metadata.Constants.AttachmentConstants.HasAttachment && mainResource.HasPublishedAndNoDraft)
+            {
+                return string.Empty;
+            }*/
+
+            return subEntity.Id;
         }
     }
 }

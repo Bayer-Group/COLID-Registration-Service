@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using COLID.Common.Extensions;
+using COLID.Common.Utilities;
 using COLID.Exception.Models.Business;
 using VDS.RDF;
 using VDS.RDF.Query;
@@ -47,7 +48,8 @@ namespace COLID.Graph.Metadata.Repositories
             else
             {
                 _logger.LogInformation($"Got request for entity type {entityType} with config {configIdentifier}");
-                usedConfig = _metadataGraphConfigurationRepository.GetEntityById(configIdentifier);
+                var graphs = new HashSet<Uri> { new Uri(Constants.MetadataGraphConfiguration.Type) };
+                usedConfig = _metadataGraphConfigurationRepository.GetEntityById(configIdentifier, graphs);
             }
 
             SparqlParameterizedString queryString = new SparqlParameterizedString();
@@ -55,8 +57,6 @@ namespace COLID.Graph.Metadata.Repositories
             queryString.CommandText = @"
                 SELECT *
                 @fromMetadataNamedGraph
-                @fromMetdataShaclNamedGraph
-                @fromEnterpriseCoreOntologyNamedGraph
                 @fromConsumerGroupNamedGraph
                 WHERE
                 {
@@ -98,8 +98,6 @@ namespace COLID.Graph.Metadata.Repositories
                 }";
 
             queryString.SetPlainLiteral("fromMetadataNamedGraph", usedConfig.GetMetadataGraphs().JoinAsFromNamedGraphs());
-            queryString.SetPlainLiteral("fromMetdataShaclNamedGraph", usedConfig.GetShaclGraphs().JoinAsFromNamedGraphs());
-            queryString.SetPlainLiteral("fromEnterpriseCoreOntologyNamedGraph", usedConfig.GetEcoGraphs().JoinAsFromNamedGraphs());
             queryString.SetPlainLiteral("fromConsumerGroupNamedGraph", usedConfig.GetConsumerGroupGraphs().JoinAsFromNamedGraphs());
 
             queryString.SetUri("entityType", new Uri(entityType));
@@ -141,6 +139,38 @@ namespace COLID.Graph.Metadata.Repositories
             return metaDataPropertyList;
         }
 
+        public EntityTypeDto GetEntityType(Uri entityType)
+        {
+            Guard.IsValidUri(entityType);
+
+            SparqlParameterizedString queryString = new SparqlParameterizedString();
+
+            queryString.CommandText =
+                @"SELECT DISTINCT * 
+                      @fromMetadataNamedGraph
+                        WHERE {
+                          @entityType rdfs:subClassOf* ?subject .
+                          ?subject ?predicate ?object.
+                          FILTER(lang(str(?object)) IN (@language , """"))
+                          }";
+
+            queryString.SetPlainLiteral("fromMetadataNamedGraph", _metadataGraphConfigurationRepository.GetGraphs(Constants.MetadataGraphConfiguration.HasMetadataGraph).JoinAsFromNamedGraphs());
+            
+            queryString.SetLiteral("language", Constants.I18n.DefaultLanguage);
+            queryString.SetUri("entityType", entityType);
+
+            SparqlResultSet results = _tripleStoreRepository.QueryTripleStoreResultSet(queryString);
+
+            if (results.IsEmpty)
+            {
+                return null;
+            }
+
+            var entities = TransformQueryResults<EntityTypeDto>(results);
+
+            return entities.FirstOrDefault(t => t.Id == entityType.ToString());
+        }
+
         public EntityTypeDto GetEntityTypes(string firstEntityType)
         {
             if (!firstEntityType.IsValidBaseUri())
@@ -153,8 +183,6 @@ namespace COLID.Graph.Metadata.Repositories
             queryString.CommandText =
                 @"SELECT DISTINCT * 
                       @fromMetadataNamedGraph
-                      @fromMetadataShacledNamedGraph
-                      @fromEnterpriseCoreOntologyNamedGraph
                         WHERE {
                           ?subject rdfs:subClassOf* @value .
                           ?subject ?predicate ?object.
@@ -163,8 +191,6 @@ namespace COLID.Graph.Metadata.Repositories
                           } ORDER BY ?subject";
 
             queryString.SetPlainLiteral("fromMetadataNamedGraph", _metadataGraphConfigurationRepository.GetGraphs(Constants.MetadataGraphConfiguration.HasMetadataGraph).JoinAsFromNamedGraphs());
-            queryString.SetPlainLiteral("fromMetadataShacledNamedGraph", _metadataGraphConfigurationRepository.GetGraphs(Constants.MetadataGraphConfiguration.HasShaclConstraintsGraph).JoinAsFromNamedGraphs());
-            queryString.SetPlainLiteral("fromEnterpriseCoreOntologyNamedGraph", _metadataGraphConfigurationRepository.GetGraphs(Constants.MetadataGraphConfiguration.HasECOGraph).JoinAsFromNamedGraphs());
 
             queryString.SetLiteral("language", Constants.I18n.DefaultLanguage);
             queryString.SetUri("value", new Uri(firstEntityType));
@@ -215,15 +241,11 @@ namespace COLID.Graph.Metadata.Repositories
             queryString.CommandText =
                 @"SELECT *
                   @fromMetadataNamedGraph
-                  @fromMetdataShaclNamedGraph
-                  @fromEnterpriseCoreOntologyNamedGraph
                   WHERE {
                       @value rdfs:subClassOf* ?type.
                   }";
 
             queryString.SetPlainLiteral("fromMetadataNamedGraph", _metadataGraphConfigurationRepository.GetGraphs(Constants.MetadataGraphConfiguration.HasMetadataGraph).JoinAsFromNamedGraphs());
-            queryString.SetPlainLiteral("fromMetdataShaclNamedGraph", _metadataGraphConfigurationRepository.GetGraphs(Constants.MetadataGraphConfiguration.HasShaclConstraintsGraph).JoinAsFromNamedGraphs());
-            queryString.SetPlainLiteral("fromEnterpriseCoreOntologyNamedGraph", _metadataGraphConfigurationRepository.GetGraphs(Constants.MetadataGraphConfiguration.HasECOGraph).JoinAsFromNamedGraphs());
 
             queryString.SetUri("value", new Uri(firstEntityType));
 
@@ -251,16 +273,12 @@ namespace COLID.Graph.Metadata.Repositories
             queryString.CommandText =
                 @"SELECT *
                   @fromMetadataNamedGraph
-                  @fromMetdataShaclNamedGraph
-                  @fromEnterpriseCoreOntologyNamedGraph
                   WHERE {
                       ?type rdfs:subClassOf* @value.
                       Filter not exists { ?subClassOf rdfs:subClassOf ?type}
                   }";
 
             queryString.SetPlainLiteral("fromMetadataNamedGraph", _metadataGraphConfigurationRepository.GetGraphs(Constants.MetadataGraphConfiguration.HasMetadataGraph).JoinAsFromNamedGraphs());
-            queryString.SetPlainLiteral("fromMetdataShaclNamedGraph", _metadataGraphConfigurationRepository.GetGraphs(Constants.MetadataGraphConfiguration.HasShaclConstraintsGraph).JoinAsFromNamedGraphs());
-            queryString.SetPlainLiteral("fromEnterpriseCoreOntologyNamedGraph", _metadataGraphConfigurationRepository.GetGraphs(Constants.MetadataGraphConfiguration.HasECOGraph).JoinAsFromNamedGraphs());
 
             queryString.SetUri("value", new Uri(firstEntityType));
 
@@ -276,7 +294,7 @@ namespace COLID.Graph.Metadata.Repositories
             return resourceTypes;
         }
 
-        public IList<string> GetInstantiableEntityTypes(string firstEntityType)
+        public IList<EntityTypeDto> GetInstantiableEntityTypes(string firstEntityType)
         {
             if (!firstEntityType.IsValidBaseUri())
             {
@@ -287,27 +305,27 @@ namespace COLID.Graph.Metadata.Repositories
             {
                 CommandText =
                 @"SELECT DISTINCT *
-                      @fromMetadataNamedGraph
-                      @fromEnterpriseCoreOntologyNamedGraph
-                        WHERE {
-                          ?class rdfs:subClassOf* @firstEntityType .
-                          ?class @dashAbstract false.
-                          } ORDER BY ?class"
+                  @fromMetadataNamedGraph
+                  WHERE {
+                    ?subject rdfs:subClassOf* @firstEntityType .
+                    ?subject @dashAbstract false .
+                    ?subject ?predicate ?object .
+                    FILTER(lang(str(?object)) IN (@language , """")) .
+                  } ORDER BY ?subject"
             };
 
             queryString.SetPlainLiteral("fromMetadataNamedGraph", _metadataGraphConfigurationRepository.GetGraphs(Constants.MetadataGraphConfiguration.HasMetadataGraph).JoinAsFromNamedGraphs());
-            queryString.SetPlainLiteral("fromEnterpriseCoreOntologyNamedGraph", _metadataGraphConfigurationRepository.GetGraphs(Constants.MetadataGraphConfiguration.HasECOGraph).JoinAsFromNamedGraphs());
             queryString.SetUri("firstEntityType", new Uri(firstEntityType));
             queryString.SetUri("dashAbstract", new Uri(Constants.DASH.Abstract));
+            queryString.SetLiteral("language", Constants.I18n.DefaultLanguage);
 
             SparqlResultSet results = _tripleStoreRepository.QueryTripleStoreResultSet(queryString);
 
-            var types = results
-                .Select(r => r.GetNodeValuesFromSparqlResult("class")?.Value)
-                .Where(r => !string.IsNullOrWhiteSpace(r))
-                .ToList();
+            var entities = TransformQueryResults<EntityTypeDto>(results);
 
-            return types;
+
+
+            return entities;
         }
 
         private MetadataProperty CreateMetadataPropertyFromList(string pidUri, List<SparqlResult> sparqlResults, string configIdentifier)
@@ -327,8 +345,8 @@ namespace COLID.Graph.Metadata.Repositories
                 {
                     case Constants.TopBraid.EditWidget when shaclValue == Constants.TopBraid.NestedObjectEditor:
                         var nestedMetaDataType = GetDataFromNode(res, "nested").Value;
-                        var nestedTypes = GetEntityTypes(nestedMetaDataType);
-                        metadataProperty.NestedMetadata = nestedTypes.SubClasses.Select(r => new DataModels.Metadata.Metadata(r.Id, r.Label, r.Description, GetMetadataForEntityTypeInConfig(r.Id, configIdentifier))).ToList();
+                        var nestedTypes = GetInstantiableEntityTypes(nestedMetaDataType);
+                        metadataProperty.NestedMetadata = nestedTypes.Select(r => new DataModels.Metadata.Metadata(r.Id, r.Label, r.Description, GetMetadataForEntityTypeInConfig(r.Id, configIdentifier))).ToList();
                         break;
 
                     case Constants.Shacl.Path when shaclValue == Constants.RDF.Type:
@@ -366,15 +384,11 @@ namespace COLID.Graph.Metadata.Repositories
                 @"
                   CONSTRUCT
                   @fromMetadataNamedGraph
-                  @fromMetdataShaclNamedGraph
-                  @fromEnterpriseCoreOntologyNamedGraph
                   WHERE {
                       ?s ?o ?p
                   }";
 
             parameterizedString.SetPlainLiteral("fromMetadataNamedGraph", _metadataGraphConfigurationRepository.GetGraphs(Constants.MetadataGraphConfiguration.HasMetadataGraph).JoinAsFromNamedGraphs());
-            parameterizedString.SetPlainLiteral("fromMetdataShaclNamedGraph", _metadataGraphConfigurationRepository.GetGraphs(Constants.MetadataGraphConfiguration.HasShaclConstraintsGraph).JoinAsFromNamedGraphs());
-            parameterizedString.SetPlainLiteral("fromEnterpriseCoreOntologyNamedGraph", _metadataGraphConfigurationRepository.GetGraphs(Constants.MetadataGraphConfiguration.HasECOGraph).JoinAsFromNamedGraphs());
 
             //Get raw data from TripleStore
             return _tripleStoreRepository.QueryTripleStoreGraphResult(parameterizedString);
@@ -433,6 +447,36 @@ namespace COLID.Graph.Metadata.Repositories
             return results.Any() ? results.FirstOrDefault().GetNodeValuesFromSparqlResult("label")?.Value : string.Empty;
         }
 
+
+        public Dictionary<string, string> GetMetadatapropertyValuesById(string id)
+        {
+            if (!id.IsValidBaseUri())
+            {
+                throw new InvalidFormatException(Constants.Messages.Identifier.IncorrectIdentifierFormat, id);
+            }
+
+            var parameterizedString = new SparqlParameterizedString();
+            parameterizedString.CommandText =
+              @"SELECT ?p ?o
+                  @fromMetadataNamedGraph
+                  WHERE {
+                      @subject ?p ?o.
+                      FILTER (lang(?o) != 'de')
+                  }";
+
+            parameterizedString.SetPlainLiteral("fromMetadataNamedGraph", _metadataGraphConfigurationRepository.GetGraphs(Constants.MetadataGraphConfiguration.HasMetadataGraph).JoinAsFromNamedGraphs());
+            parameterizedString.SetUri("subject", new Uri(id));
+
+            var results = _tripleStoreRepository.QueryTripleStoreResultSet(parameterizedString);
+
+            var resultlist = results.GroupBy(result => result.GetNodeValuesFromSparqlResult("p").Value).ToList()
+             .ToDictionary(
+              y => y.Key,
+              y => y.FirstOrDefault().GetNodeValuesFromSparqlResult("o").Value);
+
+            return resultlist;
+        }
+
         /// <summary>
         /// IMPORTANT: It's neccesary to identify the colums with "id", "predicate" and "object" when you query the graph, so the fields can be transformed properly.
         /// </summary>
@@ -465,5 +509,125 @@ namespace COLID.Graph.Metadata.Repositories
             return res.GetNodeValuesFromSparqlResult("object").Value;
         }
 
+        public List<CategoryFilterDTO> GetCategoryFilter()
+        {
+            var parameterizedString = new SparqlParameterizedString();
+            parameterizedString.CommandText = @"SELECT *
+                  @fromMetadataNamedGraph
+                  WHERE {
+                     ?subject rdfs:label  ?categoryLabel. 
+                     ?subject rdfs:comment  ?categoryDescription. 
+                     ?subject @hasResourceTypes  ?resourceTypes. 
+                     ?subject @hasLastChangeUser  ?lastChangeUser.  }";
+
+            parameterizedString.SetUri("fromCategoryFilterGraph", new Uri(_metadataGraphConfigurationRepository.GetSingleGraph(Constants.MetadataGraphConfiguration.HasCategoryFilterGraph)));
+            parameterizedString.SetUri("subject", new Uri(Graph.Metadata.Constants.Entity.IdPrefix + Guid.NewGuid()));
+            parameterizedString.SetUri("hasResourceTypes", new Uri(COLID.Graph.Metadata.Constants.CategoryFilter.hasResourceTypes));
+            parameterizedString.SetUri("hasLastChangeUser", new Uri(COLID.Graph.Metadata.Constants.Resource.LastChangeUser));
+            
+
+            parameterizedString.SetPlainLiteral("fromMetadataNamedGraph", _metadataGraphConfigurationRepository.GetGraphs(Constants.MetadataGraphConfiguration.HasCategoryFilterGraph).JoinAsFromNamedGraphs());
+
+            var results = _tripleStoreRepository.QueryTripleStoreResultSet(parameterizedString);
+
+            var resultlist = results.GroupBy(result => result.GetNodeValuesFromSparqlResult("subject").Value).ToList().ToDictionary(y => y.Key, y => y.GroupBy(result => result.GetNodeValuesFromSparqlResult("resourceTypes").Value).ToList()).Select(x => new CategoryFilterDTO()
+            {
+
+                Name = x.Value.FirstOrDefault().ElementAt(0).GetNodeValuesFromSparqlResult("categoryLabel").Value,
+                Description = x.Value.FirstOrDefault().ElementAt(0).GetNodeValuesFromSparqlResult("categoryDescription").Value,
+                LastChangeUser = x.Value.FirstOrDefault().ElementAt(0).GetNodeValuesFromSparqlResult("lastChangeUser").Value,
+                ResourceTypes = x.Value.Select(y => y.Key).ToList(),
+            }).ToList();
+
+
+
+            return resultlist;
+        }
+
+        public List<CategoryFilterDTO> GetCategoryFilter(string categoryLabel)
+        {
+            var parameterizedString = new SparqlParameterizedString();
+            parameterizedString.CommandText = @"SELECT *
+                  @fromMetadataNamedGraph
+                  WHERE {
+                     ?subject rdfs:label  @categoryLabel. 
+                     ?subject rdfs:comment  ?categoryDescription. 
+                     ?subject @hasResourceTypes  ?resourceTypes. 
+                     ?subject @hasLastChangeUser  ?lastChangeUser.  }";
+
+            parameterizedString.SetUri("fromCategoryFilterGraph", new Uri(_metadataGraphConfigurationRepository.GetSingleGraph(Constants.MetadataGraphConfiguration.HasCategoryFilterGraph)));
+            parameterizedString.SetUri("subject", new Uri(Graph.Metadata.Constants.Entity.IdPrefix + Guid.NewGuid()));
+            parameterizedString.SetUri("hasResourceTypes", new Uri(COLID.Graph.Metadata.Constants.CategoryFilter.hasResourceTypes));
+            parameterizedString.SetUri("hasLastChangeUser", new Uri(COLID.Graph.Metadata.Constants.Resource.LastChangeUser));
+            parameterizedString.SetLiteral("categoryLabel", categoryLabel);
+
+
+            parameterizedString.SetPlainLiteral("fromMetadataNamedGraph", _metadataGraphConfigurationRepository.GetGraphs(Constants.MetadataGraphConfiguration.HasCategoryFilterGraph).JoinAsFromNamedGraphs());
+
+            var results = _tripleStoreRepository.QueryTripleStoreResultSet(parameterizedString);
+
+            var resultlist = results.GroupBy(result => result.GetNodeValuesFromSparqlResult("subject").Value).ToList().ToDictionary(y => y.Key, y => y.GroupBy(result => result.GetNodeValuesFromSparqlResult("resourceTypes").Value).ToList()).Select(x => new CategoryFilterDTO()
+            {
+
+                Name = categoryLabel,
+                Description = x.Value.FirstOrDefault().ElementAt(0).GetNodeValuesFromSparqlResult("categoryDescription").Value,
+                LastChangeUser = x.Value.FirstOrDefault().ElementAt(0).GetNodeValuesFromSparqlResult("lastChangeUser").Value,
+                ResourceTypes = x.Value.Select(y => y.Key).ToList(),
+            }).ToList();
+
+
+
+            return resultlist;
+        }
+
+        public void AddCategoryFilter(CategoryFilterDTO categoryFilterDto)
+        {
+            var parameterizedString = new SparqlParameterizedString();
+            parameterizedString.CommandText +=
+               @"
+                INSERT DATA {
+                    GRAPH @fromCategoryFilterGraph { 
+                        @subject rdfs:label  @categoryLabel. 
+                        @subject rdfs:comment  @categoryDescription. 
+                        @subject @hasResourceTypes  @resourceTypes. 
+                        @subject @hasLastChangeUser  @lastChangeUser. 
+                        
+                        }
+                }";
+
+            parameterizedString.SetUri("fromCategoryFilterGraph", new Uri(_metadataGraphConfigurationRepository.GetSingleGraph(Constants.MetadataGraphConfiguration.HasCategoryFilterGraph)));
+            parameterizedString.SetUri("subject", new Uri(Graph.Metadata.Constants.Entity.IdPrefix + Guid.NewGuid()));
+            parameterizedString.SetLiteral("categoryLabel", categoryFilterDto.Name);
+            parameterizedString.SetLiteral("categoryDescription", categoryFilterDto.ResourceTypes.JoinAsStringList());
+            parameterizedString.SetUri("hasResourceTypes", new Uri(COLID.Graph.Metadata.Constants.CategoryFilter.hasResourceTypes));
+            parameterizedString.SetPlainLiteral("resourceTypes", categoryFilterDto.ResourceTypes.JoinAsLiteralList());
+            parameterizedString.SetUri("hasLastChangeUser", new Uri(COLID.Graph.Metadata.Constants.Resource.LastChangeUser));
+            parameterizedString.SetLiteral("lastChangeUser", categoryFilterDto.LastChangeUser);
+
+            _tripleStoreRepository.UpdateTripleStore(parameterizedString);
+
+            
+            
+        }
+
+        public void DeleteCategoryFilter(string categoryFilterName)
+        {
+
+            var deleteQuery = new SparqlParameterizedString
+            {
+                CommandText = @"
+                    WITH @fromCategoryFilterGraph
+                    DELETE { ?subject ?predicate ?object } 
+                    WHERE { ?subject rdfs:label  @categoryLabel.
+                            ?subject ?predicate ?object };
+                "
+            };
+
+            deleteQuery.SetUri("fromCategoryFilterGraph", new Uri(_metadataGraphConfigurationRepository.GetSingleGraph(Constants.MetadataGraphConfiguration.HasCategoryFilterGraph)));
+            deleteQuery.SetLiteral("categoryLabel", categoryFilterName);
+
+            _tripleStoreRepository.UpdateTripleStore(deleteQuery);
+
+        }
     }
 }

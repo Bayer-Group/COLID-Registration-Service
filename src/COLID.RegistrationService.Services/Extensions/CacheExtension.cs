@@ -19,20 +19,30 @@ namespace COLID.RegistrationService.Services.Extensions
         public static void DeleteRelatedCacheEntries<TService, TEntityType>(this ICacheService cache, string identifier) where TEntityType : EntityBase
         {
             Guard.ArgumentNotNullOrWhiteSpace(identifier, nameof(identifier));
-            cache.Delete("*", $"*{identifier}*", false);
+            cache.Delete("*", $"{identifier}*", true);
 
             cache.DeleteRelatedCacheEntries<TService, TEntityType>();
         }
 
-
         public static void DeleteRelatedCacheEntries<TService, TEntityType>(this ICacheService cache) where TEntityType : EntityBase
         {
             // delete cache for current class
-            cache.Delete(nameof(TService), "*");
+            cache.Delete(typeof(TService).Name, "*");
 
             // delete taxonomy and entity (entity service) cache entries
             string entityType = typeof(TEntityType).GetAttributeValue((TypeAttribute type) => type.Type);
-            cache.Delete("*", $"*{entityType}*", false);
+            
+           cache.DeleteRelatedCacheEntries<TService>(entityType);
+        }
+
+        public static void DeleteRelatedCacheEntries<TService>(this ICacheService cache, string entityType)
+        {
+            Guard.ArgumentNotNullOrWhiteSpace(entityType, nameof(entityType));
+
+            // delete cache for current class
+            //cache.Delete(nameof(TService), "*");
+
+            cache.Delete("*", $"{entityType}*", true);
         }
     }
 }

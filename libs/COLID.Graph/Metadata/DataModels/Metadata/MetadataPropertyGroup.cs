@@ -19,5 +19,16 @@
             EditDescription = editDescription;
             ViewDescription = viewDescription;
         }
+
+        public string GetValue(string key)
+        {
+            if(key.ToUpper() == "KEY")
+            {
+                return Key;
+
+            }
+            return null;
+        }
+
     }
 }

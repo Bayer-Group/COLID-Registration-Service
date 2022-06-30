@@ -12,21 +12,24 @@ using VDS.RDF;
 using COLID.Common.Extensions;
 using System;
 using COLID.Common.Utilities;
+using COLID.Exception.Models;
+using COLID.Exception.Models.Business;
 using COLID.Graph.Metadata.DataModels.Metadata.Comparison;
-using Newtonsoft.Json;
-
+using Entity = COLID.Graph.TripleStore.DataModels.Base.Entity;
 namespace COLID.Graph.Metadata.Services
 {
     public class MetadataService : IMetadataService
     {
         private readonly IMetadataRepository _metadataRepository;
         private readonly ICacheService _cacheService;
+        private readonly IMetadataGraphConfigurationRepository _metadataGraphConfigurationRepository;
 
 
-        public MetadataService(IMetadataRepository metadataRepository, ICacheService cacheService)
+        public MetadataService(IMetadataRepository metadataRepository, ICacheService cacheService, IMetadataGraphConfigurationRepository metadataGraphConfigurationRepository)
         {
             _metadataRepository = metadataRepository;
             _cacheService = cacheService;
+            _metadataGraphConfigurationRepository = metadataGraphConfigurationRepository;
         }
 
         public IGraph GetAllShaclAsGraph()
@@ -81,6 +84,12 @@ namespace COLID.Graph.Metadata.Services
             return label;
         }
 
+        public Dictionary<string, string> GetMetadatapropertyValuesById(string id)
+        {
+
+            return _cacheService.GetOrAdd($"value:{id}", () => _metadataRepository.GetMetadatapropertyValuesById(id));
+        }
+
         public IList<MetadataProperty> GetMetadataForEntityType(string entityType)
         {
             // Will be cached in GetMetadataForEntityTypeInConfig
@@ -122,7 +131,7 @@ namespace COLID.Graph.Metadata.Services
 
             var mergedMetadata = new Dictionary<string, MetadataComparisonProperty>();
 
-            foreach(var configTypes in metadataComparisonConfigTypes)
+            foreach (var configTypes in metadataComparisonConfigTypes)
             {
                 foreach (var entityType in configTypes.EntityTypes)
                 {
@@ -208,10 +217,12 @@ namespace COLID.Graph.Metadata.Services
             var orderedMetadata = metadataProperties
                 .OrderBy(f => f.GetMetadataPropertyGroup() == null)
                 .ThenBy(r => r.GetMetadataPropertyGroup()?.Order)
-                .ThenBy(t => t.Properties.GetValueOrNull(Shacl.Order, true)).ToList();
+                .ThenBy(t => decimal.TryParse(t.Properties.GetValueOrNull(Shacl.Order, true), out decimal order) ? order : 999).ToList();
 
             return orderedMetadata;
         }
+
+
 
         /// <summary>
         /// Orders the metadata comparison properties by their group and own order number
@@ -229,6 +240,160 @@ namespace COLID.Graph.Metadata.Services
             return orderedMetadata;
         }
 
+        #region Instance Graph
+
+        public Uri GetInstanceGraph(string entityType)
+        {            
+            var cacheInstanceGraph = $"InstanceGraph:{entityType}";
+            Uri instanceGraph = _cacheService.GetOrAdd(cacheInstanceGraph,
+                () =>
+                {
+                    return GetGraphByType(entityType);
+                });
+            
+            return instanceGraph;
+        }
+
+        private Uri GetGraphByType(string entityType)
+        {
+            try
+            {
+                var graph = GetInstanceGraphByMetadata(entityType);
+                return graph;
+            }
+            catch (BusinessException)
+            {
+                switch (entityType)
+                {
+                    case ConsumerGroup.Type:
+                        return GetInstanceGraphByConfig(MetadataGraphConfiguration.HasConsumerGroupGraph);
+                    case PidUriTemplate.Type:
+                        return GetInstanceGraphByConfig(MetadataGraphConfiguration.HasPidUriTemplatesGraph);
+                    case ExtendedUriTemplate.Type:
+                        return GetInstanceGraphByConfig(MetadataGraphConfiguration.HasExtendedUriTemplateGraph);
+                    case Keyword.Type:
+                        return GetInstanceGraphByConfig(MetadataGraphConfiguration.HasKeywordsGraph);
+                    case PIDO.PidConcept:
+                        return GetInstanceGraphByConfig(MetadataGraphConfiguration.HasResourcesGraph);
+                    case "draft":
+                        return GetInstanceGraphByConfig(MetadataGraphConfiguration.HasResourcesDraftGraph); //resource named graph mit <https://pid.bayer.com/resource/4.0/Draft>
+                    case "linkHistory":
+                        return GetInstanceGraphByConfig(MetadataGraphConfiguration.HasLinkHistoryGraph); //resource named graph mit <https://pid.bayer.com/resource/4.0/Draft>
+                    case MetadataGraphConfiguration.Type:
+                        return new Uri(MetadataGraphConfiguration.Type);
+                    default:
+                        throw new BusinessException($"Instance graph for type {entityType} is not stored in the system and must be stored in the metadata or metadata config. ");
+                }
+            }
+        }
+
+        public Uri GetHistoricInstanceGraph()
+        {
+            return GetInstanceGraphByConfig(MetadataGraphConfiguration.HasResourceHistoryGraph);
+        }
+
+        private Uri GetInstanceGraphByMetadata(string entityType)
+        {
+            var entityTypeClass = GetEntityType(entityType);
+            var graphs = GetAllGraph();
+
+            string instanceGraph = entityTypeClass?.Properties?.GetValueOrNull(PIDO.Shacl.InstanceGraph, true);
+
+            // TODO:  In the future all graphs will be taken from ontology.
+            if (string.IsNullOrWhiteSpace(instanceGraph) || graphs.All(t => t.ToString() != instanceGraph))
+            {
+                throw new BusinessException($"Instance graph for type {entityType} is not stored in metadata config. ");
+            }
+
+            return new Uri(instanceGraph);
+        }
+
+        private Uri GetInstanceGraphByConfig(string configEntityType)
+        {
+            var cacheInstanceGraphByConfig = $"InstanceGraphByConfig:{configEntityType}";
+            Uri InstanceGraphByConfig = _cacheService.GetOrAdd(cacheInstanceGraphByConfig,
+                () =>
+                {
+                    var graph = _metadataGraphConfigurationRepository.GetSingleGraph(configEntityType);
+                    return new Uri(graph);
+                });
+
+            return InstanceGraphByConfig;
+
+            
+        }
+
+        public ISet<Uri> GetMultiInstanceGraph(string entityType)
+        {
+            try
+            {
+                var graph = GetInstanceGraph(entityType);
+                return new HashSet<Uri> { graph };
+            }
+            catch (BusinessException)
+            {
+                return GetAllGraph();
+            }
+        }
+
+        public ISet<Uri> GetAllGraph()
+        {
+            var graphs = _metadataGraphConfigurationRepository.GetGraphs(MetadataGraphConfiguration.Graphs);
+            graphs.Add(new Uri(MetadataGraphConfiguration.Type));
+            return graphs;
+        }
+
+        /// <summary>
+        /// Returns all graphs that are stored in the metadata configuration which is applicable to the published resources
+        /// </summary>
+        /// <returns></returns>
+        public ISet<Uri> GetGraphForPublishedResource()
+        {
+            var graphs = MetadataGraphConfiguration.Graphs;
+            graphs.Remove(MetadataGraphConfiguration.HasResourcesDraftGraph);
+            graphs.Remove(MetadataGraphConfiguration.HasResourcesGraph);
+            graphs.Remove(MetadataGraphConfiguration.HasLinkHistoryGraph);
+            graphs.Remove(MetadataGraphConfiguration.HasResourceHistoryGraph);
+
+            var final_graphs = _metadataGraphConfigurationRepository.GetGraphs(graphs);
+            final_graphs.Add(new Uri(MetadataGraphConfiguration.Type));
+            return final_graphs;
+        }
+
+        public ISet<Uri> GetMetadataGraphs()
+        {
+            var graphs = _metadataGraphConfigurationRepository.GetGraphs(MetadataGraphConfiguration.HasMetadataGraph);
+            graphs.Add(new Uri(MetadataGraphConfiguration.Type));
+            return graphs;
+        }
+
+        #endregion
+
+        private Entity GetEntityType(string entityType)
+        {
+            Guard.ArgumentNotNullOrWhiteSpace(entityType, nameof(entityType));
+
+            if (!Uri.TryCreate(entityType, UriKind.Absolute, out Uri entityTypeUri))
+            {
+                throw new BusinessException($"Entity type {entityType} is not a valid uri");
+            }
+
+            var cachePrefixEntityType = $"class:entityType:{entityType}";
+            var entityTypeClass = _cacheService.GetOrAdd(cachePrefixEntityType, () =>
+            {
+                var entity = _metadataRepository.GetEntityType(entityTypeUri);
+
+                if (entity == null)
+                {
+                    throw new EntityNotFoundException($"Entity class for type {entityType} were not found. ");
+                }
+
+                return entity;
+            });
+
+            return entityTypeClass;
+        }
+
         public EntityTypeDto GetResourceTypeHierarchy(string firstEntityType)
         {
             var resourceType = string.IsNullOrWhiteSpace(firstEntityType) ? Resource.Type.FirstResouceType : firstEntityType;
@@ -242,6 +407,77 @@ namespace COLID.Graph.Metadata.Services
             });
 
             return resourceTypeHierarchy;
+        }
+        
+        public IList<ResourceHierarchyDTO> GetResourceTypeHierarchyDmp(string firstEntityType)
+        {
+            var resourceType = string.IsNullOrWhiteSpace(firstEntityType) ? Resource.Type.FirstResouceType : firstEntityType;
+
+            var cachePrefixHierarchy = $"hierarchy:{resourceType}";
+            var resourceTypeHierarchy = _cacheService.GetOrAdd(cachePrefixHierarchy, () =>
+            {
+                var entityType = _metadataRepository.GetEntityTypes(resourceType);
+                FilterEntityType(entityType);
+                return entityType;
+            });
+
+            List<ResourceHierarchyDTO> hierarchyList = new List<ResourceHierarchyDTO>();
+
+            foreach (var entity in resourceTypeHierarchy.SubClasses)
+            {
+                var typeClass = CreateTypeHierarchyList(entity, 1);
+                hierarchyList.Add(typeClass);
+            }
+
+            var categories = this.GetCategoryFilterDmp();
+
+            hierarchyList.AddRange(categories);
+
+            return hierarchyList;
+        }
+
+        private ResourceHierarchyDTO CreateTypeHierarchyList(EntityTypeDto resourceTypeHierarchy, int level)
+        {
+            List<ResourceHierarchyDTO> hierarchyList = new List<ResourceHierarchyDTO>();
+
+            
+            if (!resourceTypeHierarchy.SubClasses.IsNullOrEmpty())
+            {
+                var parent = new ResourceHierarchyDTO()
+                {
+                    HasChild = true,
+                    Level = level,
+                    IsCategory = false,
+                    Instantiable = false,
+                    Name = resourceTypeHierarchy.Label
+                };
+
+                foreach (var res in resourceTypeHierarchy.SubClasses)
+                {
+                    var child = CreateTypeHierarchyList(res, level + 1);
+                    child.HasParent = true;
+                    child.Id = child.Name + "#" + parent.Name;
+                    child.ParentName = parent.Name;
+                    child.IsCategory = false;
+                    hierarchyList.Add(child);
+                }
+
+                parent.Children = hierarchyList;
+                return parent;
+
+            }
+            else
+            {
+                return new ResourceHierarchyDTO()
+                {
+                    Children = new List<ResourceHierarchyDTO>(),
+                    HasChild = false,
+                    Level = level,
+                    IsCategory=false,
+                    Instantiable = true,
+                    Name = resourceTypeHierarchy.Label
+                };
+            }
         }
 
         /// <summary>
@@ -279,8 +515,89 @@ namespace COLID.Graph.Metadata.Services
         {
             var cachePrefixResourceTypes = $"instantiableResourceTypes:{firstEntityType}";
             var instantiableResourceTypes = _cacheService.GetOrAdd(cachePrefixResourceTypes,
-                () => _metadataRepository.GetInstantiableEntityTypes(firstEntityType));
+                () => _metadataRepository.GetInstantiableEntityTypes(firstEntityType))
+                .Select(m => m.Id).ToList();
             return instantiableResourceTypes;
+        }
+
+        public List<Entity> GetLinkedEntityTypes(List<Entity> entityType)
+        {
+            foreach (var item in entityType)
+            {
+                var linkRangesResources = GetInstantiableEntityTypes(item.Properties["range"].FirstOrDefault());
+                item.Properties["range"] = new List<dynamic>() { linkRangesResources };
+
+            }
+            return entityType;
+        }
+
+        public IList<CategoryFilterDTO> GetCategoryFilter()
+        {
+            List<CategoryFilterDTO> result = _metadataRepository.GetCategoryFilter();
+            return result;
+
+        }
+        public IList<CategoryFilterDTO> GetCategoryFilter(string categoryName)
+        {
+            List<CategoryFilterDTO> result = _metadataRepository.GetCategoryFilter(categoryName);
+            return result;
+        }
+        public IList<ResourceHierarchyDTO> GetCategoryFilterDmp()
+        {
+            var categoryList = new List<ResourceHierarchyDTO>();
+            var resourceList = GetCategoryFilter();
+
+            resourceList.ToList().ForEach(x =>
+            {
+                var hierarchyObject = new ResourceHierarchyDTO()
+                {
+                    Level = 0,
+                    HasChild = true,
+                    HasParent = false,
+                    IsCategory=true,
+                    Description = x.Description,
+                    Instantiable = false,
+                    Name = x.Name,
+                };
+
+                x.ResourceTypes.ToList().ForEach(child =>
+                {
+                    hierarchyObject.addChild(new ResourceHierarchyDTO()
+                    {
+                        Level = 1,
+                        HasChild = false,
+                        HasParent = true,
+                        IsCategory = true,
+                        Id = child + "#" + x.Name,
+                        Instantiable = true,
+                        Name = child
+                    });
+
+                });
+
+                categoryList.Add(hierarchyObject);
+            });
+
+            return categoryList;
+
+        }
+
+        public void CreateOrUpdateCategoryFilter(CategoryFilterDTO CategoryFilterDTO)
+        {
+           // CategoryFilterDTO.ResourceTypes.ToList().ForEach(x => Guard.IsValidUri(new Uri(x)));
+
+            bool categoryExists = ! GetCategoryFilter(CategoryFilterDTO.Name).IsNullOrEmpty();
+
+            if (categoryExists)
+            {
+                throw new BusinessException($"Category already exist");
+            }
+            _metadataRepository.AddCategoryFilter(CategoryFilterDTO);
+        }
+
+        public void DeleteCategoryFilter(string categoryName)
+        {
+            _metadataRepository.DeleteCategoryFilter(categoryName);
         }
     }
 }

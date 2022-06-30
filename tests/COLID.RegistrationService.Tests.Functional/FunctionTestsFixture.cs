@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using COLID.AWS;
 using COLID.MessageQueue.Services;
 using COLID.RegistrationService.Repositories;
 using COLID.RegistrationService.Services.Interface;
@@ -17,11 +18,17 @@ using COLID.RegistrationService.Common.DataModel.Resources;
 using Moq;
 using COLID.RegistrationService.Services;
 using COLID.Graph.Metadata.DataModels.Resources;
+using Microsoft.Extensions.Hosting;
 
 namespace COLID.RegistrationService.Tests.Functional
 {
     public class FunctionTestsFixture : WebApplicationFactory<Startup>
     {
+        protected override IHostBuilder CreateHostBuilder()
+        {
+            return Host.CreateDefaultBuilder().ConfigureWebHostDefaults(builder =>
+            builder.UseStartup<Startup>());
+        }
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Testing");
@@ -48,13 +55,13 @@ namespace COLID.RegistrationService.Tests.Functional
                 });
 
                 services.RemoveAll(typeof(IRemoteAppDataService));
-                services.AddTransient<IRemoteAppDataService>(provider =>
+                services.AddTransient(provider =>
                 {
                     var remoteAppDataMock = new Mock<IRemoteAppDataService>();
                     var validPersons = new List<string> { "superadmin@bayer.com", "christian.kaubisch.ext@bayer.com", "anonymous@anonymous.com" };
 
-                    remoteAppDataMock.Setup(mock => mock.CheckPerson(It.IsIn<string>(validPersons))).Returns(Task.FromResult(true));
-                    remoteAppDataMock.Setup(mock => mock.CheckPerson(It.IsNotIn<string>(validPersons))).Returns(Task.FromResult(false));
+                    remoteAppDataMock.Setup(mock => mock.CheckPerson(It.IsIn<string>(validPersons))).Returns(It.IsAny<bool>());
+                    remoteAppDataMock.Setup(mock => mock.CheckPerson(It.IsNotIn<string>(validPersons))).Returns(It.IsAny<bool>());
                     remoteAppDataMock.Setup(t => t.CreateConsumerGroup(It.IsAny<Uri>()));
                     remoteAppDataMock.Setup(t => t.DeleteConsumerGroup(It.IsAny<Uri>()));
                     remoteAppDataMock.Setup(t => t.NotifyResourcePublished(It.IsAny<Resource>()));
@@ -63,16 +70,10 @@ namespace COLID.RegistrationService.Tests.Functional
                 });
 
                 services.RemoveAll(typeof(IMessageQueueService));
-                services.AddTransient<IMessageQueueService>(provider =>
-                {
-                    return new Mock<IMessageQueueService>().Object;
-                });
+                services.AddTransient(provider => new Mock<IMessageQueueService>().Object);
 
                 services.RemoveAll(typeof(IReindexingService));
-                services.AddTransient<IReindexingService>(provider =>
-                {
-                    return new Mock<IReindexingService>().Object;
-                });
+                services.AddTransient(provider => new Mock<IReindexingService>().Object);
             });
         }
     }

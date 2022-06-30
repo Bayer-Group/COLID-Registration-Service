@@ -5,6 +5,7 @@ namespace COLID.MessageQueue.Configuration
     public class ColidMessageQueueOptions
     {
         public bool Enabled { get; set; }
+        public bool UseSsl { get; set; }
         public string HostName { get; set; }
         public string Username { get; set; }
         public string Password { get; set; }

@@ -3,26 +3,30 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using COLID.Common.Extensions;
+using COLID.Graph.Metadata.Constants;
 using COLID.RegistrationService.Common.DataModel.PidUriTemplates;
 using COLID.RegistrationService.Repositories.Interface;
 using COLID.RegistrationService.Services.Extensions;
 using COLID.RegistrationService.Services.Interface;
-using COLID.Graph.TripleStore.DataModels.Base;
 using COLID.Graph.TripleStore.Extensions;
 using COLID.Graph.Metadata.Extensions;
+using COLID.Graph.Metadata.Services;
+using Entity = COLID.Graph.TripleStore.DataModels.Base.Entity;
 
 namespace COLID.RegistrationService.Services.Implementation
 {
     internal class PidUriGenerationService : IPidUriGenerationService
     {
         private readonly IPidUriTemplateRepository _pidUriTemplateRepository;
+        private readonly IMetadataService _metadataService;
 
         public IList<string> GeneratedIdentifier { get; }
 
-        public PidUriGenerationService(IPidUriTemplateRepository pidUriTemplateRepository)
+        public PidUriGenerationService(IPidUriTemplateRepository pidUriTemplateRepository, IMetadataService metataService)
         {
             _pidUriTemplateRepository = pidUriTemplateRepository;
             GeneratedIdentifier = new List<string>();
+            _metadataService = metataService;
         }
 
         public string GenerateIdentifierFromTemplate(PidUriTemplateFlattened pidUriTemplateFlat, Entity resource)
@@ -97,7 +101,7 @@ namespace COLID.RegistrationService.Services.Implementation
         {
             var matchingPidUris = new List<string>();
 
-            var activePidUris = _pidUriTemplateRepository.GetMatchingPidUris(regexForExistingPidUris);
+            var activePidUris = _pidUriTemplateRepository.GetMatchingPidUris(regexForExistingPidUris, _metadataService.GetInstanceGraph(COLID.Graph.Metadata.Constants.PIDO.PidConcept), _metadataService.GetInstanceGraph("draft"));
             matchingPidUris.AddRange(activePidUris);
 
             Entity resourcePidUri = resource.Properties.GetValueOrNull(Graph.Metadata.Constants.EnterpriseCore.PidUri, true);

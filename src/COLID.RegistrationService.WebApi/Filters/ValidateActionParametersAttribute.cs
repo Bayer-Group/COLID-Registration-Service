@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using COLID.Common.DataModel.Attributes;
@@ -12,10 +13,9 @@ namespace COLID.RegistrationService.WebApi.Filters
     public class ValidateActionParametersAttribute : ActionFilterAttribute
     {
         /// <inheritdoc />
-        public override void OnActionExecuting(ActionExecutingContext context)
+       public override void OnActionExecuting(ActionExecutingContext context)
         {
             var descriptor = context.ActionDescriptor as ControllerActionDescriptor;
-
             if (descriptor != null)
             {
                 var parameters = descriptor.MethodInfo.GetParameters();
@@ -32,7 +32,7 @@ namespace COLID.RegistrationService.WebApi.Filters
             {
                 throw new RequestException(Messages.Request.Invalid);
             }
-
+            
             var missingParamter = new List<string>();
 
             foreach (var parameter in parameters)
@@ -48,5 +48,7 @@ namespace COLID.RegistrationService.WebApi.Filters
                 throw new MissingParameterException(Messages.Request.MissingParameter, missingParamter);
             }
         }
+
+       
     }
 }

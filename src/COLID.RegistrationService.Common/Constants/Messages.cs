@@ -1,7 +1,18 @@
-namespace COLID.RegistrationService.Common.Constants
+﻿namespace COLID.RegistrationService.Common.Constants
 {
     public static class Messages
     {
+        public static class Attachment
+        {
+            public const string Conflict = "The attachment cannot be deleted because it is attached to undeletable resources.";
+            public const string NotExists = "Please make sure that all selected files have already been uploaded before saving the resource.";
+        }
+
+        public static class Attribute
+        {
+            public const string NotExists = "The given attribute does not exist in the database";
+        }
+
         public static class Exception
         {
             public const string ForbiddenEntityType = "The given entity type is not allowed.";

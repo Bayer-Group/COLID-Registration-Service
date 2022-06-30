@@ -1,23 +1,16 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
 using System.Net.Mime;
-using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using COLID.Common.DataModel.Attributes;
+using COLID.Graph.Utils;
+using COLID.Identity.Requirements;
 using COLID.RegistrationService.Services.Interface;
 using COLID.RegistrationService.WebApi.Filters;
 using COLID.StatisticsLog.Type;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using System.Threading.Tasks;
-using Amazon;
-using Amazon.S3;
-using COLID.Identity.Requirements;
-using COLID.Graph.Metadata.Services;
-using COLID.Graph.Metadata.DataModels.MetadataGraphConfiguration;
-using System;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 
 namespace COLID.RegistrationService.WebApi.Controllers.V3
 {
@@ -32,6 +25,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
     public class GraphManagementController : Controller
     {
         private readonly IGraphManagementService _graphService;
+        private const string _mimetypeOctetStream = "application/octet-stream";
 
         /// <summary>
         /// API endpoint for graph management.
@@ -50,14 +44,15 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         /// <response code="404">If no metadata graph configuration exists</response>
         /// <response code="500">If an unexpected error occurs</response>
         [HttpGet]
-        public IActionResult GetGraphs()
+        public IActionResult GetGraphs([NotRequiredAttribute] bool includeRevisionGraphs = false)
         {
-            var graphs = _graphService.GetGraphs();
+         
+            var graphs = _graphService.GetGraphs(includeRevisionGraphs);
             return Ok(graphs);
         }
 
         /// <summary>
-        /// Deletes a graph unless it is used by the system. 
+        /// Deletes a graph unless it is used by the system.
         /// </summary>
         /// <response code="200">If the graph was successfully deleted.</response>
         /// <response code="400">If graph is used by the system or some other business exceptions occurs</response>
@@ -95,10 +90,21 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         [HttpGet]
         [Route("{loadId}")]
         public async Task<IActionResult> GetGraphUploadStatus(Guid loadId)
-        {   
+        {
             var status = await _graphService.GetGraphImportStatus(loadId);
             return Ok(status);
         }
 
+        /// <summary>
+        /// Download the graph with the specified graph name in turtlefile format.
+        /// </summary>
+        [HttpGet("download")]
+        public async Task<IActionResult> DownloadGraph([FromQuery] Uri graph)
+        {
+            var stream = await _graphService.DownloadGraph(graph);
+            var file = File(stream, _mimetypeOctetStream, GraphUtils.GetFileName(graph));
+            
+            return file;
+        }
     }
 }

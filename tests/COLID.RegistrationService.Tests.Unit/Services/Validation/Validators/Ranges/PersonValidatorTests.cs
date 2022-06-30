@@ -6,6 +6,7 @@ using COLID.Graph.Metadata.DataModels.Metadata;
 using COLID.Graph.Metadata.DataModels.Resources;
 using COLID.Graph.Metadata.DataModels.Validation;
 using COLID.Graph.Tests.Builder;
+using COLID.Graph.TripleStore.DataModels.Resources;
 using COLID.RegistrationService.Services.Interface;
 using COLID.RegistrationService.Services.Validation.Models;
 using COLID.RegistrationService.Services.Validation.Validators.Ranges;
@@ -33,16 +34,38 @@ namespace COLID.RegistrationService.Tests.Unit.Services.Validation.Validators.Ra
 
         private void SetupRemoteAppDataService(bool exists)
         {
-            _remoteAppDataService.Setup(ex => ex.CheckPerson(It.IsAny<string>())).Returns(Task.FromResult(exists));
+            _remoteAppDataService.Setup(ex => ex.CheckPerson(It.IsAny<string>())).Returns(It.IsAny<bool>());
         }
 
         [Theory]
-        [InlineData(null)]
         [InlineData("")]
         [InlineData("invalid-text")]
         [InlineData("invalid-text-with-!§$%&")]
         [InlineData("peter.russel@bayer.com")]
         public void InternalHasValidationResult_CustomIdentifier_Successfully(string author)
+        {
+            // Arrange
+            var resource = CreateResource(author);
+
+            SetupRemoteAppDataService(true);
+
+            EntityValidationFacade validationFacade = new EntityValidationFacade(ResourceCrudAction.Create, resource, null, null, _metadata, null);
+
+            // Act
+            _validator.HasValidationResult(validationFacade, GetAuthorProperty(resource));
+
+            // Assert
+            Assert.Contains(Graph.Metadata.Constants.Resource.Author, validationFacade.RequestResource.Properties);
+            Assert.Equal(1, validationFacade.ValidationResults.Count);
+
+            string currentAuthor = validationFacade.RequestResource.Properties.SingleOrDefault(p => p.Key == Graph.Metadata.Constants.Resource.Author).Value[0];
+
+            Assert.Equal(author, currentAuthor);
+        }
+
+        [Theory]
+        [InlineData(null)]
+        public void InternalHasValidationResult_Null_Successfully(string author)
         {
             // Arrange
             var resource = CreateResource(author);

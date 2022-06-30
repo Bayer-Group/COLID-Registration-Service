@@ -17,7 +17,7 @@ namespace COLID.RegistrationService.Services.Validation.Validators.Keys
                 var propertyString = property as string;
 
                 // Target URI must we wellformed, else error
-                if (!Uri.IsWellFormedUriString(propertyString, UriKind.Absolute))
+                if (!Uri.TryCreate(propertyString, UriKind.Absolute, out _))
                 {
                     validationFacade.ValidationResults.Add(new ValidationResultProperty(validationFacade.RequestResource.Id, properties.Key, propertyString, Common.Constants.Messages.TargetUri.NotWellformedUri, ValidationResultSeverity.Warning));
                 }

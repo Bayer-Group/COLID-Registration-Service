@@ -34,18 +34,18 @@ namespace COLID.RegistrationService.WebApi.Controllers.V2
     {
         private readonly IResourceService _resourceService;
         private readonly IResourceLinkingService _resourceLinkingService;
-        private readonly IHistoricResourceService _historicResourceService;
+        //private readonly IHistoricResourceService _historicResourceService;
 
         /// <summary>
         /// API endpoint for resources.
         /// </summary>
         /// <param name="resourceService">The service for resources</param>
         /// <param name="resourceLinkingService">The service for linking two resources as versions together</param>
-        public ResourceController(IResourceService resourceService, IResourceLinkingService resourceLinkingService, IHistoricResourceService historicResourceService)
+        public ResourceController(IResourceService resourceService, IResourceLinkingService resourceLinkingService )//, IHistoricResourceService historicResourceService)
         {
             _resourceService = resourceService;
             _resourceLinkingService = resourceLinkingService;
-            _historicResourceService = historicResourceService;
+            //_historicResourceService = historicResourceService;
         }
 
         /// <summary>
@@ -221,9 +221,9 @@ namespace COLID.RegistrationService.WebApi.Controllers.V2
         [ValidateActionParameters]
         [Authorize(Policy = nameof(ResourceRequirement))]
         [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
-        public IActionResult DeleteResourceAsync([FromQuery] Uri pidUri)
+        public async  Task<IActionResult> DeleteResourceAsync([FromQuery] Uri pidUri, string requester)
         {
-            var result = _resourceService.DeleteResource(pidUri);
+            var result = await _resourceService.DeleteResource(pidUri, requester);
 
             return Ok(result);
         }
@@ -339,42 +339,42 @@ namespace COLID.RegistrationService.WebApi.Controllers.V2
 
         #region Historic Resources
 
-        /// <summary>
-        /// Determine all historic entries, identified by the given pidUri, and returns overview information of them.
-        /// </summary>
-        /// <param name="pidUri">the resource to search for</param>
-        /// <returns>a list of resource-information related to the pidUri</returns>
-        [MapToApiVersion(Constants.API.Version.V2)]
-        [HttpGet]
-        [ValidateActionParameters]
-        [Route("historyList")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
-        public IActionResult GetHistoricOverviewList([FromQuery] string pidUri)
-        {
-            var result = _historicResourceService.GetHistoricOverviewByPidUri(pidUri);
+        ///// <summary>
+        ///// Determine all historic entries, identified by the given pidUri, and returns overview information of them.
+        ///// </summary>
+        ///// <param name="pidUri">the resource to search for</param>
+        ///// <returns>a list of resource-information related to the pidUri</returns>
+        //[MapToApiVersion(Constants.API.Version.V2)]
+        //[HttpGet]
+        //[ValidateActionParameters]
+        //[Route("historyList")]
+        //[ProducesResponseType(StatusCodes.Status200OK)]
+        //[ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+        //public IActionResult GetHistoricOverviewList([FromQuery] string pidUri)
+        //{
+        //    var result = _historicResourceService.GetHistoricOverviewByPidUri(pidUri);
 
-            return Ok(result);
-        }
+        //    return Ok(result);
+        //}
 
-        /// <summary>
-        /// Determine a single historic entry, identified by the given unique subject and pidUri.
-        /// </summary>
-        /// <param name="pidUri">the resource pidUri to search for</param>
-        /// <param name="subject">the resource subject to search for</param>
-        /// <returns>a single historized resource</returns>
-        [MapToApiVersion(Constants.API.Version.V2)]
-        [HttpGet]
-        [ValidateActionParameters]
-        [Route("history")]
-        [ProducesResponseType(200)]
-        [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
-        public IActionResult GetHistoricResource([FromQuery] string pidUri, [FromQuery] string subject)
-        {
-            var result = _historicResourceService.GetHistoricResource(pidUri, subject);
+        ///// <summary>
+        ///// Determine a single historic entry, identified by the given unique subject and pidUri.
+        ///// </summary>
+        ///// <param name="pidUri">the resource pidUri to search for</param>
+        ///// <param name="subject">the resource subject to search for</param>
+        ///// <returns>a single historized resource</returns>
+        //[MapToApiVersion(Constants.API.Version.V2)]
+        //[HttpGet]
+        //[ValidateActionParameters]
+        //[Route("history")]
+        //[ProducesResponseType(200)]
+        //[ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+        //public IActionResult GetHistoricResource([FromQuery] string pidUri, [FromQuery] string subject)
+        //{
+        //    var result = _historicResourceService.GetHistoricResource(pidUri, subject);
 
-            return Ok(result);
-        }
+        //    return Ok(result);
+        //}
 
         #endregion Historic Resources
     }

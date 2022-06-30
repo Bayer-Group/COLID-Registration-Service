@@ -9,7 +9,6 @@ namespace COLID.Graph.TripleStore.DataModels.Base
     {
         public string Id { get; set; }
 
-        [JsonIgnore]
         public IDictionary<string, List<dynamic>> InboundProperties { get; set; }
 
         public Entity() : base()

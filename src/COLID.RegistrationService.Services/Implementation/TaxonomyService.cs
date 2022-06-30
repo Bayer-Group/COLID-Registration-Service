@@ -2,10 +2,13 @@
 using System.Linq;
 using AutoMapper;
 using COLID.Cache.Services;
+using COLID.Exception.Models;
 using COLID.Exception.Models.Business;
+using COLID.Graph.Metadata.Constants;
 using COLID.Graph.Metadata.Services;
 using COLID.Graph.TripleStore.DataModels.Base;
 using COLID.Graph.TripleStore.DataModels.Taxonomies;
+using COLID.Graph.TripleStore.Extensions;
 using COLID.Graph.TripleStore.Services;
 using COLID.RegistrationService.Repositories.Interface;
 using COLID.RegistrationService.Services.Interface;
@@ -34,7 +37,8 @@ namespace COLID.RegistrationService.Services.Implementation
         {
             var taxonomy = _cacheService.GetOrAdd($"id:{id}", () =>
             {
-                var taxonomies = _taxonomyRepository.GetTaxonomiesByIdentifier(id);
+                var graphs = _metadataService.GetAllGraph();
+                var taxonomies = _taxonomyRepository.GetTaxonomiesByIdentifier(id, graphs);
                 var transformed = TransformTaxonomyListToHierarchy(taxonomies, id).FirstOrDefault();
 
                 if (transformed == null)
@@ -52,8 +56,20 @@ namespace COLID.RegistrationService.Services.Implementation
         {
             var taxonomies = _cacheService.GetOrAdd($"type:{taxonomyType}", () =>
             {
-                var taxonomyList = _taxonomyRepository.GetTaxonomies(taxonomyType);
+                var graphs = _metadataService.GetMultiInstanceGraph(taxonomyType);
+                var taxonomyList = _taxonomyRepository.GetTaxonomies(taxonomyType, graphs);
                 return TransformTaxonomyListToHierarchy(taxonomyList);
+            });
+            return taxonomies;
+        }
+
+        public IList<Taxonomy> GetAllTaxonomies()
+        {
+            var taxonomies = _cacheService.GetOrAdd($"type:AllTaxonomies", () =>
+            {
+                var graphs = _metadataService.GetAllGraph();
+                var taxonomyList = _taxonomyRepository.GetTaxonomies(graphs);
+                return taxonomyList;
             });
             return taxonomies;
         }
@@ -62,7 +78,8 @@ namespace COLID.RegistrationService.Services.Implementation
         {
             var plainTaxonomies = _cacheService.GetOrAdd($"list:type:{taxonomyType}", () =>
             {
-                var taxonomies = _taxonomyRepository.GetTaxonomies(taxonomyType);
+                var graphs = _metadataService.GetMultiInstanceGraph(taxonomyType);
+                var taxonomies = _taxonomyRepository.GetTaxonomies(taxonomyType, graphs);
                 return CreateHierarchicalStructureFromTaxonomyList(taxonomies);
             });
 
@@ -82,10 +99,10 @@ namespace COLID.RegistrationService.Services.Implementation
 
             if (!string.IsNullOrWhiteSpace(topTaxonomyIdentifier))
             {
-                return taxonomyHierarchy.Where(t => t.Id == topTaxonomyIdentifier).ToList();
+                return taxonomyHierarchy.Where(t => t.Id == topTaxonomyIdentifier).OrderBy(t => t.Properties.GetValueOrNull(RDFS.Label, true)).ToList();
             }
 
-            return taxonomyHierarchy.Where(t => !t.HasParent).ToList();
+            return taxonomyHierarchy.Where(t => !t.HasParent).OrderBy(t => t.Properties.GetValueOrNull(RDFS.Label, true)).ToList();
         }
 
         /// <summary>
@@ -102,7 +119,7 @@ namespace COLID.RegistrationService.Services.Implementation
             {
                 var child = taxonomy.Value;
 
-                if (child.Properties.TryGetValue(Graph.Metadata.Constants.SKOS.Broader, out var parents))
+                if (child.Properties.TryGetValue(SKOS.Broader, out var parents))
                 {
                     foreach (var parent in parents)
                     {
@@ -110,6 +127,8 @@ namespace COLID.RegistrationService.Services.Implementation
                         {
                             parentTaxonomy.Children.Add(child);
                         }
+
+                        parentTaxonomy.Children.OrderBy(t => t.Properties.GetValueOrNull(RDFS.Label, true));
                     }
                 }
             }

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace COLID.Graph.TripleStore.Extensions
@@ -15,9 +16,22 @@ namespace COLID.Graph.TripleStore.Extensions
             return string.Join(",", collection.Select(sg => $"<{sg}>"));
         }
 
+        public static string JoinAsLiteralList(this IEnumerable<string> collection)
+        {
+            return string.Join(",", collection.Select(sg => $"\"{sg}\""));
+        }
+        public static string JoinAsStringList(this IEnumerable<string> collection)
+        {
+            return string.Join(",", collection.Select(sg => $"{sg}"));
+        }
         public static string JoinAsValuesList(this IEnumerable<string> collection)
         {
             return string.Join(" ", collection.Select(sg => $"<{sg}>"));
+        }
+
+        public static string JoinAsFromNamedGraphs(this IEnumerable<Uri> collection)
+        {
+            return string.Join("\n", collection.Select(sg => $"FROM <{sg}>"));
         }
     }
 }

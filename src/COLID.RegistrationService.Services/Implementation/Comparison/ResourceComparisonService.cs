@@ -22,7 +22,7 @@ namespace COLID.RegistrationService.Services.Implementation.Comparison
         ILogger<ResourceComparisonService> _logger;
         IMetadataService _metadataService;
         IResourceService _resourceService;
-        IHistoricResourceService _historicResourceService;
+        //IHistoricResourceService _historicResourceService;
         IDifferenceCalculationService _differenceCalculator;
         ISimilarityCalculationService _similarityCalculator;
 
@@ -30,14 +30,14 @@ namespace COLID.RegistrationService.Services.Implementation.Comparison
             ILogger<ResourceComparisonService> logger,
             IMetadataService metadataService,
             IResourceService resourceService,
-            IHistoricResourceService historicResourceService,
+            //IHistoricResourceService historicResourceService,
             IDifferenceCalculationService differenceCalculator,
             ISimilarityCalculationService similarityCalculator)
         {
             _logger = logger;
             _metadataService = metadataService;
             _resourceService = resourceService;
-            _historicResourceService = historicResourceService;
+            //_historicResourceService = historicResourceService;
             _differenceCalculator = differenceCalculator;
             _similarityCalculator = similarityCalculator;
         }
@@ -106,11 +106,14 @@ namespace COLID.RegistrationService.Services.Implementation.Comparison
             // Instead of checking for resource existing in one graph first, this minimizes calls to database
             try
             {
-                resource = _resourceService.GetById(resourceId);
+                 
+                resource = _resourceService.GetById(resourceId, _metadataService.GetInstanceGraph(COLID.Graph.Metadata.Constants.PIDO.PidConcept));
+                resource = resource != null ? resource : _resourceService.GetById(resourceId, _metadataService.GetInstanceGraph("draft"));
             }
             catch (EntityNotFoundException)
             {
-                resource = _historicResourceService.GetHistoricResource(resourceId);
+                //resource = _historicResourceService.GetHistoricResource(resourceId);
+                resource = null;
             }
 
             return resource;

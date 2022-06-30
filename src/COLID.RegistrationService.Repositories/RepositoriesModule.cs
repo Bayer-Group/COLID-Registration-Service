@@ -23,6 +23,7 @@ namespace COLID.RegistrationService.Repositories
         {
             services.RegisterBaseRepositoriesModule();
             services.AddGraphModule(configuration);
+            //services.AddSingletonGraphModule(configuration);
             services.AddDistributedCacheModule(configuration, GetCachingJsonSerializerSettings());
 
             return services;
@@ -37,6 +38,8 @@ namespace COLID.RegistrationService.Repositories
         {
             services.RegisterBaseRepositoriesModule();
             services.AddGraphModule(configuration);
+            //services.AddSingletonGraphModule(configuration);
+
             services.AddCacheModule(configuration, GetCachingJsonSerializerSettings());
 
             return services;
@@ -69,11 +72,12 @@ namespace COLID.RegistrationService.Repositories
             services.AddTransient<IPidUriTemplateRepository, PidUriTemplateRepository>();
             services.AddTransient<IExtendedUriTemplateRepository, ExtendedUriTemplateRepository>();
             services.AddTransient<IEntityRepository, EntityRepository>();
-            services.AddTransient<IKeywordRepository, KeywordRepository>();
             services.AddTransient<IIdentifierRepository, IdentifierRepository>();
-            services.AddTransient<IHistoricResourceRepository, HistoricResourceRepository>();
+            //services.AddTransient<IHistoricResourceRepository, HistoricResourceRepository>();
             services.AddTransient<ITaxonomyRepository, TaxonomyRepository>();
             services.AddTransient<IGraphManagementRepository, GraphManagementRepository>();
+            services.AddTransient<IAttachmentRepository, AttachmentRepository>();
+            services.AddTransient<IIronMountainRepository, IronMountainRepository>();
 
             return services;
         }

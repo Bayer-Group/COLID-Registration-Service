@@ -16,6 +16,7 @@ using Serilog;
 using Serilog.Events;
 using Serilog.Formatting.Elasticsearch;
 using Serilog.Sinks.Elasticsearch;
+using Destructurama;
 
 namespace COLID.StatisticsLog.Services
 {
@@ -54,7 +55,14 @@ namespace COLID.StatisticsLog.Services
                 }
                 else
                 {
-                    _awsHttpConnection = new AwsHttpConnection(options.AwsRegion);
+                    try
+                    {
+                        _awsHttpConnection = new AwsHttpConnection(options.AwsRegion);
+                    }
+                    catch (System.ArgumentException exception) //catch case where an invalid endpoint is provided. Sometimes happens on local Docker
+                    {
+                        _awsHttpConnection = new AwsHttpConnection(RegionEndpoint.EUCentral1.SystemName);
+                    }
                 }
             }
 
@@ -66,11 +74,13 @@ namespace COLID.StatisticsLog.Services
             if (options.Enabled == false)
             {
                 return new LoggerConfiguration()
+                    .Destructure.JsonNetTypes()
                     .MinimumLevel.Verbose()
                     .WriteTo.Console();
             }
 
             return new LoggerConfiguration()
+              .Destructure.JsonNetTypes()
               .MinimumLevel.Verbose()
               .WriteTo.Elasticsearch(new ElasticsearchSinkOptions(options.BaseUri)
               {

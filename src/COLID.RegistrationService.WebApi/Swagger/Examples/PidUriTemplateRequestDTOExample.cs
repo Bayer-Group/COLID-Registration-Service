@@ -24,12 +24,12 @@ namespace COLID.RegistrationService.WebApi.Swagger.Examples
             {
                 Properties = new Dictionary<string, List<dynamic>>()
                 {
-                    [RDF.Type] = new List<dynamic>() { Common.Constants.PidUriTemplate.Type },
-                    [Common.Constants.PidUriTemplate.HasBaseUrl] = new List<dynamic>() { "https://qa-pid.bayer.com/" },
-                    [Common.Constants.PidUriTemplate.HasRoute] = new List<dynamic>() { "rnd/" },
-                    [Common.Constants.PidUriTemplate.HasPidUriTemplateIdType] = new List<dynamic>() { IdType.Guid.GetDescription() },
-                    [Common.Constants.PidUriTemplate.HasIdLength] = new List<dynamic>() { "0" },
-                    [Common.Constants.PidUriTemplate.HasPidUriTemplateSuffix] = new List<dynamic>() { Suffix.Slash.GetDescription() }
+                    [RDF.Type] = new List<dynamic>() { COLID.Graph.Metadata.Constants.PidUriTemplate.Type },
+                    [COLID.Graph.Metadata.Constants.PidUriTemplate.HasBaseUrl] = new List<dynamic>() { "https://qa-pid.bayer.com/" },
+                    [COLID.Graph.Metadata.Constants.PidUriTemplate.HasRoute] = new List<dynamic>() { "rnd/" },
+                    [COLID.Graph.Metadata.Constants.PidUriTemplate.HasPidUriTemplateIdType] = new List<dynamic>() { IdType.Guid.GetDescription() },
+                    [COLID.Graph.Metadata.Constants.PidUriTemplate.HasIdLength] = new List<dynamic>() { "0" },
+                    [COLID.Graph.Metadata.Constants.PidUriTemplate.HasPidUriTemplateSuffix] = new List<dynamic>() { Suffix.Slash.GetDescription() }
                 }
             };
         }

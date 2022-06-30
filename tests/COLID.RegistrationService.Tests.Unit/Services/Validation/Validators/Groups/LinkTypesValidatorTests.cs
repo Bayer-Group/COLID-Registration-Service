@@ -7,6 +7,7 @@ using COLID.Graph.Metadata.DataModels.Metadata;
 using COLID.Graph.Metadata.DataModels.Resources;
 using COLID.Graph.Metadata.Services;
 using COLID.Graph.Tests.Builder;
+using COLID.Graph.TripleStore.DataModels.Resources;
 using COLID.RegistrationService.Services.Interface;
 using COLID.RegistrationService.Services.Validation.Models;
 using COLID.RegistrationService.Services.Validation.Validators.Groups;

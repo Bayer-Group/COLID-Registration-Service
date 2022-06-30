@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using COLID.Graph.TripleStore.Repositories;
 using COLID.Graph.Metadata.DataModels.MetadataGraphConfiguration;
 
@@ -28,14 +29,14 @@ namespace COLID.Graph.Metadata.Repositories
         /// <param name="graphType">the graphtype to use</param>
         /// <param name="config">the config to use</param>
         /// <returns>A List of graphs for a given graph type and optional configuration</returns>
-        IList<string> GetGraphs(string graphType, string config = "");
+        ISet<Uri> GetGraphs(string graphType, string config = "");
 
         /// <summary>
         /// Get all graphs to a given graph type and returns them in a list.
         /// </summary>
         /// <param name="graphTypes">the list of graphtypes to use</param>
         /// <returns>a list of found graphs</returns>
-        IList<string> GetGraphs(IEnumerable<string> graphTypes);
+        ISet<Uri> GetGraphs(IEnumerable<string> graphTypes);
 
         /// <summary>
         /// Gets only a single (first) graph for a given graph type.

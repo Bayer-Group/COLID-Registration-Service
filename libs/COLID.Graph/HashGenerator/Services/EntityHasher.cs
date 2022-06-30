@@ -8,7 +8,9 @@ using COLID.Common.Utilities;
 using COLID.Graph.HashGenerator.Exceptions;
 using COLID.Graph.Metadata.Extensions;
 using COLID.Graph.TripleStore.DataModels.Base;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
 
 namespace COLID.Graph.HashGenerator.Services
@@ -18,138 +20,241 @@ namespace COLID.Graph.HashGenerator.Services
     /// </summary>
     public class EntityHasher : IEntityHasher
     {
+        /// <summary>
+        /// Serializer setting for json.
+        /// </summary>
         private readonly JsonSerializerSettings _serializerSettings;
 
-        public EntityHasher()
+        /// <summary>
+        /// ILogger for debugging purposes.
+        /// </summary>
+        private readonly ILogger<EntityHasher> _logger;
+
+        public EntityHasher(ILogger<EntityHasher> logger)
         {
-            _serializerSettings = new JsonSerializerSettings { ContractResolver = new CamelCasePropertyNamesContractResolver() };
+            _serializerSettings = new JsonSerializerSettings
+            {
+                ContractResolver = new CamelCasePropertyNamesContractResolver(),
+                NullValueHandling = NullValueHandling.Ignore
+            };
+
+            IsoDateTimeConverter dateConverter = new IsoDateTimeConverter
+            {
+                DateTimeFormat = "yyyy'-'MM'-'dd'T'HH':'mm':'ss.fff'Z'"
+            };
+            _serializerSettings.Converters.Add(dateConverter);
+
+            _logger = logger;
         }
 
         /// <summary>
-        /// Hashes the given entity with SHA256 and returns the result as a string.
-        /// Only properties will be considered and all properties will be sorted by key first, and the by it's value.
-        ///
-        /// In addition to that, the following technical and invisible technical attributes will be removed:
-        /// <list type="bullet">
-        ///		<item>https://pid.bayer.com/kos/19050/hasHistoricVersion</item>
-        ///		<item>https://pid.bayer.com/kos/19050/646465</item>
-        ///		<item>https://pid.bayer.com/kos/19050/hasEntryLifecycleStatus</item>
-        ///		<item>https://pid.bayer.com/kos/19050/hasLaterVersion</item>
-        ///		<item>https://pid.bayer.com/kos/19050/lastChangeUser</item>
-        ///		<item>https://pid.bayer.com/kos/19050/546454</item>
-        ///		<item>https://pid.bayer.com/kos/19050/author</item>
-        ///		<item>https://pid.bayer.com/kos/19050/lastChangeDateTime</item>
-        ///		<item>https://pid.bayer.com/kos/19050/dateCreate</item>
-        /// </list>
+        /// <inheritdoc>
+        ///     <cref>IEntityHasher.Hash(Entity)</cref>
+        /// </inheritdoc>
         /// </summary>
         /// <param name="entity">the entity to hash</param>
         /// <returns>sha256 hash of entity</returns>
         /// <exception cref="ArgumentNullException">if given entity is null</exception>
+        /// <exception cref="MissingPropertiesException">If the given entity doesn't contain properties (even after preparing)</exception>
         public string Hash(Entity entity)
         {
             Guard.ArgumentNotNull(entity, nameof(entity));
+
             var propertyKeysToIgnore = GetTechnicalKeys();
+
             return Hash(entity, propertyKeysToIgnore);
         }
 
+        /// <summary>
+        /// <inheritdoc>
+        ///     <cref>IEntityHasher.Hash(Entity, ISet)</cref>
+        /// </inheritdoc>
+        /// </summary>
+        /// <param name="entity">the entity to hash</param>
+        /// <param name="propertyKeysToIgnore">the property keys to ignore and remove from entity</param>
+        /// <returns>sha256 hash of entity</returns>
+        /// <exception cref="ArgumentNullException">if given entity is null</exception>
+        /// <exception cref="MissingPropertiesException">If the given entity doesn't contain properties (even after preparing)</exception>
         public string Hash(Entity entity, ISet<string> propertyKeysToIgnore)
         {
             Guard.ArgumentNotNull(entity, nameof(entity));
             Guard.ArgumentNotNull(propertyKeysToIgnore, nameof(propertyKeysToIgnore));
-
             if (entity.Properties.IsNullOrEmpty())
             {
                 throw new MissingPropertiesException("The given entity does not contain any properties");
             }
 
-            using SHA256 sha256 = SHA256.Create();
-
-            var sortedEntity = SortEntity(entity);
-            var cleanedProperties = sortedEntity.Properties
-                .Where(x => !propertyKeysToIgnore.Any(y => y.Equals(x.Key.ToString())))
-                .ToDictionary(t => t.Key, t => t.Value);
-
-            if (cleanedProperties.IsNullOrEmpty())
+            Entity hashableEntity = PrepareEntityForHashing(entity, propertyKeysToIgnore);
+            if (hashableEntity.Properties.IsNullOrEmpty())
             {
                 throw new MissingPropertiesException(
                     "The given entity contains no properties. It is possible, that only technical ones were passed.");
             }
+            string entityJson = JsonConvert.SerializeObject(hashableEntity.Properties, _serializerSettings);
 
-            string propertyJson = JsonConvert.SerializeObject(cleanedProperties, _serializerSettings);
+            using SHA256 sha256 = SHA256.Create();
+            var computedHash = HashGenerator.GetHash(sha256, entityJson);
 
-            return GetHash(sha256, propertyJson);
+            var loggingInfos = new Dictionary<string, string>
+            {
+                {"Ignored_Properties", string.Join(',', propertyKeysToIgnore) },
+                {"Algorithm", nameof(sha256)},
+                {"Entity_Original", entity.ToString()},
+                {"Entity_ToHash", hashableEntity.ToString()},
+                {"Computed_Hash", computedHash}
+            };
+            _logger.LogDebug("Entity has been hashed", loggingInfos);
+
+            return HashGenerator.GetHash(sha256, entityJson);
+        }
+
+        private Entity PrepareEntityForHashing(Entity entity, ISet<string> propertyKeysToIgnore, bool calledRecursively = false)
+        {
+            // Important: This reference will change the sub-property order in nested entities from the given original entity
+            var ety = new Entity(entity.Id, entity.Properties);
+
+            ety.Properties = RemoveEmptyProperties(ety.Properties, propertyKeysToIgnore);
+
+            // Id of endpoints between resource versions are different
+            ety.Properties = RemoveIdFromDistributionEndpoints(ety.Properties);
+
+            ety.Properties = SortValuesByKeyAndValue(ety.Properties);
+
+            // Inbound properties are not requiered to hash.
+            ety.InboundProperties = null;
+
+            return ety;
+        }
+
+        private IDictionary<string, List<dynamic>> RemoveEmptyProperties(IDictionary<string, List<dynamic>> properties, ISet<string> propertyKeysToIgnore)
+        {
+            properties = properties
+                .Where(propertyValues => propertyValues.Value != null) // if the user inserts null values instead of lists 
+                .Select(propertyValues =>
+                {
+                    var newValues = propertyValues.Value
+                    .Where(v => v != null) // Filter empty properties
+                    .Where(v => !string.IsNullOrWhiteSpace(v.ToString().Trim()))
+                    .Select(value =>
+                    {
+                            // Check if value is entity and remove nested empty values
+                            if (DynamicExtension.IsType<Entity>(value, out Entity entity))
+                        {
+                            entity.Properties = RemoveEmptyProperties(entity.Properties, propertyKeysToIgnore);
+                            entity.InboundProperties = null;
+                            return entity as dynamic;
+                        }
+
+                        return value;
+                    });
+
+                    return new KeyValuePair<string, List<dynamic>>(propertyValues.Key, newValues.ToList());
+                })
+                .Where(propertyValues => !(propertyValues.Value.IsNullOrEmpty() || propertyKeysToIgnore.Contains(propertyValues.Key))) // Remove empty lists and property keys to be ignored
+                .ToDictionary(x => x.Key, x => x.Value);
+
+            return properties;
         }
 
         /// <summary>
-        /// Generate a hash by the given algorithm and input string. Originally taken from:
-        /// https://docs.microsoft.com/de-de/dotnet/api/system.security.cryptography.hashalgorithm.computehash?view=netcore-3.1
+        /// Removes the field ID recursively from the given entity, if the key is distribution endpoint
+        /// - Distribution
+        /// - Main Distribution
         /// </summary>
-        /// <param name="hashAlgorithm">The algorithm to use</param>
-        /// <param name="input">the input string to hash</param>
-        /// <returns>the hashed input string as hexadecimal</returns>
-        private string GetHash(HashAlgorithm hashAlgorithm, string input)
+        /// <param name="entity">the entity to use</param>
+        private IDictionary<string, List<dynamic>> RemoveIdFromDistributionEndpoints(IDictionary<string, List<dynamic>> properties)
         {
-            // Convert the input string to a byte array and compute the hash.
-            byte[] data = hashAlgorithm.ComputeHash(Encoding.UTF8.GetBytes(input));
+            return properties
+                .Select(propertyValues =>
+                {
+                    var newValues = propertyValues.Value;
 
-            // Create a new Stringbuilder to collect the bytes
-            // and create a string.
-            var sBuilder = new StringBuilder();
+                    if (propertyValues.Key == Metadata.Constants.Resource.Distribution || propertyValues.Key == Metadata.Constants.Resource.MainDistribution)
+                    {
+                        newValues = propertyValues.Value.Select(v =>
+                        {
+                            if (DynamicExtension.IsType<Entity>(v, out Entity mappedEntity))
+                            {
+                                mappedEntity.Id = null;
+                                return mappedEntity as dynamic;
+                            }
+                            return v;
+                        }).ToList();
 
-            // Loop through each byte of the hashed data
-            // and format each one as a hexadecimal string.
-            for (int i = 0; i < data.Length; i++)
-            {
-                sBuilder.Append(data[i].ToString("x2"));
-            }
+                    }
 
-            // Return the hexadecimal string.
-            return sBuilder.ToString();
+                    return new KeyValuePair<string, List<dynamic>>(propertyValues.Key, newValues);
+                })
+                .ToDictionary(x => x.Key, x => x.Value);
         }
 
+        private IDictionary<string, List<dynamic>> SortValuesByKeyAndValue(IDictionary<string, List<dynamic>> properties)
+        {
+            var sortedProperties = properties
+                .Select(propertyValues =>
+                {
+                    var newValues = propertyValues.Value
+                    .Select(value =>
+                    {
+                        // Check if value is entity and remove nested empty values
+                        if (DynamicExtension.IsType<Entity>(value, out Entity entity))
+                        {
+                            entity.Properties = SortValuesByKeyAndValue(entity.Properties);
+                            return entity as dynamic;
+                        }
+
+                        return value;
+                    })
+                    .OrderBy(t => GetKeyToOrderBy(t));
+
+                    return new KeyValuePair<string, List<dynamic>>(propertyValues.Key, newValues.ToList());
+                })
+                .OrderBy(x => x.Key, StringComparer.Ordinal) // sort by key
+                .ToDictionary(x => x.Key, x => x.Value);
+
+            return sortedProperties;
+        }
+
+        private string GetKeyToOrderBy(dynamic value)
+        {
+            if (DynamicExtension.IsType<Entity>(value, out Entity entity))
+            {
+                if (entity.Properties.TryGetValue(COLID.Graph.Metadata.Constants.EnterpriseCore.PidUri, out var pidUriList))
+                {
+                    foreach(var pidUriEntity in pidUriList)
+                    {
+                        if (DynamicExtension.IsType<Entity>(pidUriEntity, out Entity pidUri))
+                        {
+                            return pidUri.Id;
+                        }
+                    }
+                    
+                }
+                return entity.Id;
+            }
+            return value.ToString();
+        }
+
+        
         /// <summary>
         /// Get a list of technical and invisible technical keys to ignore.
         /// </summary>
         private ISet<string> GetTechnicalKeys()
         {
-            return new HashSet<string> {
-                Metadata.Constants.Resource.HasHistoricVersion,
+            return new HashSet<string>
+            {
+                //Metadata.Constants.Resource.HasHistoricVersion,
                 Metadata.Constants.Resource.MetadataGraphConfiguration,
                 Metadata.Constants.Resource.HasEntryLifecycleStatus,
                 Metadata.Constants.Resource.HasLaterVersion,
-
-                Metadata.Constants.Resource.ChangeRequester,
-                Metadata.Constants.Resource.DateModified,
                 Metadata.Constants.Resource.LastChangeUser,
+                Metadata.Constants.Resource.ChangeRequester,
                 Metadata.Constants.Resource.Author,
+                Metadata.Constants.Resource.DateModified,
                 Metadata.Constants.Resource.DateCreated,
+                Metadata.Constants.Resource.HasPidEntryDraft,
+                Metadata.Constants.Resource.HasEntryLifecycleStatus
             };
-        }
-
-        /// <summary>
-        /// Recursive function to sort the properties of an entity first by key, afterwards by value.
-        /// </summary>
-        /// <param name="entity">the entity to sort</param>
-        /// <returns>a sorted entity</returns>
-        private Entity SortEntity(Entity entity)
-        {
-            entity.Properties = entity.Properties
-                .OrderBy(x => x.Key, StringComparer.Ordinal)
-                .ThenBy(x => x.Value)
-                .ToDictionary(x => x.Key, x => x.Value);
-
-            foreach (var (_, value) in entity.Properties)
-            {
-                foreach (var listItem in value.Where(listItem => listItem != null))
-                {
-                    if (DynamicExtension.IsType<Entity>(listItem, out Entity mappedEntity))
-                    {
-                        SortEntity(mappedEntity);
-                    }
-                }
-            }
-
-            return entity;
         }
     }
 }

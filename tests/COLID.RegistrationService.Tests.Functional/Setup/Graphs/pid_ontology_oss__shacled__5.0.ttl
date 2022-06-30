@@ -723,6 +723,7 @@ rdfs:Resource  rdf:type  sh:NodeShape .
         sh:group        <https://pid.bayer.com/kos/19050/UsageAndMaintenance> ;
         sh:path         <https://pid.bayer.com/kos/19050/47119343> ;
         sh:nodeKind     sh:IRI ;
+        <https://pid.bayer.com/ns/shacl/fieldType>  <https://pid.bayer.com/ns/shacl/fieldType#extendableList> ;
         sh:description  "This property is used to assign a list of keywords to a resource like free tagging fields." .
 
 <https://pid.bayer.com/kos/19050/PID_Concept-hasVersion>

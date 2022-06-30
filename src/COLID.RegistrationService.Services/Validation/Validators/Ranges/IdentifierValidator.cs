@@ -9,8 +9,8 @@ using COLID.Graph.Metadata.Extensions;
 using COLID.RegistrationService.Services.Extensions;
 using COLID.RegistrationService.Services.Interface;
 using COLID.RegistrationService.Services.Validation.Models;
-using Microsoft.Extensions.DependencyInjection;
 using COLID.Graph.TripleStore.DataModels.Base;
+using COLID.Graph.TripleStore.DataModels.Resources;
 using COLID.Graph.TripleStore.Extensions;
 using COLID.RegistrationService.Common.DataModel.PidUriTemplates;
 

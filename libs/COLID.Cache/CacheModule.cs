@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
+using System.Threading;
 using COLID.Cache.Configuration;
 using COLID.Cache.Services;
 using COLID.Cache.Services.Lock;
@@ -19,6 +20,7 @@ namespace COLID.Cache
         public static IServiceCollection AddCacheModule(this IServiceCollection services, IConfiguration configuration,
             CachingJsonSerializerSettings cachingJsonSerializerSettings)
         {
+
             var cacheOptions = ParseCachingConfiguration(configuration);
 
             if (!cacheOptions.Enabled)
@@ -50,7 +52,7 @@ namespace COLID.Cache
             }
 
             services.AddSingleton(cachingJsonSerializerSettings);
-            services.AddTransient<ICacheService, CacheService>();
+            services.AddSingleton<ICacheService, CacheService>();
             services.Configure<ColidCacheOptions>(configuration.GetSection(nameof(ColidCacheOptions)));
 
             var connectionMultiplexer = CreateConnectionMultiplexer(configuration);
@@ -106,8 +108,12 @@ namespace COLID.Cache
             {
                 AbortOnConnectFail = cacheOptions.AbortOnConnectFail,
                 SyncTimeout = cacheOptions.SyncTimeout,
+                KeepAlive = cacheOptions.KeepAlive,
+                ReconnectRetryPolicy = new LinearRetry(cacheOptions.ReconnectRetryPolicy),
+                SocketManager = new SocketManager("IncreasedWorkerCount", 100, true),
                 Password = cacheOptions.Password,
-                AllowAdmin = cacheOptions.AllowAdmin
+                AllowAdmin = cacheOptions.AllowAdmin,
+                Ssl = cacheOptions.Ssl
             };
 
             foreach (var endpoint in cacheOptions.EndpointUrls)
@@ -140,7 +146,7 @@ namespace COLID.Cache
         {
             Contract.Requires(condition: configuration != null);
 
-            services.AddSingleton<IDistributedLockFactory, LockFactory>();
+            services.AddSingleton<IDistributedLockFactory, InMemoryLockFactory>();
             services.AddTransient<ILockServiceFactory, LockServiceFactory>();
 
             return services;

@@ -184,7 +184,7 @@ namespace COLID.RegistrationService.Tests.Functional.Setup
 
         public ITripleStoreTransaction CreateTransaction()
         {
-            _transaction = new TripleStoreTransaction(this);
+            _transaction = new TripleStoreTransaction(this,null);
             return _transaction;
         }
 

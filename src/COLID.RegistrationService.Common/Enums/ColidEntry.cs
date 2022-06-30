@@ -32,6 +32,9 @@ namespace COLID.RegistrationService.Common.Enums.ColidEntry
     public enum Type
     {
         [Description("https://pid.bayer.com/kos/19050/GenericDataset")]
-        GenericDataset
+        GenericDataset,
+
+        [Description("http://pid.bayer.com/kos/19014/Document")]
+        Document
     }
 }

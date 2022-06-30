@@ -26,7 +26,7 @@ namespace COLID.RegistrationService.Services.Validation.Validators.Datatypes
                         return value;
                     }
 
-                    return Convert.ToDateTime(value).ToString("o", DateTimeFormatInfo.InvariantInfo);
+                    return Convert.ToDateTime(value).ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss.fff'Z'"); //ToString("o", DateTimeFormatInfo.InvariantInfo);
                 }
                 catch (FormatException)
                 {

@@ -7,10 +7,11 @@ using System.Net.Mime;
 using System.Threading.Tasks;
 using AngleSharp.Common;
 using AutoMapper;
+using COLID.AWS.DataModels;
+using COLID.AWS.Interface;
 using COLID.Exception.Models.Business;
 using COLID.Graph.Metadata.DataModels.MetadataGraphConfiguration;
 using COLID.Graph.Metadata.Services;
-using COLID.Graph.TripleStore.AWS;
 using COLID.Graph.Triplestore.Exceptions;
 using COLID.Graph.TripleStore.Repositories;
 using COLID.RegistrationService.Repositories.Interface;
@@ -18,6 +19,7 @@ using COLID.RegistrationService.Services.Implementation;
 using COLID.RegistrationService.Services.Interface;
 using COLID.StatisticsLog.Services;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 
@@ -44,13 +46,18 @@ namespace COLID.RegistrationService.Tests.Unit.Services
             _mockAwsS3Service = new Mock<IAmazonS3Service>();
             _mockNeptuneLoaderConnector = new Mock<INeptuneLoaderConnector>();
             SetupMockGraphMgmt();
-            _service = new GraphManagementService(_mockGraphMgmtRepo.Object, _mockGraphRepository.Object, _mockMetadataGraphConfigService.Object, _mockAuditTrailLogService.Object, _mockAwsS3Service.Object, _mockNeptuneLoaderConnector.Object);
-        }
 
+            AmazonWebServicesOptions awsOptions = new AmazonWebServicesOptions();
+            var awsOptionsMonitor = Mock.Of<IOptionsMonitor<AmazonWebServicesOptions>>(_ => _.CurrentValue == awsOptions);
+
+            _service = new GraphManagementService(_mockGraphMgmtRepo.Object, _mockGraphRepository.Object,
+                _mockMetadataGraphConfigService.Object, _mockAuditTrailLogService.Object, _mockAwsS3Service.Object,
+                _mockNeptuneLoaderConnector.Object, awsOptionsMonitor);
+        }
 
         private void SetupMockGraphMgmt()
         {
-            var usedGraphs = new List<string>() { "https://pid.bayer.com/resource/1.0", "https://pid.bayer.com/resource/historic" };
+            var usedGraphs = new List<string>() { "https://pid.bayer.com/resource/1.0", "https://pid.bayer.com/resource/2.0/Draft", "https://pid.bayer.com/resource/historic", "https://pid.bayer.com/linkhistory" };
             var historicGraphs = new List<string>() { "https://pid.bayer.com/resource/2.0" };
             var unusedGraph = new List<string>() { "https://pid.bayer.com/colid/test/graph", COLID.Graph.Metadata.Constants.MetadataGraphConfiguration.Type };
             var graphs = usedGraphs.Concat(unusedGraph).Concat(historicGraphs);
@@ -59,9 +66,16 @@ namespace COLID.RegistrationService.Tests.Unit.Services
             var currentGraphConfig = new MetadataGraphConfigurationOverviewDTO() { Graphs = usedGraphs, StartDateTime = DateTime.UtcNow.ToString("o") };
             var graphConfig = new List<MetadataGraphConfigurationOverviewDTO>() { currentGraphConfig, historicGraphConfig };
 
-            _mockGraphMgmtRepo.Setup(s => s.GetGraphs()).Returns(graphs);
-            _mockMetadataGraphConfigService.Setup(s => s.GetConfigurationOverview()).Returns(graphConfig);
+            _mockGraphMgmtRepo.Setup(s => s.GetGraphs(false)).Returns(graphs);
 
+            var g = new VDS.RDF.Graph(true)
+            {
+                BaseUri = new Uri("https://pid.bayer.com/resource/1.0")
+            };
+
+            _mockGraphMgmtRepo.Setup(s => s.GetGraph(new Uri("https://pid.bayer.com/resource/1.0"))).Returns(g);
+
+            _mockMetadataGraphConfigService.Setup(s => s.GetConfigurationOverview()).Returns(graphConfig);
         }
 
         #region Get Graph
@@ -70,11 +84,11 @@ namespace COLID.RegistrationService.Tests.Unit.Services
         public void GetGraphs_Success()
         {
             // Act
-            var resultGraph = _service.GetGraphs();
+            var resultGraph = _service.GetGraphs(false);
 
             // Assert
             Assert.NotNull(resultGraph);
-            Assert.Equal(5, resultGraph.Count);
+            Assert.Equal(7, resultGraph.Count);
             Assert.Single(resultGraph, g => g.Status == RegistrationService.Common.Enums.Graph.GraphStatus.Unreferenced && string.IsNullOrWhiteSpace(g.StartTime));
             Assert.Single(resultGraph, g => g.Status == RegistrationService.Common.Enums.Graph.GraphStatus.Historic && !string.IsNullOrWhiteSpace(g.StartTime));
         }
@@ -122,13 +136,40 @@ namespace COLID.RegistrationService.Tests.Unit.Services
             Assert.Throws<ReferenceException>(() => _service.DeleteGraph(uri));
         }
 
-        #endregion
+        #endregion Delete Region
+
+        [Fact]
+        public async Task DownloadGraph_Returns_Stream()
+        {
+            // Act
+            var graph = new Uri("https://pid.bayer.com/resource/1.0");
+            var result = await _service.DownloadGraph(graph);
+
+            //Assert
+            Assert.NotNull(result);
+            Assert.True(result.Position == 0);
+            Assert.True(result.Length > 0);
+        }
+
+        [Fact]
+        public async Task DownloadGraph_Returns_GraphNotFoundExceptionWhenGraphNotExist()
+        {
+            // Act
+            var graph = new Uri("https://pid.bayer.com/resource/xx");
+            Assert.ThrowsAsync<GraphNotFoundException>(() => _service.DownloadGraph(graph));
+        }
+
+        [Fact]
+        public async Task DownloadGraph_Returns_UriFormatExceptionWhenUriIsNull()
+        {
+            Assert.ThrowsAsync<ArgumentNullException>(() => _service.DownloadGraph(null));
+        }
 
         [Fact]
         public async Task ImportGraph_Success()
         {
             // Arrange
-            const string s3Key = "s3://some.fancy.kid.said/i.like.turtles";
+            var s3FileInfo = new AmazonS3FileUploadInfoDto { FileName = "", FileSize = 0, FileType = "", S3KeyName = "s3://some.fancy.kid.said/i.like.turtles", S3ObjectUrl = "" };
             var loadId = Guid.NewGuid().ToString();
             var formFile = GenerateTtlFormFile();
             var graphName = new Uri("https://www.speedofart.com/glorious/painting/1.0");
@@ -138,9 +179,9 @@ namespace COLID.RegistrationService.Tests.Unit.Services
                 payload = new Dictionary<string, string> { { "loadId", loadId }, { "namedGraphName", graphName.AbsoluteUri } }
             };
 
-            _mockAwsS3Service.Setup(x => x.UploadFile(It.IsAny<IFormFile>())).ReturnsAsync(s3Key);
+            _mockAwsS3Service.Setup(x => x.UploadFileAsync(It.IsAny<string>(), It.IsAny<IFormFile>())).ReturnsAsync(s3FileInfo);
             _mockGraphRepository.Setup(x => x.CheckIfNamedGraphExists(It.IsAny<Uri>())).Returns(false);
-            _mockNeptuneLoaderConnector.Setup(x => x.LoadGraph(s3Key, graphName)).ReturnsAsync(expectedResponse);
+            _mockNeptuneLoaderConnector.Setup(x => x.LoadGraph(s3FileInfo.S3KeyName, graphName)).ReturnsAsync(expectedResponse);
 
             // Act
             var result = await _service.ImportGraph(formFile, graphName, false);
@@ -157,9 +198,10 @@ namespace COLID.RegistrationService.Tests.Unit.Services
         [Fact]
         public async Task ImportGraph_ThrowsException_IfGraphExistsAndOverwriteFalse()
         {
+            var s3FileInfo = new AmazonS3FileUploadInfoDto { FileName = "", FileSize = 0, FileType = "", S3KeyName = "s3://some.fancy.kid.said/i.like.turtles", S3ObjectUrl = "" };
             var formFile = GenerateTtlFormFile();
             var graphName = new Uri("https://www.speedofart.com/glorious/painting/1.0");
-            _mockAwsS3Service.Setup(x => x.UploadFile(It.IsAny<IFormFile>())).ReturnsAsync("s3://123");
+            _mockAwsS3Service.Setup(x => x.UploadFileAsync(It.IsAny<string>(), It.IsAny<IFormFile>())).ReturnsAsync(s3FileInfo);
             _mockGraphRepository.Setup(x => x.CheckIfNamedGraphExists(It.IsAny<Uri>())).Returns(true);
 
             await Assert.ThrowsAsync<GraphAlreadyExistsException>(() =>

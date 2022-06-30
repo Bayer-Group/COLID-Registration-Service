@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using COLID.Graph.TripleStore.DataModels.Resources;
 using COLID.Graph.TripleStore.Extensions;
-using COLID.RegistrationService.Services.Interface;
 using COLID.RegistrationService.Services.Validation.Models;
 
 namespace COLID.RegistrationService.Services.Validation.Validators.Keys
@@ -14,7 +14,12 @@ namespace COLID.RegistrationService.Services.Validation.Validators.Keys
         {
             if (validationFacade.ResourceCrudAction == ResourceCrudAction.Create)
             {
-                validationFacade.RequestResource.Properties[property.Key] = new List<dynamic>() { DateTime.UtcNow.ToString("o") };
+                validationFacade.RequestResource.Properties[property.Key] = new List<dynamic>() { property.Value[0].ToString("o") };// { DateTime.UtcNow.ToString("o") };
+                return;
+            }
+            else if (validationFacade.ResourceCrudAction == ResourceCrudAction.Create && property.Value==null)
+            {
+                validationFacade.RequestResource.Properties[property.Key] = new List<dynamic>()  { DateTime.UtcNow.ToString("o") };
                 return;
             }
 

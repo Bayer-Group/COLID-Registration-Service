@@ -1,25 +1,32 @@
-﻿using COLID.Exception;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using COLID.Common.Logger;
+using COLID.Exception;
 using COLID.Identity;
-using COLID.MessageQueue;
 using COLID.Maintenance;
 using COLID.Maintenance.Filters;
+using COLID.MessageQueue;
+using COLID.RegistrationService.Services.Authorization;
+using COLID.RegistrationService.Services.Implementation;
 using COLID.RegistrationService.WebApi.Filters;
+using COLID.SQS;
+using COLID.SQS.Model;
 using COLID.StatisticsLog;
+using COLID.Swagger;
+using CorrelationId;
+using CorrelationId.DependencyInjection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using COLID.RegistrationService.Services.Authorization;
-using COLID.Swagger;
-using System.Collections.Generic;
-using System.Reflection;
-using System.Linq;
-using System.Text.RegularExpressions;
-using Swashbuckle.AspNetCore.Filters;
-using COLID.RegistrationService.WebApi.Swagger.Examples;
-using COLID.RegistrationService.Common.Constants;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 
 namespace COLID.RegistrationService.WebApi
 {
@@ -46,14 +53,22 @@ namespace COLID.RegistrationService.WebApi
         /// <param name="services">The service collection</param>
         public void ConfigureServices(IServiceCollection services)
         {
+            services.AddDefaultCorrelationId();
+            services.AddCorrelationIdLogger();
+
             services.AddCors();
 
             var mvcBuilder = services.AddControllers(configure => configure.Filters.Add(typeof(ValidateActionParametersAttribute)))
-                .AddNewtonsoftJson();
+                .AddNewtonsoftJson(opt =>
+                {
+                    opt.SerializerSettings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore;
+                    opt.SerializerSettings.ContractResolver = new CamelCasePropertyNamesContractResolver();
+                });
 
             services.AddApiVersioning();
             services.AddHttpContextAccessor();
             services.AddHttpClient();
+           
 
             // Disable automatic model state validation. Model state will be checked in ValidateActionParametersAttribute.
             services.Configure<ApiBehaviorOptions>(options =>
@@ -65,6 +80,7 @@ namespace COLID.RegistrationService.WebApi
 
             AddServices(services);
             AddModules(services, mvcBuilder);
+            
         }
 
         private void AddServices(IServiceCollection services)
@@ -81,15 +97,17 @@ namespace COLID.RegistrationService.WebApi
             services.AddMessageQueueModule(Configuration);
             services.AddStatisticsLogModule(Configuration);
             services.AddMaintenanceModule(mvcBuilder);
+            services.Configure<AWSSQSConfiguration>(Configuration.GetSection("AWSSQSConfiguration"));
+            services.AddAWSSQSModule(Configuration);
         }
 
         /// <summary>
         /// This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         /// </summary>
         /// <param name="app">The application builder</param>
-        /// <param name="env">The environment</param>
-        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+        public void Configure(IApplicationBuilder app)
         {
+            app.UseCorrelationId();
             app.UseExceptionMiddleware();
 
             app.UseRouting();

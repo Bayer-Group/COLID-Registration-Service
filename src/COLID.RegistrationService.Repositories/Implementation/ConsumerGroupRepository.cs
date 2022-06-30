@@ -7,6 +7,7 @@ using COLID.Graph.TripleStore.DataModels.ConsumerGroups;
 using COLID.Graph.TripleStore.Extensions;
 using COLID.Graph.TripleStore.Repositories;
 using COLID.RegistrationService.Repositories.Interface;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using VDS.RDF.Query;
 
@@ -14,18 +15,14 @@ namespace COLID.RegistrationService.Repositories.Implementation
 {
     internal class ConsumerGroupRepository : BaseRepository<ConsumerGroup>, IConsumerGroupRepository
     {
-        protected override string InsertingGraph => Graph.Metadata.Constants.MetadataGraphConfiguration.HasConsumerGroupGraph;
-
-        protected override IEnumerable<string> QueryGraphs => new List<string>() { InsertingGraph };
-
         public ConsumerGroupRepository(
+            IConfiguration configuration,
             ITripleStoreRepository tripleStoreRepository,
-            ILogger<ConsumerGroupRepository> logger,
-            IMetadataGraphConfigurationRepository metadataGraphConfigurationRepository) : base(tripleStoreRepository, metadataGraphConfigurationRepository, logger)
+            ILogger<ConsumerGroupRepository> logger) : base(configuration, tripleStoreRepository, logger)
         {
         }
 
-        public IList<ConsumerGroup> GetConsumerGroupsByLifecycleStatus(string lifecycleStatus)
+        public IList<ConsumerGroup> GetConsumerGroupsByLifecycleStatus(string lifecycleStatus, Uri namedGraph)
         {
             if (string.IsNullOrWhiteSpace(lifecycleStatus))
             {
@@ -35,14 +32,14 @@ namespace COLID.RegistrationService.Repositories.Implementation
             var parameterizedString = new SparqlParameterizedString();
             parameterizedString.CommandText =
                 @"SELECT ?subject ?predicate ?object
-                  @fromNamedGraphs
+                  From @namedGraph
                   WHERE {
                       ?subject rdf:type @type.
                       ?subject @hasLifecycleStatus @lifecycleStatus.
                       ?subject ?predicate ?object
                   }";
 
-            parameterizedString.SetPlainLiteral("fromNamedGraphs", GetNamedSubGraphs(QueryGraphs));
+            parameterizedString.SetUri("namedGraph", namedGraph);
             parameterizedString.SetUri("hasLifecycleStatus", new Uri(Graph.Metadata.Constants.ConsumerGroup.HasLifecycleStatus));
             parameterizedString.SetUri("lifecycleStatus", new Uri(lifecycleStatus));
             parameterizedString.SetUri("type", new Uri(Graph.Metadata.Constants.ConsumerGroup.Type));
@@ -52,7 +49,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
             return TransformQueryResults(results);
         }
 
-        public string GetAdRoleForConsumerGroup(string id)
+        public string GetAdRoleForConsumerGroup(string id, Uri namedGraph)
         {
             if (string.IsNullOrWhiteSpace(id))
             {
@@ -69,7 +66,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
             var queryString =
                 @"
                 SELECT ?adRole
-                @fromNamedGraphs
+                From @namedGraph
                 WHERE {
                     @consumerGroup rdf:type pid:ConsumerGroup.
                     @consumerGroup @adRole ?adRole
@@ -78,7 +75,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
             parameterizedString.CommandText = queryString;
             parameterizedString.SetUri("consumerGroup", new Uri(id));
             parameterizedString.SetUri("adRole", new Uri(Graph.Metadata.Constants.ConsumerGroup.AdRole));
-            parameterizedString.SetPlainLiteral("fromNamedGraphs", _metadataGraphConfigurationRepository.GetGraphs(QueryGraphs).JoinAsFromNamedGraphs());
+            parameterizedString.SetUri("namedGraph", namedGraph);
 
             SparqlResultSet results = _tripleStoreRepository.QueryTripleStoreResultSet(parameterizedString);
 
@@ -92,7 +89,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
             return result.GetNodeValuesFromSparqlResult("adRole").Value ?? null;
         }
 
-        public bool CheckConsumerGroupHasColidEntryReference(string id)
+        public bool CheckConsumerGroupHasColidEntryReference(string id, Uri consumerGroupNamedGraph, Uri resourceNamedGraph, Uri resourceDraftNamedGraph)
         {
             if (string.IsNullOrWhiteSpace(id))
             {
@@ -103,15 +100,17 @@ namespace COLID.RegistrationService.Repositories.Implementation
             {
                 CommandText =
                     @"ASK
-                      @fromConsumerGroupGraph
-                      @fromResourceGraph
+                      From @consumerGroupGraph
+                      From @resourceGraph
+                      From @resourceDraftGraph
                       WHERE {
                           ?subject ?predicate @identifier.
                           @identifier rdf:type @cgType.
                       }"
             };
-            parametrizedSparql.SetPlainLiteral("fromConsumerGroupGraph", _metadataGraphConfigurationRepository.GetGraphs(QueryGraphs).JoinAsFromNamedGraphs());
-            parametrizedSparql.SetPlainLiteral("fromResourceGraph", _metadataGraphConfigurationRepository.GetGraphs(Graph.Metadata.Constants.MetadataGraphConfiguration.HasResourcesGraph).JoinAsFromNamedGraphs());
+            parametrizedSparql.SetUri("consumerGroupGraph", consumerGroupNamedGraph);
+            parametrizedSparql.SetUri("resourceGraph", resourceNamedGraph);
+            parametrizedSparql.SetUri("resourceDraftGraph", resourceDraftNamedGraph);
 
             parametrizedSparql.SetUri("identifier", new Uri(id));
             parametrizedSparql.SetUri("cgType", new Uri(Graph.Metadata.Constants.ConsumerGroup.Type));

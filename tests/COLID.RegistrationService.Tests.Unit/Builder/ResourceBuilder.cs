@@ -236,11 +236,11 @@ namespace COLID.RegistrationService.Tests.Common.Builder
             return this;
         }
 
-        public ResourceBuilder WithHistoricVersion(string pidUri)
+       /* public ResourceBuilder WithHistoricVersion(string pidUri)
         {
             CreateOrOverwriteProperty(Graph.Metadata.Constants.Resource.HasHistoricVersion, pidUri);
             return this;
-        }
+        }*/
 
         // === TODO === //
 

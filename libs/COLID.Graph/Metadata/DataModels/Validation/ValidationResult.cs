@@ -17,6 +17,8 @@ namespace COLID.Graph.Metadata.DataModels.Validation
     {
         public bool Conforms { get => Severity == null; }
 
+        public string Triples { get; set; }
+
         [JsonConverter(typeof(StringEnumConverter))]
         public ValidationResultSeverity? Severity 
         {

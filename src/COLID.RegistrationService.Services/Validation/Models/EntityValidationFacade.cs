@@ -2,8 +2,7 @@
 using COLID.Graph.Metadata.DataModels.Metadata;
 using COLID.Graph.Metadata.DataModels.Resources;
 using COLID.Graph.Metadata.DataModels.Validation;
-using COLID.RegistrationService.Common.DataModel.Resources;
-using COLID.RegistrationService.Services.Interface;
+using COLID.Graph.TripleStore.DataModels.Resources;
 
 namespace COLID.RegistrationService.Services.Validation.Models
 {

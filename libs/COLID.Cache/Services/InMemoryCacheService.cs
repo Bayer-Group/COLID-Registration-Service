@@ -13,7 +13,7 @@ using Microsoft.Extensions.Options;
 
 namespace COLID.Cache.Services
 {
-    internal class InMemoryCacheService : ICacheService
+    public class InMemoryCacheService : ICacheService
     {
         private readonly IMemoryCache _memoryCache;
         private readonly IHostEnvironment _environment;
@@ -64,7 +64,16 @@ namespace COLID.Cache.Services
         public bool Set<T>(string key, T value, TimeSpan expirationTime)
         {
             Guard.ArgumentNotNullOrWhiteSpace(key, nameof(key));
-            Guard.ArgumentNotNull(value, nameof(value));
+
+            if (typeof(T) == typeof(string))
+            {
+                Guard.ArgumentNotNullOrWhiteSpace(value?.ToString(), nameof(value));
+            }
+            else
+            {
+                Guard.ArgumentNotNull(value, nameof(value));
+            }
+
             Guard.ArgumentNotNull(expirationTime, nameof(expirationTime));
 
             var entryKey = BuildCacheEntryKey(key);
@@ -102,7 +111,7 @@ namespace COLID.Cache.Services
                 }
                 catch (System.Exception ex) when (ex is NotSupportedException || ex is ArgumentNullException)
                 {
-                    Console.WriteLine($"Memory Cache Delete error for {key}", ex);
+                    _logger.LogError($"Memory Cache Delete error for {key}", ex);
                 }
             }
         }
@@ -237,7 +246,7 @@ namespace COLID.Cache.Services
             }
             catch (System.Exception ex) when (ex is NotSupportedException || ex is ArgumentNullException)
             {
-                Console.WriteLine($"Memory Cache Delete error for {key}", ex);
+                _logger.LogError($"Memory Cache Delete error for {key}", ex);
             }
         }
 
@@ -258,21 +267,30 @@ namespace COLID.Cache.Services
 
             var entryKey = addAppAndEnvNameToKey ? BuildCacheEntryKey(key) : key;
 
+            
             foreach (var k in _keys)
             {
-                if (Regex.IsMatch(k, $"{entryKey}{pattern}"))
+                try
                 {
-                    try
+                    if (Regex.IsMatch(k, $"{entryKey}{pattern}"))
                     {
-                        _memoryCache.Remove(k);
-                        _logger.LogDebug("Removed key {entryKey}", entryKey);
-                    }
-                    catch (System.Exception ex) when (ex is NotSupportedException || ex is ArgumentNullException)
-                    {
-                        _logger.LogError($"Memory Cache Delete error for {k}", ex);
+                        try
+                        {
+                            _memoryCache.Remove(k);
+                            _logger.LogDebug("Removed key {entryKey}", entryKey);
+                        }
+                        catch (System.Exception ex) when (ex is NotSupportedException || ex is ArgumentNullException)
+                        {
+                            _logger.LogError($"Memory Cache Delete error for {k}", ex);
+                        }
                     }
                 }
+                catch (System.Exception)
+                {
+
+                }
             }
+            
         }
 
         public void Delete(object o, string pattern)

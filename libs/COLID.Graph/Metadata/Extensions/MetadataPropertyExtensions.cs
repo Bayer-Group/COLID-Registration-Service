@@ -19,11 +19,12 @@ namespace COLID.Graph.Metadata.Extensions
 
             string hasPid = metadataProperty.Properties.GetValueOrNull(Constants.EnterpriseCore.PidUri, true);
 
-            if (hasPid == Constants.Resource.MainDistribution ||
+            if (hasPid == Constants.Resource.Attachment || 
+                hasPid == Constants.Resource.MainDistribution ||
                 hasPid == Constants.Resource.Distribution ||
                 hasPid == Constants.Resource.BaseUri ||
                 hasPid == Constants.RDF.Type ||
-                hasPid == Constants.Resource.HasHistoricVersion ||
+                //hasPid == Constants.Resource.HasHistoricVersion ||
                 hasPid == Constants.Resource.HasLaterVersion ||
                 hasPid == Constants.Resource.MetadataGraphConfiguration)
             {

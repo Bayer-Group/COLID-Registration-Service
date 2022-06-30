@@ -4,7 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using COLID.Graph.Metadata.DataModels.Metadata;
 using COLID.Graph.Metadata.DataModels.Resources;
 using COLID.Graph.Tests.Builder;
-using COLID.RegistrationService.Common.DataModel.Resources;
+using COLID.Graph.TripleStore.DataModels.Resources;
 using COLID.RegistrationService.Services.Interface;
 using COLID.RegistrationService.Services.Validation.Models;
 using COLID.RegistrationService.Services.Validation.Validators;
@@ -42,7 +42,7 @@ namespace COLID.RegistrationService.Tests.Unit.Services.Validation.Validators
 
             var requestResource = CreateResourceWithType(Graph.Metadata.Constants.Resource.Type.GenericDataset);
             var repoResource = CreateResourceWithType(Graph.Metadata.Constants.Resource.Type.Ontology);
-            var resourcesCTO = new ResourcesCTO(repoResource, repoResource);
+            var resourcesCTO = new ResourcesCTO(repoResource, repoResource, new List<VersionOverviewCTO>());
 
             var entityValidationFacade = new EntityValidationFacade(ResourceCrudAction.Update, requestResource, resourcesCTO, string.Empty, _metadata, string.Empty);
 

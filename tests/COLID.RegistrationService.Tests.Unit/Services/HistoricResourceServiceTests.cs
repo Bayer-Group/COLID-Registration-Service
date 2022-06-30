@@ -1,8 +1,9 @@
-﻿using System;
+﻿/*using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using COLID.Common.Extensions;
+using COLID.Graph.Metadata.Constants;
 using COLID.Graph.Metadata.DataModels.Metadata;
 using COLID.Graph.Metadata.Services;
 using COLID.RegistrationService.Common.DataModel.Resources;
@@ -13,11 +14,11 @@ using COLID.RegistrationService.Services.Implementation;
 using COLID.RegistrationService.Services.Interface;
 using COLID.RegistrationService.Tests.Common.Builder;
 using COLID.StatisticsLog.Services;
-using COLID.Graph.TripleStore.DataModels.Base;
 using Moq;
 using Xunit;
 using Microsoft.Extensions.Logging;
-using COLID.Graph.Metadata.DataModels.Resources;
+using Entity = COLID.Graph.TripleStore.DataModels.Base.Entity;
+using Resource = COLID.Graph.Metadata.DataModels.Resources.Resource;
 
 namespace COLID.RegistrationService.Tests.Unit.Services
 {
@@ -30,15 +31,30 @@ namespace COLID.RegistrationService.Tests.Unit.Services
         private readonly Mock<IMetadataService> _metadataService;
         private readonly IHistoricResourceService _service;
 
+        private readonly Uri _resourecGraph;
+        private readonly Uri _historicResourecGraph;
+
         public HistoricResourceServiceTests()
         {
+            _resourecGraph = new Uri("https://pid.bayer.com/resource/2.0");
+            _historicResourecGraph = new Uri("https://pid.bayer.com/resource/historic");
+
             _logger = new Mock<ILogger<HistoricResourceService>>();
             _historicRepo = new Mock<IHistoricResourceRepository>();
             _resourceRepo = new Mock<IResourceRepository>();
             _metadataService = new Mock<IMetadataService>();
 
+            SetupMetadataService();
+
             _service = new HistoricResourceService(_logger.Object, _historicRepo.Object, _resourceRepo.Object, _metadataService.Object);
         }
+
+        private void SetupMetadataService()
+        {
+            _metadataService.Setup(mock => mock.GetInstanceGraph(PIDO.PidConcept)).Returns(_resourecGraph);
+            _metadataService.Setup(mock => mock.GetHistoricInstanceGraph()).Returns(_historicResourecGraph);
+        }
+
 
         [Fact]
         public void CreateHistoricTest_Successful()
@@ -46,8 +62,8 @@ namespace COLID.RegistrationService.Tests.Unit.Services
             Resource resourceAfterMethod = null;
 
             // Arrange
-            _historicRepo.Setup(mock => mock.CreateHistoricResource(It.IsAny<Resource>(), It.IsAny<IList<MetadataProperty>>()))
-                .Callback<Resource, IList<MetadataProperty>>((r, mp) => resourceAfterMethod = r);
+            _historicRepo.Setup(mock => mock.CreateHistoricResource(It.IsAny<Resource>(), It.IsAny<IList<MetadataProperty>>(), _historicResourecGraph))
+                .Callback<Resource, IList<MetadataProperty>, Uri>((r, mp, ng) => resourceAfterMethod = r);
 
             Entity de = new DistributionEndpointBuilder().GenerateSampleData().Build();
             Entity mainDe = new DistributionEndpointBuilder().GenerateSampleData().WithNetworkAddress("www.google2").Build();
@@ -61,7 +77,7 @@ namespace COLID.RegistrationService.Tests.Unit.Services
             _service.CreateHistoricResource(res, new List<MetadataProperty>());
 
             // Assert
-            _historicRepo.Verify(mock => mock.CreateHistoricResource(It.IsAny<Resource>(), It.IsAny<IList<MetadataProperty>>()), Times.Once());
+            _historicRepo.Verify(mock => mock.CreateHistoricResource(It.IsAny<Resource>(), It.IsAny<IList<MetadataProperty>>(), _historicResourecGraph), Times.Once());
 
             res.Properties.TryGetValue(Graph.Metadata.Constants.Resource.HasEntryLifecycleStatus, out var entryLifecycleStatusValue);
             Assert.False(entryLifecycleStatusValue.Contains(ColidEntryLifecycleStatus.Published.GetDescription()));
@@ -83,8 +99,8 @@ namespace COLID.RegistrationService.Tests.Unit.Services
         {
             // Arrange
             Resource resourceAfterMethod = null;
-            _historicRepo.Setup(mock => mock.CreateHistoricResource(It.IsAny<Resource>(), It.IsAny<IList<MetadataProperty>>()))
-                .Callback<Resource, IList<MetadataProperty>>((r, mp) => resourceAfterMethod = r);
+            _historicRepo.Setup(mock => mock.CreateHistoricResource(It.IsAny<Resource>(), It.IsAny<IList<MetadataProperty>>(), _historicResourecGraph))
+                .Callback<Resource, IList<MetadataProperty>, Uri>((r, mp, ng) => resourceAfterMethod = r);
 
             Resource res = new ResourceBuilder().GenerateSampleData()
                 .WithEntryLifecycleStatus(ColidEntryLifecycleStatus.Draft)
@@ -94,14 +110,14 @@ namespace COLID.RegistrationService.Tests.Unit.Services
             _service.CreateHistoricResource(res, new List<MetadataProperty>());
 
             // Assert
-            _historicRepo.Verify(mock => mock.CreateHistoricResource(It.IsAny<Resource>(), It.IsAny<IList<MetadataProperty>>()), Times.Never());
+            _historicRepo.Verify(mock => mock.CreateHistoricResource(It.IsAny<Resource>(), It.IsAny<IList<MetadataProperty>>(),_historicResourecGraph), Times.Never());
         }
 
         [Fact]
         public void CreateHistoricTest_IgnoreNonPublishedResources()
         {
             // Arrange
-            _historicRepo.Setup(mock => mock.CreateHistoricResource(It.IsAny<Resource>(), It.IsAny<IList<MetadataProperty>>()));
+            _historicRepo.Setup(mock => mock.CreateHistoricResource(It.IsAny<Resource>(), It.IsAny<IList<MetadataProperty>>(), _historicResourecGraph));
             Resource res = new ResourceBuilder().GenerateSampleData().WithEntryLifecycleStatus(ColidEntryLifecycleStatus.Draft)
                 .WithHistoricVersion("http://somehistoricuri").Build();
 
@@ -109,7 +125,7 @@ namespace COLID.RegistrationService.Tests.Unit.Services
             _service.CreateHistoricResource(res, new List<MetadataProperty>());
 
             // Assert
-            _historicRepo.Verify(mock => mock.CreateHistoricResource(It.IsAny<Resource>(), It.IsAny<IList<MetadataProperty>>()), Times.Never());
+            _historicRepo.Verify(mock => mock.CreateHistoricResource(It.IsAny<Resource>(), It.IsAny<IList<MetadataProperty>>(), _historicResourecGraph), Times.Never());
         }
 
         [Theory]
@@ -121,11 +137,11 @@ namespace COLID.RegistrationService.Tests.Unit.Services
         public void CreateHasHistoricRelationTest_ThrowsArgumentException(string firstUri, string secondUri)
         {
             // Arrange
-            _resourceRepo.Setup(mock => mock.CreateProperty(It.IsAny<Uri>(), It.IsAny<Uri>(), It.IsAny<Uri>()));
+            _resourceRepo.Setup(mock => mock.CreateProperty(It.IsAny<Uri>(), It.IsAny<Uri>(), It.IsAny<Uri>(), _resourecGraph));
 
             // Act
             //Action act = () => _service.CreateHasHistoricRelation(firstUri, secondUri);
-            _resourceRepo.Verify(mock => mock.CreateProperty(It.IsAny<Uri>(), It.IsAny<Uri>(), It.IsAny<Uri>()), Times.Never());
+            _resourceRepo.Verify(mock => mock.CreateProperty(It.IsAny<Uri>(), It.IsAny<Uri>(), It.IsAny<Uri>(), _resourecGraph), Times.Never());
 
             // Assert
             //var exception = Assert.Throws<ArgumentException>(act);
@@ -145,3 +161,4 @@ namespace COLID.RegistrationService.Tests.Unit.Services
         }
     }
 }
+*/

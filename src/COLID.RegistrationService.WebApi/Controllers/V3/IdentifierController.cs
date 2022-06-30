@@ -9,6 +9,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using COLID.RegistrationService.Services.Validation;
 using COLID.Identity.Requirements;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
@@ -99,6 +101,30 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         {
             _identifierService.DeleteOrphanedIdentifier(uri);
             return Ok();
+        }
+
+        /// <summary>
+        /// Delete an orphaned multiple identifier which matches the given URI.
+        /// </summary>
+        /// <remarks>
+        /// This URI will be checked for any relations, before the identifier will be deleted.
+        /// <para><b>Caution:</b> If the uri doesn't match to an orphaned one, it won't be deleted but status 200 returns!</para>
+        /// </remarks>
+        /// <param name="uris">The URI of the extended uri template to delete.</param>
+        /// <response code="200">Ok, and the orphaned identifier was deleted.</response>
+        /// <response code="404">There is no resource for the given uri</response>
+        /// <response code="500">The uri is in the wrong format or no uri given</response>
+        [HttpDelete]
+        [ValidateActionParameters]
+        [Route("orphanedList")]
+        [ProducesResponseType(200)]
+        [Authorize(Policy = nameof(SuperadministratorRequirement))]
+        [ProducesResponseType(typeof(string), 404)]
+        [Log(LogType.AuditTrail)]
+        public async Task<IActionResult> DeleteOrphanedIdentifierList([FromBody] List<string> uris)
+        {
+            var result= await _identifierService.DeleteOrphanedIdentifierList(uris);
+            return Ok(result);
         }
     }
 }

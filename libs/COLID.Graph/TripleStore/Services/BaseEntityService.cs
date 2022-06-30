@@ -1,9 +1,11 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using AutoMapper;
 using COLID.Common.Extensions;
 using COLID.Exception.Models.Business;
+using COLID.Graph.Metadata.Constants;
 using COLID.Graph.Metadata.DataModels.Metadata;
 using COLID.Graph.Metadata.DataModels.Validation;
 using COLID.Graph.Metadata.Exceptions;
@@ -13,6 +15,7 @@ using COLID.Graph.TripleStore.DataModels.Base;
 using COLID.Graph.TripleStore.Extensions;
 using COLID.Graph.TripleStore.Repositories;
 using Microsoft.Extensions.Logging;
+using Entity = COLID.Graph.TripleStore.DataModels.Base.Entity;
 
 namespace COLID.Graph.TripleStore.Services
 {
@@ -56,7 +59,7 @@ namespace COLID.Graph.TripleStore.Services
                 throw new EntityValidationException(validationResult, entityResult);
             }
 
-            _repository.CreateEntity(entity, metadataProperties);
+            _repository.CreateEntity(entity, metadataProperties, GetInstanceGraph());
 
             return new TEntityWriteResult() { Entity = entityResult, ValidationResult = validationResult };
         }
@@ -64,7 +67,7 @@ namespace COLID.Graph.TripleStore.Services
         public virtual void DeleteEntity(string id)
         {
             CheckIfEntityExists(id);
-            _repository.DeleteEntity(id);
+            _repository.DeleteEntity(id, GetInstanceGraph());
         }
 
         private async Task<ValidationResult> ValidateEntity(TEntity entity, IList<MetadataProperty> metadataProperties, TEntity repoEntity = null)
@@ -93,7 +96,7 @@ namespace COLID.Graph.TripleStore.Services
 
         public virtual TEntityWriteResult EditEntity(string identifier, TEntityRequest baseEntityRequest)
         {
-            var repoEntity = _repository.GetEntityById(identifier);
+            var repoEntity = _repository.GetEntityById(identifier, GetAllInstanceGraphs());
 
             var entity = _mapper.Map<TEntity>(baseEntityRequest);
             entity.Id = identifier;
@@ -110,7 +113,7 @@ namespace COLID.Graph.TripleStore.Services
                 throw new EntityValidationException(validationResult, entityResult);
             }
 
-            _repository.UpdateEntity(entity, metadataProperties);
+            _repository.UpdateEntity(entity, metadataProperties, GetInstanceGraph());
 
             return new TEntityWriteResult { Entity = entityResult, ValidationResult = validationResult };
         }
@@ -119,7 +122,8 @@ namespace COLID.Graph.TripleStore.Services
         {
             var type = string.IsNullOrWhiteSpace(search?.Type) ? Type : search.Type;
             var types = _metadataService.GetLeafEntityTypes(type);
-            var entities = _repository.GetEntities(search, types);
+            // TODO: Fix graphs
+            var entities = _repository.GetEntities(search, types, GetAllInstanceGraphs());
 
             return entities
                     .Where(c => c.Id.IsValidBaseUri())
@@ -129,7 +133,7 @@ namespace COLID.Graph.TripleStore.Services
 
         public virtual TEntityResult GetEntity(string id)
         {
-            var entity = _repository.GetEntityById(id);
+            var entity = _repository.GetEntityById(id, GetAllInstanceGraphs());
             return _mapper.Map<TEntityResult>(entity);
         }
 
@@ -137,10 +141,28 @@ namespace COLID.Graph.TripleStore.Services
         {
             var types = _metadataService.GetLeafEntityTypes(Type);
 
-            if (!_repository.CheckIfEntityExists(id, types))
+            if (!_repository.CheckIfEntityExists(id, types, GetAllInstanceGraphs()))
             {
                 throw new EntityNotFoundException(Metadata.Constants.Messages.Entity.NotFound, id);
             }
+        }
+
+        protected Uri GetInstanceGraph()
+        {
+            string name = typeof(TEntity).GetAttributeValue((TypeAttribute type) => type.Type);
+            var instanceGraph = _metadataService.GetInstanceGraph(name);
+            return instanceGraph;
+        }
+
+        private ISet<Uri> GetAllInstanceGraphs()
+        {
+            return _metadataService.GetAllGraph();
+        }
+
+        public bool CheckIfPropertyValueExists(Uri predicate, string obj, string entityType, out string id)
+        {
+            var entityInstanceGraph = _metadataService.GetInstanceGraph(entityType);
+            return _repository.CheckIfPropertyValueExists(predicate, obj, entityType, entityInstanceGraph, out id);
         }
     }
 }

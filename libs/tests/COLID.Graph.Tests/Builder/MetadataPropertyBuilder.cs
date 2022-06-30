@@ -115,6 +115,12 @@ namespace COLID.Graph.Tests.Builder
             return this;
         }
 
+        public MetadataPropertyBuilder WithFieldType(string fieldType)
+        {
+            CreateAndAddPropety(Graph.Metadata.Constants.PIDO.Shacl.FieldType, fieldType);
+            return this;
+        }
+
         public MetadataPropertyBuilder WithNestedMetadata(IList<Graph.Metadata.DataModels.Metadata.Metadata> nestedMetadata)
         {
             _prop.NestedMetadata = nestedMetadata;

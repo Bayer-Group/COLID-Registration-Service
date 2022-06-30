@@ -1,4 +1,5 @@
-﻿using System.Net.Mime;
+﻿using System;
+using System.Net.Mime;
 using COLID.Cache.Services;
 using Microsoft.Extensions.Logging;
 
@@ -27,7 +28,7 @@ namespace COLID.Maintenance.Services
         public void UpdateInMaintenanceMode(bool inMaintenanceModeValue)
         {
             _logger.LogInformation("Services set to InMaintenance = {inMaintenanceModeValue}", inMaintenanceModeValue);
-            _cacheService.Set<bool>(InMaintenanceModeKey, inMaintenanceModeValue);
+            _cacheService.Set<bool>(InMaintenanceModeKey, inMaintenanceModeValue, TimeSpan.FromHours(24));
         }
 
     }

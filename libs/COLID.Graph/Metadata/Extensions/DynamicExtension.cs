@@ -1,5 +1,6 @@
 ﻿using System;
 using Newtonsoft.Json.Linq;
+using VDS.RDF.Parsing.Tokens;
 
 namespace COLID.Graph.Metadata.Extensions
 {
@@ -12,7 +13,8 @@ namespace COLID.Graph.Metadata.Extensions
                 result = value;
                 return true;
             }
-            else if (value is JObject)
+            
+            if (value is JObject)
             {
                 JObject jObject = value;
 

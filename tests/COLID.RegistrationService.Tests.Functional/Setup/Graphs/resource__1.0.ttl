@@ -15,8 +15,7 @@
                                                                        <https://pid.bayer.com/kos/19050/isDerivedFromDataset> <https://pid.bayer.com/kos/19050#fff23414-1b9c-446a-9bbd-28271ba33899> ;
                                                                        <https://pid.bayer.com/kos/19050/author> "tim.odenthal.ext@bayer.com" ;
                                                                        <https://pid.bayer.com/kos/19050/isPersonalData> "false"^^<http://www.w3.org/2001/XMLSchema#boolean> ;
-                                                                       <https://pid.bayer.com/kos/19050#hasConsumerGroup> <https://pid.bayer.com/kos/19050#bf2f8eeb-fdb9-4ee1-ad88-e8932fa8753c> ;
-                                                                       <https://pid.bayer.com/kos/19050/hasHistoricVersion> <https://pid.bayer.com/kos/19050#b2461db8-7280-4224-b7e5-678ef67e0c6a> .
+                                                                       <https://pid.bayer.com/kos/19050#hasConsumerGroup> <https://pid.bayer.com/kos/19050#bf2f8eeb-fdb9-4ee1-ad88-e8932fa8753c>.
                                                                       
 <https://pid.bayer.com/URI1010> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://pid.bayer.com/kos/19014/PermanentIdentifier> .
 
@@ -46,8 +45,7 @@
                                                                        <https://pid.bayer.com/kos/19050/lastChangeDateTime> "2019-12-19T14:24:36.316Z"^^<http://www.w3.org/2001/XMLSchema#dateTime> ;
                                                                        <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://pid.bayer.com/kos/19050/GenericDataset> ;
                                                                        <https://pid.bayer.com/kos/19050/author> "simon.lansing.ext@bayer.com" ;
-                                                                       <https://pid.bayer.com/kos/19050#hasConsumerGroup> <https://pid.bayer.com/kos/19050#bf2f8eeb-fdb9-4ee1-ad88-e8932fa8753c> ;
-                                                                       <https://pid.bayer.com/kos/19050/hasHistoricVersion> <https://pid.bayer.com/kos/19050#d9da2707-124d-4fca-a37b-c36bb25008cf> .
+                                                                       <https://pid.bayer.com/kos/19050#hasConsumerGroup> <https://pid.bayer.com/kos/19050#bf2f8eeb-fdb9-4ee1-ad88-e8932fa8753c>.
                                                                       
 <https://pid.bayer.com/URI5002> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://pid.bayer.com/kos/19014/PermanentIdentifier> .
 

@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-using COLID.RegistrationService.Services.Interface;
+using COLID.Graph.TripleStore.DataModels.Resources;
 using COLID.RegistrationService.Services.Validation.Models;
 
 namespace COLID.RegistrationService.Services.Validation.Validators.Keys

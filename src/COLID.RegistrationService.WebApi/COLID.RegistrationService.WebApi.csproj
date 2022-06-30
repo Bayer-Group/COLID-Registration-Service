@@ -26,6 +26,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\libs\COLID.Identity\COLID.Identity.csproj" />
+    <ProjectReference Include="..\..\libs\COLID.SQS\COLID.SQS.csproj" />
     <ProjectReference Include="..\..\libs\COLID.Swagger\COLID.Swagger.csproj" />
     <ProjectReference Include="..\..\libs\COLID.Maintenance\COLID.Maintenance.csproj" />
     <ProjectReference Include="..\COLID.RegistrationService.References\COLID.RegistrationService.References.csproj" />

@@ -12,6 +12,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Destructurama.JsonNet" Version="2.0.0" />
     <PackageReference Include="Elasticsearch.Net.Aws" Version="7.0.4" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="3.1.3" />
     <PackageReference Include="Serilog.Sinks.Console" Version="3.1.1" />

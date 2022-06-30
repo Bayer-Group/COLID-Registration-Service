@@ -2,19 +2,21 @@
 {
     public class SparqlResponseProperty
     {
-        public string Value { get; set; }
         public string Type { get; set; }
         public string DataType { get; set; }
+        public string Value { get; set; }
+        public string Language { get; set; }
 
         public SparqlResponseProperty()
         {
         }
 
-        public SparqlResponseProperty(string value, string type, string dataType)
+        public SparqlResponseProperty(string type, string dataType, string value, string language)
         {
-            Value = value;
             Type = type;
             DataType = dataType;
+            Value = value;
+            Language = language;
         }
     }
 }

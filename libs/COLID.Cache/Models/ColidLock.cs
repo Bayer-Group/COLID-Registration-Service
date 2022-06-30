@@ -45,6 +45,9 @@ namespace COLID.Cache.Models
         /// </summary>
         private bool _disposed;
 
+        public ColidLock() {
+        }
+
         public ColidLock(string resource, string lockId, bool isAcquired, RedLockStatus status, RedLockInstanceSummary instanceSummary, int extendCount, Action<string> disposeAction)
         {
             Resource = resource;

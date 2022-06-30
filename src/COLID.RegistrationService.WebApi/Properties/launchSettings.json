@@ -20,7 +20,7 @@
       "commandName": "IISExpress",
       "launchBrowser": true,
       "launchUrl": "swagger",
-      "environmentVariables": {
+      "environmentVariables": {        
         "ASPNETCORE_ENVIRONMENT": "OnPrem"
       }
     },
@@ -28,7 +28,7 @@
       "commandName": "IISExpress",
       "launchBrowser": true,
       "launchUrl": "swagger",
-      "environmentVariables": {
+      "environmentVariables": {        
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },

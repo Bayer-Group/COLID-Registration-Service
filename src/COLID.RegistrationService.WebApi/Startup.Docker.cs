@@ -3,6 +3,7 @@ using COLID.RegistrationService.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace COLID.RegistrationService.WebApi
 {
@@ -23,11 +24,10 @@ namespace COLID.RegistrationService.WebApi
         /// This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         /// </summary>
         /// <param name="app">The application builder</param>
-        /// <param name="env">The environment</param>
-        public void ConfigureDocker(IApplicationBuilder app, IWebHostEnvironment env)
+        public void ConfigureDocker(IApplicationBuilder app)
         {
             app.UseDeveloperExceptionPage();
-            Configure(app, env);
+            Configure(app);
         }
     }
 }

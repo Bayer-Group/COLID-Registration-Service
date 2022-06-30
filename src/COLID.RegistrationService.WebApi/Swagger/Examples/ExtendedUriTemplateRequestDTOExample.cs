@@ -21,12 +21,12 @@ namespace COLID.RegistrationService.WebApi.Swagger.Examples
             {
                 Properties = new Dictionary<string, List<dynamic>>()
                 {
-                    [RDF.Type] = new List<dynamic>() { Common.Constants.ExtendedUriTemplate.Type },
-                    [Common.Constants.ExtendedUriTemplate.HasTargetUriMatchRegex] = new List<dynamic>() { "^(.*)$" },
-                    [Common.Constants.ExtendedUriTemplate.HasPidUriSearchRegex] = new List<dynamic>() { "^https://qa-pid.bayer.com(.*)$" },
-                    [Common.Constants.ExtendedUriTemplate.HasReplacementString] = new List<dynamic>() { "{targetUri}$1" },
-                    [Common.Constants.ExtendedUriTemplate.UseHttpScheme] = new List<dynamic>() { "true" },
-                    [Common.Constants.ExtendedUriTemplate.HasOrder] = new List<dynamic>() { "4" },
+                    [RDF.Type] = new List<dynamic>() { COLID.Graph.Metadata.Constants.ExtendedUriTemplate.Type },
+                    [COLID.Graph.Metadata.Constants.ExtendedUriTemplate.HasTargetUriMatchRegex] = new List<dynamic>() { "^(.*)$" },
+                    [COLID.Graph.Metadata.Constants.ExtendedUriTemplate.HasPidUriSearchRegex] = new List<dynamic>() { "^https://qa-pid.bayer.com(.*)$" },
+                    [COLID.Graph.Metadata.Constants.ExtendedUriTemplate.HasReplacementString] = new List<dynamic>() { "{targetUri}$1" },
+                    [COLID.Graph.Metadata.Constants.ExtendedUriTemplate.UseHttpScheme] = new List<dynamic>() { "true" },
+                    [COLID.Graph.Metadata.Constants.ExtendedUriTemplate.HasOrder] = new List<dynamic>() { "4" },
                     [RDFS.Label] = new List<dynamic>() { "Standard case" }
                 }
             };

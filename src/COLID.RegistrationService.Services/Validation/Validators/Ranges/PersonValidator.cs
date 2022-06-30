@@ -1,17 +1,11 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
-using COLID.Common.Utilities;
 using COLID.Graph.Metadata.DataModels.Validation;
 using COLID.Graph.Metadata.Extensions;
+using COLID.Graph.TripleStore.DataModels.Resources;
 using COLID.RegistrationService.Services.Interface;
 using COLID.RegistrationService.Services.Validation.Models;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.VisualBasic;
-using VDS.RDF.Query.Paths;
 
 namespace COLID.RegistrationService.Services.Validation.Validators.Ranges
 {
@@ -20,7 +14,10 @@ namespace COLID.RegistrationService.Services.Validation.Validators.Ranges
     {
         private readonly IRemoteAppDataService _remoteAppDataService;
 
+        public override int Priority => 1;
         protected override string Range => Graph.Metadata.Constants.Person.Type;
+
+        protected override string FieldType => Graph.Metadata.Constants.PIDO.Shacl.FieldTypes.Person;
 
         public PersonValidator(IRemoteAppDataService remoteAppDataService)
         {
@@ -38,14 +35,15 @@ namespace COLID.RegistrationService.Services.Validation.Validators.Ranges
             {
                 try
                 {
-                    bool exists = _remoteAppDataService.CheckPerson(person).GetAwaiter().GetResult();
-
+                    bool exists = _remoteAppDataService.CheckPerson(person);
+                   
                     if (!exists)
                     {
                         var metadataProperty = validationFacade.MetadataProperties.FirstOrDefault(m => m.Key == properties.Key);
                         var criticalError = metadataProperty.IsTechnicalMetadataProperty() ? ValidationResultSeverity.Violation : ValidationResultSeverity.Warning;
                         validationFacade.ValidationResults.Add(new ValidationResultProperty(validationFacade.RequestResource.Id, properties.Key, person, string.Format(Common.Constants.Messages.Person.PersonNotFound, person), criticalError));
                         continue;
+                        
                     }
                 }
                 catch (ArgumentException)

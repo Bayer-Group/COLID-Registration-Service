@@ -17,7 +17,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V2
     [ApiVersion(Constants.API.Version.V2)]
     [Route("api/v{version:apiVersion}/reindex")]
     [Produces(MediaTypeNames.Application.Json)]
-    [ApiExplorerSettings(IgnoreApi = true)]
+    //[ApiExplorerSettings(IgnoreApi = true)]
     [Obsolete]
     public class IndexingController : Controller
     {

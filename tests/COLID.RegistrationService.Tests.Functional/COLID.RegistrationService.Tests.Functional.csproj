@@ -11,6 +11,7 @@
     <None Remove="Setup\Graphs\consumergroup__1.0.ttl" />
     <None Remove="Setup\Graphs\extended_uri_template__1.0.ttl" />
     <None Remove="Setup\Graphs\keyword__1.0.ttl" />
+    <None Remove="Setup\Graphs\linkhistory.ttl" />
     <None Remove="Setup\Graphs\metadata_graph_configuration.ttl" />
     <None Remove="Setup\Graphs\pid_enterprise_core_ontology__1.0.ttl" />
     <None Remove="Setup\Graphs\pid_ontology_oss__5.ttl" />
@@ -21,6 +22,7 @@
     <None Remove="Setup\Graphs\resources_historic.ttl" />
     <None Remove="Setup\Graphs\resource__1.0.ttl" />
     <None Remove="Setup\Graphs\resource__2.0.ttl" />
+    <None Remove="Setup\Graphs\resource__2.0__Draft.ttl" />
   </ItemGroup>
 
   <ItemGroup>
@@ -35,6 +37,10 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.6.1" />
     <PackageReference Include="Moq" Version="4.14.5" />
     <PackageReference Include="xunit" Version="2.4.1" />
+    <PackageReference Include="coverlet.msbuild" Version="2.9.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="xunit.runner.visualstudio" Version="2.4.1" />
     <DotNetCliToolReference Include="dotnet-xunit" Version="2.3.1" />
   </ItemGroup>
@@ -77,6 +83,12 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </EmbeddedResource>
     <EmbeddedResource Include="Setup\Graphs\resources_historic.ttl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Setup\Graphs\linkhistory.ttl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Setup\Graphs\resource__2.0__Draft.ttl">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </EmbeddedResource>
     <EmbeddedResource Include="Setup\Graphs\resource__2.0.ttl">

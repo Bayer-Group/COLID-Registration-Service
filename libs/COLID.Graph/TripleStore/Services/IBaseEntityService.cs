@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using COLID.Graph.TripleStore.DataModels.Base;
 using COLID.Graph.TripleStore.Repositories;
@@ -53,5 +54,16 @@ namespace COLID.Graph.TripleStore.Services
         /// </summary>
         /// <param name="id">the entity to delete</param>
         void DeleteEntity(string id);
+
+        /// <summary>
+        /// Checks if an instance exists that has the given property.
+        /// A string comparison is made for the object to exclude any differences in the data type. 
+        /// </summary>
+        /// <param name="predicate">Uri of the property to be checked</param>
+        /// <param name="obj">String of the value (object) to be checked</param>
+        /// <param name="entityType">Entity type of the instances to be checked</param>
+        /// <param name="id">Output parameter is the id of the located instance.</param>
+        /// <returns>true if entity exists, otherwise false</returns>
+        bool CheckIfPropertyValueExists(Uri predicate, string obj, string entityType, out string id);
     }
 }

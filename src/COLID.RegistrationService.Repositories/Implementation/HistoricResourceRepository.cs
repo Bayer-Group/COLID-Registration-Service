@@ -1,16 +1,17 @@
-﻿using System;
+﻿/*using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using COLID.Common.Utilities;
 using COLID.Exception.Models.Business;
 using COLID.Graph.Metadata.DataModels.Metadata;
 using COLID.Graph.Metadata.DataModels.Resources;
-using COLID.Graph.Metadata.Repositories;
 using COLID.Graph.TripleStore.DataModels.Base;
 using COLID.Graph.TripleStore.Extensions;
 using COLID.Graph.TripleStore.Repositories;
 using COLID.RegistrationService.Common.DataModel.Resources;
 using COLID.RegistrationService.Repositories.Interface;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using VDS.RDF.Query;
 
@@ -18,9 +19,6 @@ namespace COLID.RegistrationService.Repositories.Implementation
 {
     internal class HistoricResourceRepository : BaseRepository<Resource>, IHistoricResourceRepository
     {
-        protected override string InsertingGraph => Graph.Metadata.Constants.MetadataGraphConfiguration.HasResourceHistoryGraph;
-
-        protected override IEnumerable<string> QueryGraphs => new List<string>() { Graph.Metadata.Constants.MetadataGraphConfiguration.HasResourcesGraph };
 
         private readonly string deleteInboundLinksToLinkedResourceQuery = @"
             WITH @historicGraph
@@ -29,8 +27,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
                 GRAPH @historicGraph {
                     ?otherResource ?predicate ?subject
                 }
-                Values ?queryGraph { @queryGraphList }
-                GRAPH ?queryGraph {
+                GRAPH @resourceGraph {
                     ?subject @hasPid @pidUri.
                     ?subject @hasEntryLifeCycleStatus @linkedResourceLifecycleStatus.
                 }
@@ -44,8 +41,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
                 GRAPH @historicGraph {
                     ?subject ?predicate ?otherResource
                 }
-                Values ?queryGraph { @queryGraphList }
-                GRAPH ?queryGraph {
+                GRAPH @resourceGraph {
                     ?subject @hasPid @pidUri.
                     ?subject @hasEntryLifeCycleStatus @linkedResourceLifecycleStatus.
                 }
@@ -53,9 +49,9 @@ namespace COLID.RegistrationService.Repositories.Implementation
             ";
 
         public HistoricResourceRepository(
+            IConfiguration configuration,
             ITripleStoreRepository tripleStoreRepository,
-            ILogger<HistoricResourceRepository> logger,
-            IMetadataGraphConfigurationRepository metadataGraphConfigurationRepository) : base(tripleStoreRepository, metadataGraphConfigurationRepository, logger)
+            ILogger<HistoricResourceRepository> logger) : base(configuration, tripleStoreRepository, logger)
         {
         }
 
@@ -64,7 +60,8 @@ namespace COLID.RegistrationService.Repositories.Implementation
         /// </summary>
         /// <param name="pidUri">the resource to search for</param>
         /// <returns>a list of resource-information related to the pidUri</returns>
-        public IList<HistoricResourceOverviewDTO> GetHistoricOverviewByPidUri(string pidUri)
+        /// <param name="historicNamedGraph">Named graph for historic resource</param>
+        public IList<HistoricResourceOverviewDTO> GetHistoricOverviewByPidUri(string pidUri, Uri historicNamedGraph)
         {
             CheckArgumentForValidUri(pidUri);
 
@@ -72,7 +69,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
             {
                 CommandText = @"
                 SELECT ?subject ?hasLabel ?lastChangeDateTime ?lastChangeUser
-                @fromHistoricGraph
+                From @historicGraph
                 WHERE {
                     ?subject @hasPid @pidUri .
                     ?subject @lastChangeDateTime ?lastChangeDateTime .
@@ -81,7 +78,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
                 ORDER BY DESC(?lastChangeDateTime)"
             };
 
-            parameterizedString.SetPlainLiteral("fromHistoricGraph", _metadataGraphConfigurationRepository.GetGraphs(Graph.Metadata.Constants.MetadataGraphConfiguration.HasResourceHistoryGraph).JoinAsFromNamedGraphs());
+            parameterizedString.SetUri("historicGraph", historicNamedGraph);
             parameterizedString.SetUri("hasPid", new Uri(Graph.Metadata.Constants.EnterpriseCore.PidUri));
             parameterizedString.SetUri("pidUri", new Uri(pidUri));
             parameterizedString.SetUri("lastChangeDateTime", new Uri(Graph.Metadata.Constants.Resource.DateModified));
@@ -112,21 +109,22 @@ namespace COLID.RegistrationService.Repositories.Implementation
         /// Based on a given information, a resource will be stored within a separate graph,
         /// which is only responsible for historization purposes.
         /// </summary>
-        /// <param name="resource">the resource to store</param>
-        /// <param name="metadata">the metadata properties to store</param>
-        public void CreateHistoricResource(Resource exisingResource, IList<MetadataProperty> metadataProperties)
+        /// <param name="exisingResource">the resource to store</param>
+        /// <param name="metadataProperties">the metadata properties to store</param>
+        /// <param name="historicNamedGraph">Named graph for historic resource</param>
+        public void CreateHistoricResource(Resource exisingResource, IList<MetadataProperty> metadataProperties, Uri historicNamedGraph)
         {
-            var createQuery = base.GenerateInsertQuery(exisingResource, metadataProperties, InsertingGraph, QueryGraphs);
+            var createQuery = base.GenerateInsertQuery(exisingResource, metadataProperties, historicNamedGraph);
             _logger.LogDebug($"CreateHistoric-Query for {exisingResource.Id.ToString()} : {createQuery}");
             _tripleStoreRepository.UpdateTripleStore(createQuery);
         }
 
-        public override void DeleteEntity(string id)
+        public override void DeleteEntity(string id, Uri historicNamedGraph)
         {
             throw new NotImplementedException();
         }
 
-        public void DeleteDraftResourceLinks(Uri pidUri)
+        public void DeleteDraftResourceLinks(Uri pidUri, Uri historicNamedGraph, Uri resourceNamedGraph)
         {
             var deleteQuery = new SparqlParameterizedString
             {
@@ -135,8 +133,8 @@ namespace COLID.RegistrationService.Repositories.Implementation
                     deleteOutboundLinksFromLinkedResourceQuery
             };
 
-            deleteQuery.SetUri("historicGraph", new Uri(_metadataGraphConfigurationRepository.GetSingleGraph(InsertingGraph)));
-            deleteQuery.SetPlainLiteral("queryGraphList", _metadataGraphConfigurationRepository.GetGraphs(QueryGraphs).JoinAsValuesList());
+            deleteQuery.SetUri("historicGraph", historicNamedGraph);
+            deleteQuery.SetUri("resourceGraph", resourceNamedGraph);
             deleteQuery.SetUri("hasEntryLifeCycleStatus", new Uri(Graph.Metadata.Constants.Resource.HasEntryLifecycleStatus));
             deleteQuery.SetUri("linkedResourceLifecycleStatus", new Uri(Graph.Metadata.Constants.Resource.ColidEntryLifecycleStatus.Draft));
             deleteQuery.SetUri("hasPid", new Uri(Graph.Metadata.Constants.EnterpriseCore.PidUri));
@@ -145,7 +143,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
             _tripleStoreRepository.UpdateTripleStore(deleteQuery);
         }
 
-        public void DeleteHistoricResourceChain(Uri pidUri)
+        public void DeleteHistoricResourceChain(Uri pidUri, Uri historicNamedGraph, Uri resourceNamedGraph)
         {
             var deleteInboundLinksToAllHistoricResourcesQuery = @"
                 WITH @historicGraph
@@ -200,8 +198,8 @@ namespace COLID.RegistrationService.Repositories.Implementation
                     deleteAllHistoricResourcesQuery
             };
 
-            deleteQuery.SetUri("historicGraph", new Uri(_metadataGraphConfigurationRepository.GetSingleGraph(InsertingGraph)));
-            deleteQuery.SetPlainLiteral("queryGraphList", _metadataGraphConfigurationRepository.GetGraphs(QueryGraphs).JoinAsValuesList());
+            deleteQuery.SetUri("historicGraph", historicNamedGraph);
+            deleteQuery.SetUri("resourceGraph", resourceNamedGraph);
             deleteQuery.SetUri("distribution", new Uri(Graph.Metadata.Constants.Resource.Distribution));
             deleteQuery.SetUri("mainDistribution", new Uri(Graph.Metadata.Constants.Resource.MainDistribution));
             deleteQuery.SetUri("hasEntryLifeCycleStatus", new Uri(Graph.Metadata.Constants.Resource.HasEntryLifecycleStatus));
@@ -213,7 +211,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
             _tripleStoreRepository.UpdateTripleStore(deleteQuery);
         }
 
-        public void CreateInboundLinksForHistoricResource(Resource newHistoricResource)
+        public void CreateInboundLinksForHistoricResource(Resource newHistoricResource, Uri historicNamedGraph, Uri resourceNamedGraph)
         {
             // While publishing a draft resource, the old published needs to be set historic. In this case we have to add all
             // inbound links to the historic graph, which were between any found resource and the old published (then new historic)
@@ -224,20 +222,19 @@ namespace COLID.RegistrationService.Repositories.Implementation
             var insertQuery = new SparqlParameterizedString()
             {
                 CommandText = @"
-                INSERT { GRAPH @historicResourceGraph {
+                INSERT { GRAPH @historicGraph {
                     ?anyResource ?points @historicResourceSubject }
                 }
                 WHERE {
-                    Values ?queryGraph { @queryGraphList }
-                    GRAPH ?queryGraph {
+                    GRAPH @resourceGraph {
                         ?anyResource ?points ?newPublishedResource.
                         ?newPublishedResource @hasPid @pidUri.
                     }
                 };"
             };
 
-            insertQuery.SetUri("historicResourceGraph", new Uri(_metadataGraphConfigurationRepository.GetSingleGraph(InsertingGraph)));
-            insertQuery.SetPlainLiteral("queryGraphList", _metadataGraphConfigurationRepository.GetGraphs(QueryGraphs).JoinAsValuesList());
+            insertQuery.SetUri("historicGraph", historicNamedGraph);
+            insertQuery.SetUri("resourceGraph", resourceNamedGraph);
 
             insertQuery.SetUri("historicResourceSubject", new Uri(newHistoricResource.Id));
             insertQuery.SetUri("hasEntryLifecycleStatus", new Uri(Graph.Metadata.Constants.Resource.HasEntryLifecycleStatus));
@@ -247,7 +244,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
             _tripleStoreRepository.UpdateTripleStore(insertQuery);
         }
 
-        public Resource GetHistoricResource(string pidUri, string id, IList<string> resourceTypes)
+        public Resource GetHistoricResource(string pidUri, string id, IList<string> resourceTypes, Uri historicNamedGraph, Uri resourceNamedGraph)
         {
             CheckArgumentForValidUri(id);
             CheckArgumentForValidUri(pidUri);
@@ -255,8 +252,8 @@ namespace COLID.RegistrationService.Repositories.Implementation
             var parameterizedString = new SparqlParameterizedString()
             {
                 CommandText = @"SELECT DISTINCT ?subject ?object ?predicate ?object_ ?objectPidUri
-                  FROM @queryGraphList
-                  FROM @historicResourceGraph
+                  FROM @resourceGraph
+                  FROM @historicGraph
                   WHERE {
                       BIND(@subject AS ?subject).
                       {
@@ -278,8 +275,8 @@ namespace COLID.RegistrationService.Repositories.Implementation
                   }"
             };
 
-            parameterizedString.SetPlainLiteral("queryGraphList", _metadataGraphConfigurationRepository.GetGraphs(QueryGraphs).JoinAsGraphsList());
-            parameterizedString.SetUri("historicResourceGraph", new Uri(_metadataGraphConfigurationRepository.GetSingleGraph(InsertingGraph)));
+            parameterizedString.SetUri("historicGraph", historicNamedGraph);
+            parameterizedString.SetUri("resourceGraph", resourceNamedGraph);
             parameterizedString.SetUri("entryLifecycleStatus", new Uri(Graph.Metadata.Constants.Resource.HasEntryLifecycleStatus));
             parameterizedString.SetUri("historicStatus", new Uri(Graph.Metadata.Constants.Resource.ColidEntryLifecycleStatus.Historic));
             parameterizedString.SetUri("hasPid", new Uri(Graph.Metadata.Constants.EnterpriseCore.PidUri));
@@ -295,20 +292,20 @@ namespace COLID.RegistrationService.Repositories.Implementation
                 throw new EntityNotFoundException(Graph.Metadata.Constants.Messages.Entity.NotFound, id);
             }
 
-            var resource = TransformQueryResults(results, id.ToString()).FirstOrDefault();
+            var resource = TransformQueryResults(results, id, resourceNamedGraph).FirstOrDefault();
 
             return resource;
         }
 
-        public Resource GetHistoricResource(string id, IList<string> resourceTypes)
+        public Resource GetHistoricResource(string id, IList<string> resourceTypes, Uri historicNamedGraph, Uri resourceNamedGraph)
         {
             CheckArgumentForValidUri(id);
 
             var parameterizedString = new SparqlParameterizedString()
             {
                 CommandText = @"SELECT DISTINCT ?subject ?object ?predicate ?object_ ?objectPidUri
-                  FROM @queryGraphList
-                  FROM @historicResourceGraph
+                  FROM @resourceGraph
+                  FROM @historicGraph
                   WHERE {
                       BIND(@subject AS ?subject).
                       {
@@ -328,8 +325,8 @@ namespace COLID.RegistrationService.Repositories.Implementation
                   }"
             };
 
-            parameterizedString.SetPlainLiteral("queryGraphList", _metadataGraphConfigurationRepository.GetGraphs(QueryGraphs).JoinAsGraphsList());
-            parameterizedString.SetUri("historicResourceGraph", new Uri(_metadataGraphConfigurationRepository.GetSingleGraph(InsertingGraph)));
+            parameterizedString.SetUri("historicGraph", historicNamedGraph);
+            parameterizedString.SetUri("resourceGraph", resourceNamedGraph);
             parameterizedString.SetUri("entryLifecycleStatus", new Uri(Graph.Metadata.Constants.Resource.HasEntryLifecycleStatus));
             parameterizedString.SetUri("historicStatus", new Uri(Graph.Metadata.Constants.Resource.ColidEntryLifecycleStatus.Historic));
             parameterizedString.SetUri("hasPid", new Uri(Graph.Metadata.Constants.EnterpriseCore.PidUri));
@@ -344,15 +341,17 @@ namespace COLID.RegistrationService.Repositories.Implementation
                 throw new EntityNotFoundException(Graph.Metadata.Constants.Messages.Entity.NotFound, id);
             }
 
-            var resource = TransformQueryResults(results, id.ToString()).FirstOrDefault();
+            var resource = TransformQueryResults(results, id, resourceNamedGraph).FirstOrDefault();
 
             return resource;
         }
 
         // === Transformation of results copied from resources. Extract to helper/super-method later ===
 
-        protected override IList<Resource> TransformQueryResults(SparqlResultSet results, string id = "")
+        protected override IList<Resource> TransformQueryResults(SparqlResultSet results, string id = "", Uri resourceNamedGraph = null)
         {
+            Guard.IsValidUri(resourceNamedGraph);
+
             if (results.IsEmpty)
             {
                 return new List<Resource>();
@@ -364,10 +363,10 @@ namespace COLID.RegistrationService.Repositories.Implementation
             var inboundCounter = 0;
             var tasks = new List<Task>();
 
-            return groupedResults.Select(result => CreateResourceFromGroupedResult(result, counter, inboundCounter)).ToList();
+            return groupedResults.Select(result => CreateResourceFromGroupedResult(result, counter, inboundCounter, resourceNamedGraph)).ToList();
         }
 
-        private Resource CreateResourceFromGroupedResult(IGrouping<string, SparqlResult> result, int counter, int inboundCounter)
+        private Resource CreateResourceFromGroupedResult(IGrouping<string, SparqlResult> result, int counter, int inboundCounter, Uri resourceNamedGraph)
         {
             var id = result.Key;
 
@@ -379,12 +378,12 @@ namespace COLID.RegistrationService.Repositories.Implementation
                 InboundProperties = GetInboundEntityPropertiesFromSparqlResultByList(result, inboundCounter)
             };
 
-            newEntity.Versions = GetAllVersionsOfResourceByPidUri(newEntity.PidUri);
+            newEntity.Versions = GetAllVersionsOfResourceByPidUri(newEntity.PidUri, resourceNamedGraph);
 
             return newEntity;
         }
 
-        public IList<VersionOverviewCTO> GetAllVersionsOfResourceByPidUri(Uri pidUri)
+        public IList<VersionOverviewCTO> GetAllVersionsOfResourceByPidUri(Uri pidUri, Uri resourceNamedGraph)
         {
             if (pidUri == null)
             {
@@ -395,7 +394,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
             var parameterizedString = new SparqlParameterizedString
             {
                 CommandText = @"SELECT DISTINCT ?resource ?pidUri ?version ?baseUri
-                  @fromResourceNamedGraph
+                  From @resourceGraph
                   WHERE {
                   ?subject @hasPid @hasPidUri
                   Filter NOT EXISTS{?_subject @hasPidEntryDraft ?subject}
@@ -417,7 +416,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
 
             // Select all resources with their PID and target Url, which are of type resource and published
 
-            parameterizedString.SetPlainLiteral("fromResourceNamedGraph", _metadataGraphConfigurationRepository.GetGraphs(QueryGraphs).JoinAsFromNamedGraphs());
+            parameterizedString.SetUri("resourceGraph", resourceNamedGraph);
             parameterizedString.SetUri("hasPidUri", pidUri);
             parameterizedString.SetUri("hasPid", new Uri(Graph.Metadata.Constants.EnterpriseCore.PidUri));
             parameterizedString.SetUri("hasBaseUri", new Uri(Graph.Metadata.Constants.Resource.BaseUri));
@@ -476,8 +475,8 @@ namespace COLID.RegistrationService.Repositories.Implementation
                         }
 
                         return value;
-                    }).ToList(); ;
-                }); ;
+                    }).ToList();
+                });
         }
 
         private IDictionary<string, List<dynamic>> GetInboundEntityPropertiesFromSparqlResultByList(IGrouping<string, SparqlResult> sparqlResults, int counter)
@@ -512,3 +511,4 @@ namespace COLID.RegistrationService.Repositories.Implementation
         }
     }
 }
+*/

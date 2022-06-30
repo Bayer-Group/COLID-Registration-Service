@@ -69,14 +69,12 @@ namespace COLID.Graph.Metadata.Services
             var validationResults = new List<ValidationResultProperty>();
 
             validationResults.AddRange(CheckGraphsExistenceForType(metadataGraphConfiguration, Constants.MetadataGraphConfiguration.HasConsumerGroupGraph));
-            validationResults.AddRange(CheckGraphsExistenceForType(metadataGraphConfiguration, Constants.MetadataGraphConfiguration.HasECOGraph));
             validationResults.AddRange(CheckGraphsExistenceForType(metadataGraphConfiguration, Constants.MetadataGraphConfiguration.HasExtendedUriTemplateGraph));
             validationResults.AddRange(CheckGraphsExistenceForType(metadataGraphConfiguration, Constants.MetadataGraphConfiguration.HasKeywordsGraph));
             validationResults.AddRange(CheckGraphsExistenceForType(metadataGraphConfiguration, Constants.MetadataGraphConfiguration.HasMetadataGraph));
             validationResults.AddRange(CheckGraphsExistenceForType(metadataGraphConfiguration, Constants.MetadataGraphConfiguration.HasPidUriTemplatesGraph));
             validationResults.AddRange(CheckGraphsExistenceForType(metadataGraphConfiguration, Constants.MetadataGraphConfiguration.HasResourcesGraph));
             validationResults.AddRange(CheckGraphsExistenceForType(metadataGraphConfiguration, Constants.MetadataGraphConfiguration.HasResourceHistoryGraph));
-            validationResults.AddRange(CheckGraphsExistenceForType(metadataGraphConfiguration, Constants.MetadataGraphConfiguration.HasShaclConstraintsGraph));
 
             return validationResults;
         }
