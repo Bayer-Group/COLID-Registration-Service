@@ -2,7 +2,6 @@
 using COLID.Graph.HashGenerator.Services;
 using COLID.Graph.Metadata.Repositories;
 using COLID.Graph.Metadata.Services;
-using COLID.Graph.TripleStore.AWS;
 using COLID.Graph.TripleStore.Configuration;
 using COLID.Graph.TripleStore.Repositories;
 using Microsoft.Extensions.Configuration;
@@ -52,9 +51,6 @@ namespace COLID.Graph
             services.AddTransient<IGraphRepository, GraphRepository>();
             services.AddTransient<IMetadataRepository, MetadataRepository>();
             services.AddTransient<IMetadataGraphConfigurationRepository, MetadataGraphConfigurationRepository>();
-
-            services.AddTransient<IEc2InstanceMetadataConnector, Ec2InstanceMetadataConnector>();
-            services.AddTransient<INeptuneLoaderConnector, NeptuneLoaderConnector>();
 
             return services;
         }

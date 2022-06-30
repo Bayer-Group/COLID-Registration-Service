@@ -1,11 +1,19 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
+using COLID.Graph.Metadata.Constants;
 using COLID.Graph.TripleStore.Configuration;
 using COLID.Graph.TripleStore.Extensions;
 using COLID.Graph.TripleStore.Transactions;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using VDS.RDF;
+using VDS.RDF.Parsing;
 using VDS.RDF.Query;
+using VDS.RDF.Shacl.Validation;
 using VDS.RDF.Update;
+using VDS.RDF.Writing;
+
 
 namespace COLID.Graph.TripleStore.Repositories
 {
@@ -15,13 +23,16 @@ namespace COLID.Graph.TripleStore.Repositories
         private readonly SparqlRemoteEndpoint _queryEndpoint;
         private readonly SparqlRemoteUpdateEndpoint _updateEndpoint;
         private ITripleStoreTransaction _transaction;
+        private ILogger<TripleStoreTransaction> _logger;
 
-        public TripleStoreRepository(IOptionsMonitor<ColidTripleStoreOptions> options)
+
+        public TripleStoreRepository(IOptionsMonitor<ColidTripleStoreOptions> options, ILogger<TripleStoreTransaction> logger)
         {
             var updateEndpoint = new SparqlRemoteUpdateEndpoint(options.CurrentValue.UpdateUrl);
             updateEndpoint.SetCredentials(options.CurrentValue.Username, options.CurrentValue.Password);
-            _queryEndpoint = new SparqlRemoteEndpoint(options.CurrentValue.ReadUrl); ;
+            _queryEndpoint = new SparqlRemoteEndpoint(options.CurrentValue.ReadUrl);
             _updateEndpoint = updateEndpoint;
+            _logger = logger;
         }
 
         public TripleStoreRepository()
@@ -46,7 +57,6 @@ namespace COLID.Graph.TripleStore.Repositories
             {
                 return string.Empty;
             }
-            
             queryString.AddAllColidNamespaces();
             using var dataStream = _queryEndpoint.QueryRaw(queryString.ToString()).GetResponseStream();
             using var reader = new StreamReader(dataStream);
@@ -76,7 +86,7 @@ namespace COLID.Graph.TripleStore.Repositories
 
         public ITripleStoreTransaction CreateTransaction()
         {
-            _transaction = new TripleStoreTransaction(this);
+            _transaction = new TripleStoreTransaction(this,this._logger);
             return _transaction;
         }
     }

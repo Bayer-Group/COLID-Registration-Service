@@ -10,6 +10,7 @@ using COLID.Common.Extensions;
 using COLID.Common.Utilities;
 using COLID.Exception.Models;
 using COLID.Exception.Models.Business;
+using COLID.Graph.Metadata.Constants;
 using COLID.Graph.Metadata.DataModels.Metadata;
 using COLID.Graph.Metadata.DataModels.Validation;
 using COLID.Graph.Metadata.Services;
@@ -25,6 +26,7 @@ using COLID.RegistrationService.Services.Interface;
 using COLID.StatisticsLog.Services;
 using Microsoft.Extensions.Logging;
 using COLID.RegistrationService.Services.Extensions;
+using ConsumerGroup = COLID.Graph.TripleStore.DataModels.ConsumerGroups.ConsumerGroup;
 
 namespace COLID.RegistrationService.Services.Implementation
 {
@@ -59,7 +61,7 @@ namespace COLID.RegistrationService.Services.Implementation
         public override IList<ConsumerGroupResultDTO> GetEntities(EntitySearch search)
         {
             var cacheKey = search == null ? Type : search.CalculateHash();
-            return _cacheService.GetOrAdd($"entities:{cacheKey}", () => base.GetEntities(search));
+            return _cacheService.GetOrAdd($"ConsumerGroups:{cacheKey}", () => base.GetEntities(search));
         }
 
         public override ConsumerGroupResultDTO GetEntity(string id)
@@ -71,14 +73,14 @@ namespace COLID.RegistrationService.Services.Implementation
         {
             var editedEntity = base.EditEntity(identifier, baseEntityRequest);
             _cacheService.DeleteRelatedCacheEntries<ConsumerGroupService, ConsumerGroup>(identifier);
-
+            
             return editedEntity;
         }
 
         public IList<ConsumerGroupResultDTO> GetActiveEntities()
         {
-            var entities = _cacheService.GetOrAdd($"lifecyclestatus:{Graph.Metadata.Constants.ConsumerGroup.LifecycleStatus.Active}", () => _repository
-                .GetConsumerGroupsByLifecycleStatus(Graph.Metadata.Constants.ConsumerGroup.LifecycleStatus.Active));
+            var entities = _cacheService.GetOrAdd($"ActiveConsumerGroups:{Graph.Metadata.Constants.ConsumerGroup.LifecycleStatus.Active}", () => _repository
+                .GetConsumerGroupsByLifecycleStatus(Graph.Metadata.Constants.ConsumerGroup.LifecycleStatus.Active, GetInstanceGraph()));
 
             if (!_userInfoService.HasAdminPrivileges() && !_userInfoService.HasApiToApiPrivileges())
             {
@@ -91,7 +93,7 @@ namespace COLID.RegistrationService.Services.Implementation
 
         public string GetAdRoleForConsumerGroup(string id)
         {
-            var adRole = _cacheService.GetOrAdd($"ad-role:{id}", () => _repository.GetAdRoleForConsumerGroup(id));
+            var adRole = _cacheService.GetOrAdd($"ad-role:{id}", () => _repository.GetAdRoleForConsumerGroup(id, GetInstanceGraph()));
             return adRole;
         }
 
@@ -157,7 +159,7 @@ namespace COLID.RegistrationService.Services.Implementation
                 {
                     try
                     {
-                        bool exists = _remoteAppDataService.CheckPerson(person).Result;
+                        bool exists = _remoteAppDataService.CheckPerson(person);
                         if (!exists)
                         {
                             validationResults.Add(new ValidationResultProperty(entity.Id, Graph.Metadata.Constants.ConsumerGroup.HasContactPerson, person, string.Format(Common.Constants.Messages.Person.PersonNotFound, person), ValidationResultSeverity.Violation));
@@ -176,15 +178,15 @@ namespace COLID.RegistrationService.Services.Implementation
 
         private static bool CheckTemplateLifecycleStatusIsDeprecated(PidUriTemplateResultDTO pidUriTemplate)
         {
-            return pidUriTemplate.Properties.GetValueOrNull(Common.Constants.PidUriTemplate.HasLifecycleStatus, true) ==
-                                          Common.Constants.PidUriTemplate.LifecycleStatus.Deprecated;
+            return pidUriTemplate.Properties.GetValueOrNull(COLID.Graph.Metadata.Constants.PidUriTemplate.HasLifecycleStatus, true) ==
+                                          COLID.Graph.Metadata.Constants.PidUriTemplate.LifecycleStatus.Deprecated;
         }
 
         public override async Task<ConsumerGroupWriteResultCTO> CreateEntity(ConsumerGroupRequestDTO consumerGroupRequest)
         {
             var result = await base.CreateEntity(consumerGroupRequest);
             _cacheService.DeleteRelatedCacheEntries<ConsumerGroupService, ConsumerGroup>();
-
+            
             try
             {
                 var cgUri = new Uri(result.Entity.Id);
@@ -212,11 +214,11 @@ namespace COLID.RegistrationService.Services.Implementation
             }
 
             var consumerGroupResult = GetEntity(id);
-            var consumerGroupReference = _repository.CheckConsumerGroupHasColidEntryReference(id);
+            var consumerGroupReference = _repository.CheckConsumerGroupHasColidEntryReference(id, GetInstanceGraph(), _metadataService.GetInstanceGraph("draft"), _metadataService.GetInstanceGraph(PIDO.PidConcept));
 
             if (!consumerGroupReference)
             {
-                _repository.DeleteEntity(id);
+                _repository.DeleteEntity(id, GetInstanceGraph());
                 _remoteAppDataService.DeleteConsumerGroup(new Uri(id));
 
                 _auditTrailLogService.AuditTrail($"Consumer Group with id {id} deleted.");
@@ -234,7 +236,7 @@ namespace COLID.RegistrationService.Services.Implementation
             var consumerGroup = _mapper.Map<ConsumerGroup>(consumerGroupResult);
             var metadataProperties = _metadataService.GetMetadataForEntityType(Type);
 
-            _repository.UpdateEntity(consumerGroup, metadataProperties);
+            _repository.UpdateEntity(consumerGroup, metadataProperties, GetInstanceGraph());
             _cacheService.DeleteRelatedCacheEntries<ConsumerGroupService, ConsumerGroup>();
             _auditTrailLogService.AuditTrail($"Consumer Group with id {id} set as deprecated.");
         }
@@ -255,7 +257,7 @@ namespace COLID.RegistrationService.Services.Implementation
 
             var consumerGroupResult = GetEntity(id);
 
-            if (CheckConsumerGroupHasStatus(consumerGroupResult, Common.Constants.PidUriTemplate.LifecycleStatus.Active))
+            if (CheckConsumerGroupHasStatus(consumerGroupResult, COLID.Graph.Metadata.Constants.PidUriTemplate.LifecycleStatus.Active))
             {
                 throw new BusinessException(Common.Constants.Messages.ConsumerGroup.ReactivationUnsuccessfulAlreadyActive);
             }
@@ -265,7 +267,7 @@ namespace COLID.RegistrationService.Services.Implementation
             var consumerGroup = _mapper.Map<ConsumerGroup>(consumerGroupResult);
             var metadataProperties = _metadataService.GetMetadataForEntityType(Type);
 
-            _repository.UpdateEntity(consumerGroup, metadataProperties);
+            _repository.UpdateEntity(consumerGroup, metadataProperties, GetInstanceGraph());
             _cacheService.DeleteRelatedCacheEntries<ConsumerGroupService, ConsumerGroup>(id);
             _auditTrailLogService.AuditTrail($"Consumer Group with id {id} reactivated.");
         }

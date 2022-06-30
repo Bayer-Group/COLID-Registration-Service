@@ -10,22 +10,20 @@ using COLID.RegistrationService.Repositories.Interface;
 using Microsoft.Extensions.Logging;
 using VDS.RDF.Query;
 using COLID.RegistrationService.Common.DataModel.Identifier;
+using Microsoft.Extensions.Configuration;
 
 namespace COLID.RegistrationService.Repositories.Implementation
 {
     internal class IdentifierRepository : BaseRepository<Identifier>, IIdentifierRepository
     {
-        protected override string InsertingGraph => Graph.Metadata.Constants.MetadataGraphConfiguration.HasResourcesGraph;
-        protected override IEnumerable<string> QueryGraphs => new List<string>() { InsertingGraph };
-
         public IdentifierRepository(
+            IConfiguration configuration,
             ITripleStoreRepository tripleStoreRepository,
-            ILogger<IdentifierRepository> logger,
-            IMetadataGraphConfigurationRepository metadataGraphConfigurationRepository) : base(tripleStoreRepository, metadataGraphConfigurationRepository, logger)
+            ILogger<IdentifierRepository> logger) : base(configuration, tripleStoreRepository, logger)
         {
         }
 
-        public IList<DuplicateResult> GetPidUriIdentifierOccurrences(Uri pidUri, IList<string> resourceTypes)
+        public IList<DuplicateResult> GetPidUriIdentifierOccurrences(Uri pidUri, IList<string> resourceTypes, Uri namedGraph)
         {
             if (pidUri == null)
             {
@@ -37,17 +35,11 @@ namespace COLID.RegistrationService.Repositories.Implementation
                 throw new InvalidFormatException(Graph.Metadata.Constants.Messages.Identifier.IncorrectIdentifierFormat, pidUri);
             }
 
-            /* TODO SL: Check should be added here, does not work with the Uri Templates (because of not wellformed curly braces) right now... which are curiously working with "new Uri(duplicateRequest.Object)"
-            if(!Uri.IsWellFormedUriString(duplicateRequest.Object, UriKind.Absolute))
-            {
-                throw new ArgumentException("The given URI is not wellformed.", duplicateRequest.Object);
-            }*/
-
             // TODO Combine HasPID/hasBaseURI and distribution/MainDistribution Query parts
             var parameterizedString = new SparqlParameterizedString();
             parameterizedString.CommandText = @"
                 SELECT DISTINCT ?pidEntry ?draft ?type ?identifierType
-                @fromResourceNamedGraph
+                From @resourceNamedGraph
                 WHERE {
                     Values ?filterType { @resourceTypes }
                     {
@@ -91,7 +83,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
                 }";
 
             parameterizedString.SetUri("pidUri", pidUri);
-            parameterizedString.SetPlainLiteral("fromResourceNamedGraph", _metadataGraphConfigurationRepository.GetGraphs(QueryGraphs).JoinAsFromNamedGraphs());
+            parameterizedString.SetUri("resourceNamedGraph", namedGraph);
             parameterizedString.SetPlainLiteral("resourceTypes", resourceTypes.JoinAsValuesList());
             parameterizedString.SetUri("identifier", new Uri(Graph.Metadata.Constants.Identifier.Type));
             parameterizedString.SetUri("hasDraft", new Uri(Graph.Metadata.Constants.Resource.HasPidEntryDraft));
@@ -102,13 +94,13 @@ namespace COLID.RegistrationService.Repositories.Implementation
             return results.Select(result => new DuplicateResult(result.GetNodeValuesFromSparqlResult("pidEntry").Value, result.GetNodeValuesFromSparqlResult("draft").Value, result.GetNodeValuesFromSparqlResult("type").Value, result.GetNodeValuesFromSparqlResult("identifierType").Value)).ToList();
         }
 
-        public void Delete(Uri pidUri)
+        public void Delete(Uri pidUri, Uri namedGraph)
         {
             if (!pidUri.IsValidBaseUri())
             {
                 throw new InvalidFormatException(Graph.Metadata.Constants.Messages.Identifier.IncorrectIdentifierFormat, pidUri);
             }
-
+            //Filter (NOT EXISTS { ?subject ?pointsTo @identifierUri })
             var deleteQuery = new SparqlParameterizedString
             {
                 CommandText = @"
@@ -117,29 +109,26 @@ namespace COLID.RegistrationService.Repositories.Implementation
                                 WHERE {
                                         @identifierUri ?predicate ?object.
                                         @identifierUri a @identifier.
-                                        Filter (NOT EXISTS { ?subject ?pointsTo @identifierUri })
                                       }"
             };
 
-            deleteQuery.SetUri("namedGraph", new Uri(_metadataGraphConfigurationRepository.GetSingleGraph(InsertingGraph)));
+            deleteQuery.SetUri("namedGraph", namedGraph);
             deleteQuery.SetUri("identifier", new Uri(Graph.Metadata.Constants.Identifier.Type));
             deleteQuery.SetUri("identifierUri", pidUri);
 
             _tripleStoreRepository.UpdateTripleStore(deleteQuery);
         }
 
-        public IList<string> GetOrphanedIdentifiersList()
+        public IList<string> GetOrphanedIdentifiersList(Uri namedGraph, Uri draftNamedGraph, Uri historicNamedGraph)
         {
             var parameterizedString = new SparqlParameterizedString()
             {
-                CommandText = "SELECT * @fromNamedGraphs From @historicNamedGraph WHERE { ?identifier a @permanentIdentifier. FILTER NOT EXISTS { ?resource ?pointsAt ?identifier } }"
+                CommandText = "SELECT * From @namedGraph From @draftNamedGraph From @historicNamedGraph WHERE { ?identifier a @permanentIdentifier. FILTER NOT EXISTS { ?resource ?pointsAt ?identifier } }"
             };
 
-            var namedGraph = _metadataGraphConfigurationRepository.GetGraphs(QueryGraphs).JoinAsFromNamedGraphs();
-            var historicNamedGraph = _metadataGraphConfigurationRepository.GetSingleGraph(Graph.Metadata.Constants.MetadataGraphConfiguration.HasResourceHistoryGraph);
-
-            parameterizedString.SetPlainLiteral("fromNamedGraphs", namedGraph);
-            parameterizedString.SetUri("historicNamedGraph", new Uri(historicNamedGraph));
+            parameterizedString.SetUri("namedGraph", namedGraph);
+            parameterizedString.SetUri("draftNamedGraph", draftNamedGraph);
+            parameterizedString.SetUri("historicNamedGraph", historicNamedGraph);
             parameterizedString.SetUri("permanentIdentifier", new Uri(Graph.Metadata.Constants.Identifier.Type));
 
             var results = _tripleStoreRepository.QueryTripleStoreResultSet(parameterizedString);
@@ -152,24 +141,25 @@ namespace COLID.RegistrationService.Repositories.Implementation
             }).ToList();
         }
 
-        public void DeleteOrphanedIdentifier(Uri identifierUri)
+        public void DeleteOrphanedIdentifier(Uri identifierUri, Uri namedGraph, Uri draftNamedGraph, Uri historicNamedGraph, bool checkInOrphanedList=true)
         {
             if (!identifierUri.IsValidBaseUri())
             {
                 throw new InvalidFormatException(Graph.Metadata.Constants.Messages.Identifier.IncorrectIdentifierFormat, identifierUri);
             }
 
-            if (!GetOrphanedIdentifiersList().Contains(identifierUri.ToString()))
+            if (checkInOrphanedList && !GetOrphanedIdentifiersList(namedGraph, draftNamedGraph, historicNamedGraph).Contains(identifierUri.ToString()))
             {
                 throw new EntityNotFoundException("No identifier exists in the database for the given id.", identifierUri.ToString());
             }
 
             var queryString = new SparqlParameterizedString
             {
-                CommandText = "DELETE WHERE { GRAPH @namedGraph { @subject ?predicate ?object } }"
+                CommandText = "DELETE WHERE { GRAPH @namedGraph { @subject ?predicate ?object } GRAPH @draftNamedGraph { @subject ?predicate ?object } }"
             };
 
-            queryString.SetUri("namedGraph", new Uri(_metadataGraphConfigurationRepository.GetSingleGraph(InsertingGraph)));
+            queryString.SetUri("namedGraph", namedGraph);
+            queryString.SetUri("draftNamedGraph", draftNamedGraph);
             queryString.SetUri("subject", identifierUri);
 
             Console.WriteLine(queryString.ToString());

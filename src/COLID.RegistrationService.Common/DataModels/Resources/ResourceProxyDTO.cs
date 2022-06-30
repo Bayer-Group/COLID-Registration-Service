@@ -7,6 +7,7 @@ namespace COLID.RegistrationService.Common.DataModel.Resources
         public string PidUrl { get; set; }
         public string TargetUrl { get; set; }
         public string ResourceVersion { get; set; }
+        public string BaseUrl { get; set; }
         public IList<ResourceProxyDTO> NestedProxies { get; set; }
     }
 }

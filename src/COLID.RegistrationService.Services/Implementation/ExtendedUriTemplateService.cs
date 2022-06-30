@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using AutoMapper;
 using COLID.Cache.Extensions;
 using COLID.Cache.Services;
@@ -57,14 +58,14 @@ namespace COLID.RegistrationService.Services.Implementation
         {
             var validationResults = new List<ValidationResultProperty>();
 
-            var orders = _cacheService.GetOrAdd("extended-uri-template-order", () => _repository.GetExtendedUriTemplateOrders());
+            var orders = _cacheService.GetOrAdd("extended-uri-template-order", () => _repository.GetExtendedUriTemplateOrders(GetInstanceGraph()));
 
             // This is the only way to iterrate, since the values are not changed. Otherwise use the same function as in preprocessservice.
             foreach (var property in extendedUriTemplate.Properties)
             {
                 switch (property.Key)
                 {
-                    case Common.Constants.ExtendedUriTemplate.HasPidUriSearchRegex:
+                    case COLID.Graph.Metadata.Constants.ExtendedUriTemplate.HasPidUriSearchRegex:
                         foreach (var prop in property.Value)
                         {
                             var prefix = $"^https://{_colidDomain}";
@@ -76,7 +77,7 @@ namespace COLID.RegistrationService.Services.Implementation
                         }
                         break;
 
-                    case Common.Constants.ExtendedUriTemplate.HasOrder:
+                    case COLID.Graph.Metadata.Constants.ExtendedUriTemplate.HasOrder:
                         foreach (var propValue in property.Value)
                         {
                             if (orders.TryGetValue(propValue, out string id) && id != extendedUriTemplate.Id)
@@ -102,7 +103,7 @@ namespace COLID.RegistrationService.Services.Implementation
                 {
                     var extendedUriTemplate = base.GetEntities(search);
                     return extendedUriTemplate
-                        .OrderBy(x => x.Properties.GetValueOrNull(Common.Constants.ExtendedUriTemplate.HasOrder, true))
+                        .OrderBy(x => x.Properties.GetValueOrNull(COLID.Graph.Metadata.Constants.ExtendedUriTemplate.HasOrder, true))
                         .ToList();
                 });
 
@@ -112,6 +113,22 @@ namespace COLID.RegistrationService.Services.Implementation
         public override ExtendedUriTemplateResultDTO GetEntity(string id)
         {
             return _cacheService.GetOrAdd($"id:{id}", () => base.GetEntity(id));
+        }
+
+        public override async Task<ExtendedUriTemplateWriteResultCTO> CreateEntity(ExtendedUriTemplateRequestDTO extendedUriTemplateRequest)
+        {
+            var result = await base.CreateEntity(extendedUriTemplateRequest);
+
+            try
+            {
+                _cacheService.DeleteRelatedCacheEntries<ExtendedUriTemplateService, ExtendedUriTemplate>();
+            }
+            catch (System.Exception ex)
+            {
+                _logger.LogError(ex, $"Error occured deleting cache for ExtendedUriTemplate: {ex.Message}", ex.InnerException);
+            }
+
+            return result;
         }
     }
 }

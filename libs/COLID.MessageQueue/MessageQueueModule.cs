@@ -2,6 +2,7 @@
 using COLID.MessageQueue.Configuration;
 using COLID.MessageQueue.Extensions;
 using COLID.MessageQueue.Services;
+using CorrelationId;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,7 +19,8 @@ namespace COLID.MessageQueue
         public static IServiceCollection AddMessageQueueModule(this IServiceCollection services, IConfiguration configuration)
         {
             Contract.Requires(configuration != null);
-            services.AddTransient<IMessageQueueService, MessageQueueService>();
+            
+            services.AddSingleton<IMessageQueueService, MessageQueueService>();
 
             services.Configure<ColidMessageQueueOptions>(configuration.GetSection(nameof(ColidMessageQueueOptions)));
 
@@ -33,6 +35,8 @@ namespace COLID.MessageQueue
         /// <returns></returns>
         public static IApplicationBuilder UseMessageQueueModule(this IApplicationBuilder app, IConfiguration configuration)
         {
+            app.UseCorrelationId();
+
             if (configuration.GetValue<bool>($"{nameof(ColidMessageQueueOptions)}:Enabled"))
             {
                 app.RegisterMessageQueueReceiver();

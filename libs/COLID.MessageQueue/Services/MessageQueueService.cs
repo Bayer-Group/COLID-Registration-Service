@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 using COLID.MessageQueue.Configuration;
 using COLID.MessageQueue.Datamodel;
+using CorrelationId;
+using CorrelationId.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -15,7 +18,8 @@ using RabbitMQ.Client.Exceptions;
 namespace COLID.MessageQueue.Services
 {
     internal class MessageQueueService : IMessageQueueService
-    {
+    {
+        private readonly ICorrelationContextAccessor _correlationContext;
         private readonly IConnectionFactory _connectionFactory;
         private readonly IConnection _connection;
         private readonly ILogger _logger;
@@ -26,20 +30,48 @@ namespace COLID.MessageQueue.Services
         private readonly IDictionary<string, Action<string>> _registeredTopics;
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization", "CA1303:Do not pass literals as localized parameters", Justification = "<Pending>")]
-        public MessageQueueService(IOptionsMonitor<ColidMessageQueueOptions> messageQueueOptionsAccessor, IServiceProvider provider, ILogger<MessageQueueService> logger)
-        {
+        public MessageQueueService(
+            ICorrelationContextAccessor correlationContext,
+            IOptionsMonitor<ColidMessageQueueOptions> messageQueueOptionsAccessor,
+            IServiceProvider provider,
+            ILogger<MessageQueueService> logger)
+        {
+            _correlationContext = correlationContext;
             _logger = logger;
 
             var options = messageQueueOptionsAccessor.CurrentValue;
+            ConnectionFactory _connectionFactory;
 
-            // default recovery time every 5 seconds
-            _connectionFactory = new ConnectionFactory()
-            {
-                HostName = options.HostName,
-                UserName = options.Username,
-                Password = options.Password
-            };
+            if (options.UseSsl)
+            {
+                X509Store store = new X509Store(StoreName.Root, StoreLocation.LocalMachine);
+                store.Open(OpenFlags.ReadOnly);
+                // default recovery time every 5 seconds
+                _connectionFactory = new ConnectionFactory()
+                {
+                    HostName = options.HostName,
+                    UserName = options.Username,
+                    Password = options.Password,
+                    Port = 5671,
+                    Ssl = new SslOption()
+                    {
+                        ServerName = options.HostName,
+                        Enabled = true,
+                        Certs = store.Certificates
+                    }
+                };
+            } 
+            else
+            {
+                _connectionFactory = new ConnectionFactory()
+                {
+                    HostName = options.HostName,
+                    UserName = options.Username,
+                    Password = options.Password
+                };
+            }
 
+            
             _exchangeName = options.ExchangeName;
 
             int retryCount = 0;
@@ -94,35 +126,43 @@ namespace COLID.MessageQueue.Services
 
         public void PublishMessage(string topic, string message, BasicProperty basicProperty = null)
         {
-            _logger.LogDebug("Publish Message" + topic);
+            if (!string.IsNullOrEmpty(message))
+            {
+                _logger.LogDebug("Publish Message" + topic);
 
-            _logger.LogDebug("[Reindexing] Exchange declare" + topic);
-            _channel.ExchangeDeclare(
-                exchange: _exchangeName,
-                type: "topic",
-                durable: false,
-                autoDelete: false,
-                arguments: null);
+                _logger.LogDebug("[Reindexing] Exchange declare" + topic);
+                _channel.ExchangeDeclare(
+                    exchange: _exchangeName,
+                    type: "topic",
+                    durable: false,
+                    autoDelete: false,
+                    arguments: null);
 
-            var body = Encoding.UTF8.GetBytes(message);
-            var basicProperties = CreateBasicProperties(basicProperty);
+                var body = Encoding.UTF8.GetBytes(message);
+                var basicProperties = CreateBasicProperties(basicProperty);
+                _logger.LogDebug($"[Reindexing] Publish > CorrelationId = {basicProperties.CorrelationId}");
 
-            _channel.BasicPublish(
-                exchange: _exchangeName,
-                routingKey: topic,
-                basicProperties: basicProperties,
-                body: body);
+                lock (_channel)
+                {
+                    _channel.BasicPublish(
+                    exchange: _exchangeName,
+                    routingKey: topic,
+                    basicProperties: basicProperties,
+                    body: body);
+                }
+
 
-            _logger.LogDebug($"Published message to MQ topic {topic}");
+                _logger.LogDebug($"Published message to MQ topic {topic}");
+            }
+            
         }
 
         private IBasicProperties CreateBasicProperties(BasicProperty basicProperty)
         {
-            if (basicProperty == null) return null;
-
             var props = _channel.CreateBasicProperties();
-            props.Priority = basicProperty.Priority;
-
+            props.Priority = basicProperty?.Priority ?? 0;
+            props.CorrelationId = _correlationContext.CorrelationContext.CorrelationId;
+
             return props;
         }
 
@@ -150,6 +190,9 @@ namespace COLID.MessageQueue.Services
             {
                 var routingKey = ea.RoutingKey;
                 var message = Encoding.UTF8.GetString(ea.Body.ToArray());
+                var correlationContext = new CorrelationContext(ea.BasicProperties.CorrelationId, CorrelationIdOptions.DefaultHeader);
+                _correlationContext.CorrelationContext = correlationContext;
+                _logger.LogDebug($"CorrelationId(Received)={_correlationContext.CorrelationContext.CorrelationId}");
 
                 _logger.LogDebug($"Received message on MQ topic {routingKey}");
 
@@ -167,5 +210,6 @@ namespace COLID.MessageQueue.Services
         {
             _connection.Close();
         }
+
     }
 }

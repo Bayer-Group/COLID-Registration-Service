@@ -1,0 +1,13 @@
+﻿<https://pid.bayer.com/kos/19050#d4f145f1-32c2-402b-a2d9-b309e1c18513>
+<https://pid.bayer.com/kos/19050/author>
+"superadmin@bayer.com" ;
+<https://pid.bayer.com/kos/19050/dateCreated>
+"2021-05-07T10:40:43.1067219Z"^^<http://www.w3.org/2001/XMLSchema#dateTime> ;
+<https://pid.bayer.com/kos/19050/hasLinkEnd>
+<https://pid.bayer.com/kos/19050#dc362bbd-24e0-4b55-8bfc-af1317a8fb5b> ;
+<https://pid.bayer.com/kos/19050/hasLinkStart>
+<https://pid.bayer.com/kos/19050#0fc7b201-cffd-41c3-9d1c-fd5f83a763c4> ;
+<https://pid.bayer.com/kos/19050/hasLinkStatus>
+<https://pid.bayer.com/kos/19050/Created> ;
+<https://pid.bayer.com/kos/19050/hasLinkType>
+<https://pid.bayer.com/kos/19050/sameDatasetAs> .

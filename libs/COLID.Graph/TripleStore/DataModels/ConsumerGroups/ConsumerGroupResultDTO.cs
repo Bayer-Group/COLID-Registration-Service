@@ -8,7 +8,7 @@ namespace COLID.Graph.TripleStore.DataModels.ConsumerGroups {
 
         private string GetLifecycleStatus()
         {
-            return Properties.TryGetValue(Graph.Metadata.Constants.ConsumerGroup.HasLifecycleStatus, out var lifecycleStatusList) ? lifecycleStatusList.FirstOrDefault() : null;
+            return Properties.TryGetValue(COLID.Graph.Metadata.Constants.ConsumerGroup.HasLifecycleStatus, out var lifecycleStatusList) ? lifecycleStatusList.FirstOrDefault() : null;
         }
     }
 }

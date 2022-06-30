@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
+using COLID.Identity.Constants;
 using Microsoft.AspNetCore.Http;
 
 namespace COLID.RegistrationService.Services.Authorization.UserInfo
@@ -15,19 +16,28 @@ namespace COLID.RegistrationService.Services.Authorization.UserInfo
 
         public UserInfoService(IHttpContextAccessor httpContextAccessor)
         {
-            _httpContextAccessor = httpContextAccessor;
+            //Check whether invoked from Background IHostedService
+            if (httpContextAccessor == null || httpContextAccessor.HttpContext == null)
+            {
+                _roles = new List<string> { AuthorizationRoles.SuperAdmin };
+                _email = "colid@bayer.com";
+            }
+            else
+            {
+                _httpContextAccessor = httpContextAccessor;
 
-            var user = _httpContextAccessor.HttpContext.User;
-            var claims = ((ClaimsIdentity)user.Identity).Claims.ToList();
+                var user = _httpContextAccessor.HttpContext.User;
+                var claims = ((ClaimsIdentity)user.Identity).Claims.ToList();
 
-            _roles = claims
-                .Where(c => c.Type == ClaimTypes.Role)
-                .Select(c => c.Value)
-                .ToList();
+                _roles = claims
+                    .Where(c => c.Type == ClaimTypes.Role)
+                    .Select(c => c.Value)
+                    .ToList();
 
-            _email = claims
-                .FirstOrDefault(c => c.Type == ClaimTypes.Upn)?
-                .Value;
+                _email = claims
+                    .FirstOrDefault(c => c.Type == ClaimTypes.Upn)?
+                    .Value;
+            }
         }
 
         public string GetEmail()
@@ -56,8 +66,8 @@ namespace COLID.RegistrationService.Services.Authorization.UserInfo
         }
 
         public bool HasApiToApiPrivileges()
-        {
+        {            
             return _roles.Intersect(RolePermissions.ApiToApi).Any();
-        }
+        }        
     }
 }

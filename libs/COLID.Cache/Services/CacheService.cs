@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
 using COLID.Cache.Configuration;
 using COLID.Cache.Exceptions;
@@ -34,6 +35,11 @@ namespace COLID.Cache.Services
             _connectionMultiplexer = connectionMultiplexer;
             _cache = _connectionMultiplexer.GetDatabase();
             _logger = logger;
+
+            int minWorker, minIOC;
+            ThreadPool.GetMinThreads(out minWorker, out minIOC);
+
+            _logger.LogInformation("Threading set to minWorker: {minWorker}, minIOC: {minIOC}", minWorker, minIOC);
         }
 
         public T GetValue<T>(string key)
@@ -42,9 +48,8 @@ namespace COLID.Cache.Services
 
             var entryKey = BuildCacheEntryKey(key);
             try
-            {
-                string value = _cache.StringGet(entryKey);
-                _logger.LogDebug("Get key {entryKey}", entryKey);
+            {                
+                string value = _cache.StringGet(entryKey);                
                 if (value != null)
                 {
                     return JsonConvert.DeserializeObject<T>(value, _serializerSettings);
@@ -52,6 +57,7 @@ namespace COLID.Cache.Services
             }
             catch (System.Exception ex) when (ex is RedisException || ex is TimeoutException)
             {
+                _logger.LogInformation("Caching: " + ex.Message);
                 HandleException(ex);
             }
 
@@ -108,7 +114,10 @@ namespace COLID.Cache.Services
                 foreach (var endpoint in endpoints)
                 {
                     var server = _connectionMultiplexer.GetServer(endpoint);
-                    server.FlushAllDatabases();
+                    if (!server.IsReplica) {
+                        server.FlushAllDatabases();
+                    }
+                    
                 }
 #pragma warning disable CA1303 // Do not pass literals as localized parameters
                 _logger.LogDebug("Cache cleared");
@@ -140,15 +149,16 @@ namespace COLID.Cache.Services
             Guard.ArgumentNotNullOrWhiteSpace(key, nameof(key));
             Guard.ArgumentNotNull(addEntry, "function");
             Guard.ArgumentNotNull(expirationTime, nameof(expirationTime));
-
+           
             var entryKey = BuildCacheEntryKey(key, addEntry);
+            
             if (TryGetValue<T>(entryKey, out var cacheEntry))
             {
                 return cacheEntry;
             }
-
-            cacheEntry = addEntry.Invoke();
-            Set(entryKey, cacheEntry, expirationTime);
+            
+            cacheEntry = addEntry.Invoke();           
+            Set(entryKey, cacheEntry, expirationTime);            
             return cacheEntry;
         }
 

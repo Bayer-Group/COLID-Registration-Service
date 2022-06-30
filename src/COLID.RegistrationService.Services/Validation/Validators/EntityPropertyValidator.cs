@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using COLID.Graph.TripleStore.DataModels.Resources;
 using COLID.Graph.TripleStore.Extensions;
 using COLID.RegistrationService.Services.Interface;
 using COLID.RegistrationService.Services.Validation.Models;

@@ -15,6 +15,7 @@ namespace COLID.Graph.Tests.Metadata.Services
     public class MetadataServiceTests
     {
         private readonly Mock<IMetadataRepository> _metadataRepo;
+        private readonly Mock<IMetadataGraphConfigurationRepository> _metadataGraphConfigRepoMock;
         private readonly ICacheService _cacheService;
 
         private readonly IMetadataService _metadataService;
@@ -23,8 +24,9 @@ namespace COLID.Graph.Tests.Metadata.Services
         {
             _metadataRepo = new Mock<IMetadataRepository>();
             _cacheService = new NoCacheService();
+            _metadataGraphConfigRepoMock = new Mock<IMetadataGraphConfigurationRepository>();
 
-            _metadataService = new MetadataService(_metadataRepo.Object, _cacheService);
+            _metadataService = new MetadataService(_metadataRepo.Object, _cacheService, _metadataGraphConfigRepoMock.Object);
         }
 
         [Fact]

@@ -1,8 +1,6 @@
 ﻿using System;
 using COLID.Exception.Models;
 using COLID.Graph.Metadata.Constants;
-using COLID.Graph.Metadata.DataModels.Validation;
-using COLID.Graph.TripleStore.AWS;
 using Newtonsoft.Json;
 
 namespace COLID.Graph.Triplestore.Exceptions

@@ -36,7 +36,7 @@ namespace COLID.Common.Utilities
         {
             if (string.IsNullOrWhiteSpace(argumentValue))
             {
-                throw new ArgumentException($"{argumentName} cannot be null, empty, or only whitespace.");
+                throw new ArgumentNullException(argumentName);
             }
         }
 
@@ -93,10 +93,10 @@ namespace COLID.Common.Utilities
             }
         }
 
-        public static void IsGreaterZero(int number)
+        public static void IsGreaterThanZero(long length)
         {
-            if (number == 0)
-                throw new ArgumentException(nameof(number), "Number must be greater than 0.");
+            if (length <= 0)
+                throw new ArgumentException(nameof(length), "Length must be greater than 0.");
         }
 
         public static void IsValidUri(Uri uri)

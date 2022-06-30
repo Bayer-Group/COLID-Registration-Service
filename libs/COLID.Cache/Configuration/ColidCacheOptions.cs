@@ -15,10 +15,13 @@ namespace COLID.Cache.Configuration
         public double AbsoluteExpirationRelativeToNow { get; set; }
 
         public int SyncTimeout { get; set; }
-
+        public int KeepAlive { get; set; }
+        public int ReconnectRetryPolicy { get; set; }
         public bool AbortOnConnectFail { get; set; }
 
         public bool AllowAdmin { get; set; }
+
+        public bool Ssl { get; set; }
 
         public ColidCacheOptions()
         {

@@ -32,7 +32,7 @@ namespace COLID.RegistrationService.Tests.Common.Builder
 
         public PidUriTemplateBuilder WithType()
         {
-            CreateOrOverwriteProperty(Graph.Metadata.Constants.RDF.Type, RegistrationService.Common.Constants.PidUriTemplate.Type);
+            CreateOrOverwriteProperty(Graph.Metadata.Constants.RDF.Type, COLID.Graph.Metadata.Constants.PidUriTemplate.Type);
             return this;
         }
 
@@ -44,37 +44,37 @@ namespace COLID.RegistrationService.Tests.Common.Builder
 
         public PidUriTemplateBuilder WithBaseUrl(string baseUrl)
         {
-            CreateOrOverwriteProperty(RegistrationService.Common.Constants.PidUriTemplate.HasBaseUrl, baseUrl);
+            CreateOrOverwriteProperty(COLID.Graph.Metadata.Constants.PidUriTemplate.HasBaseUrl, baseUrl);
             return this;
         }
 
         public PidUriTemplateBuilder WithIdLength(int idLength)
         {
-            CreateOrOverwriteProperty(RegistrationService.Common.Constants.PidUriTemplate.HasIdLength, idLength.ToString());
+            CreateOrOverwriteProperty(COLID.Graph.Metadata.Constants.PidUriTemplate.HasIdLength, idLength.ToString());
             return this;
         }
 
         public PidUriTemplateBuilder WithPidUriTemplateIdType(string idType)
         {
-            CreateOrOverwriteProperty(RegistrationService.Common.Constants.PidUriTemplate.HasPidUriTemplateIdType, idType);
+            CreateOrOverwriteProperty(COLID.Graph.Metadata.Constants.PidUriTemplate.HasPidUriTemplateIdType, idType);
             return this;
         }
 
         public PidUriTemplateBuilder WithPidUriTemplateLifecycleStatus(LifecycleStatus status)
         {
-            CreateOrOverwriteProperty(RegistrationService.Common.Constants.PidUriTemplate.HasLifecycleStatus, status.GetDescription());
+            CreateOrOverwriteProperty(COLID.Graph.Metadata.Constants.PidUriTemplate.HasLifecycleStatus, status.GetDescription());
             return this;
         }
 
         public PidUriTemplateBuilder WithPidUriTemplateSuffix(string suffix)
         {
-            CreateOrOverwriteProperty(RegistrationService.Common.Constants.PidUriTemplate.HasPidUriTemplateSuffix, suffix);
+            CreateOrOverwriteProperty(COLID.Graph.Metadata.Constants.PidUriTemplate.HasPidUriTemplateSuffix, suffix);
             return this;
         }
 
         public PidUriTemplateBuilder WithRoute(string route)
         {
-            CreateOrOverwriteProperty(RegistrationService.Common.Constants.PidUriTemplate.HasRoute, route);
+            CreateOrOverwriteProperty(COLID.Graph.Metadata.Constants.PidUriTemplate.HasRoute, route);
             return this;
         }
     }

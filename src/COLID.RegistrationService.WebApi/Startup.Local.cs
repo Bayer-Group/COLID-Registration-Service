@@ -1,10 +1,12 @@
 ﻿using COLID.Cache;
 using COLID.RegistrationService.Repositories;
 using COLID.RegistrationService.Services;
+using COLID.RegistrationService.Services.Implementation;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace COLID.RegistrationService.WebApi
 {
@@ -25,17 +27,17 @@ namespace COLID.RegistrationService.WebApi
             ConfigureServices(services);
             services.RegisterDebugRepositoriesModule(Configuration);
             services.AddLocalServicesModule(Configuration);
+            //services.AddHostedService<BulkProcessBackgroundService>();
         }
 
         /// <summary>
         /// This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         /// </summary>
         /// <param name="app">The application builder</param>
-        /// <param name="env">The environment</param>
-        public void ConfigureLocal(IApplicationBuilder app, IWebHostEnvironment env)
+        public void ConfigureLocal(IApplicationBuilder app)
         {
             app.UseDeveloperExceptionPage();
-            Configure(app, env);
+            Configure(app);
         }
     }
 }

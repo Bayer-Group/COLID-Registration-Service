@@ -13,16 +13,6 @@ namespace COLID.Graph.Metadata.DataModels.MetadataGraphConfiguration
             return GetValue(Constants.MetadataGraphConfiguration.HasMetadataGraph);
         }
 
-        public IList<string> GetShaclGraphs()
-        {
-            return GetValue(Constants.MetadataGraphConfiguration.HasShaclConstraintsGraph);
-        }
-
-        public IList<string> GetEcoGraphs()
-        {
-            return GetValue(Constants.MetadataGraphConfiguration.HasECOGraph);
-        }
-
         public IList<string> GetResourceGraphs()
         {
             return GetValue(Constants.MetadataGraphConfiguration.HasResourcesGraph);
@@ -41,11 +31,6 @@ namespace COLID.Graph.Metadata.DataModels.MetadataGraphConfiguration
         public IList<string> GetExtendedUriTemplateGraphs()
         {
             return GetValue(Constants.MetadataGraphConfiguration.HasExtendedUriTemplateGraph);
-        }
-
-        public IList<string> GetKeywordGraphs()
-        {
-            return GetValue(Constants.MetadataGraphConfiguration.HasKeywordsGraph);
         }
 
         public IList<string> GetPidUriTemplateGraphs()

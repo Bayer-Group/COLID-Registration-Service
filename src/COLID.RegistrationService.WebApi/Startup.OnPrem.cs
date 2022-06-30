@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace COLID.RegistrationService.WebApi
 {
@@ -31,8 +32,7 @@ namespace COLID.RegistrationService.WebApi
         /// This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         /// </summary>
         /// <param name="app">The application builder</param>
-        /// <param name="env">The environment</param>
-        public void ConfigureOnPrem(IApplicationBuilder app, IWebHostEnvironment env)
+        public void ConfigureOnPrem(IApplicationBuilder app)
         {
             app.UseDeveloperExceptionPage();
 
@@ -42,7 +42,7 @@ namespace COLID.RegistrationService.WebApi
             // See https://docs.microsoft.com/en-us/dotnet/api/system.net.http.socketshttphandler?view=netcore-3.1#remarks
             AppContext.SetSwitch("System.Net.Http.UseSocketsHttpHandler", false);
 
-            Configure(app, env);
+            Configure(app);
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using COLID.Graph.TripleStore.Repositories;
 using COLID.RegistrationService.Common.DataModel.ExtendedUriTemplates;
 
@@ -13,6 +14,6 @@ namespace COLID.RegistrationService.Repositories.Interface
         /// Get a map of orders and depending extended uri templates. The resulting map is ordered alphabetically by the order field.
         /// </summary>
         /// <returns>Dictionary containing orders (first generic) and extendedUriTemplate (second generic)</returns>
-        IDictionary<string, string> GetExtendedUriTemplateOrders();
+        IDictionary<string, string> GetExtendedUriTemplateOrders(Uri namedGraph);
     }
 }

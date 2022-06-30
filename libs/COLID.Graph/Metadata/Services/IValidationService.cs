@@ -20,6 +20,14 @@ namespace COLID.Graph.Metadata.Services
         Task<ValidationResult> ValidateEntity(Entity entity, IList<MetadataProperty> metadataProperties);
 
         /// <summary>
+        /// Validates a list of entities.
+        /// </summary>
+        /// <param name="entities">the list of entities to validate</param>
+        /// <param name="metadataProperties">the properties to consider</param>
+        /// <returns>the result of validation</returns>
+        Task<ValidationResult> ValidateEntity(List<Entity> entities, IList<MetadataProperty> metadataProperties);
+
+        /// <summary>
         /// Checks whether the given entity, contains a property with its type and may be stored by the interface. Accordingly, an exception is thrown.
         /// </summary>
         /// <typeparam name="TEntity">TEntity is a type that implements the class entity</typeparam>

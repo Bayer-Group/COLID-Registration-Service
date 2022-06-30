@@ -15,28 +15,34 @@ namespace COLID.RegistrationService.Repositories.Interface
         /// Deletes a single identifier of a resource from a graph by a given pidURI.
         /// </summary>
         /// <param name="pidUri">the pidUri of resource to delete identifiers from</param>
-        void Delete(Uri pidUri);
+        /// <param name="namedGraph">Named graph for resource instances</param>
+        void Delete(Uri pidUri, Uri namedGraph);
 
         /// <summary>
         /// Gets a list of all identifier occurences.
         /// </summary>
         /// <param name="pidUri">identifier to search for</param>
         /// <param name="resourceTypes">resource types to find occurrences for</param>
+        /// <param name="namedGraph">Named graph for resource instances</param>
         /// <returns>List of <see cref="DuplicateResult"/>, empty list if no occurence</returns>
-        IList<DuplicateResult> GetPidUriIdentifierOccurrences(Uri pidUri, IList<string> resourceTypes);
+        IList<DuplicateResult> GetPidUriIdentifierOccurrences(Uri pidUri, IList<string> resourceTypes, Uri namedGraph);
 
         /// <summary>
         /// Determine all oprhaned identifiers and returns them in a list. An Identifier is an orphaned one,
         /// if it doesn't have any relation to a pid-uri or base-uri.
         /// </summary>
+        /// <param name="namedGraph">Named graph for resource instances</param>
+        /// <param name="historicNamedGraph">Named graph for historic resource instances</param>
         /// <returns>A list of orphaned identifiers as strings</returns>
-        IList<string> GetOrphanedIdentifiersList();
+        IList<string> GetOrphanedIdentifiersList(Uri namedGraph, Uri draftNamedGraph, Uri historicNamedGraph);
 
         /// <summary>
         /// Delete an orphaned identifier which matches the given uri. The <paramref name="identifierUri"/>
-        /// will be checken, if it really has no relation, before the identifier will be deleted.
+        /// will be checked, if it really has no relation, before the identifier will be deleted.
         /// </summary>
         /// <param name="identifierUri">the uri to check and delete</param>
-        void DeleteOrphanedIdentifier(Uri identifierUri);
+        /// <param name="namedGraph">Named graph for resource instances</param>
+        /// <param name="historicNamedGraph">Named graph for historic resource instances</param>
+        void DeleteOrphanedIdentifier(Uri identifierUri, Uri namedGraph, Uri draftNamedGraph, Uri historicNamedGraph, bool checkInOrphanedList = true);
     }
 }

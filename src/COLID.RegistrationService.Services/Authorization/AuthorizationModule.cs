@@ -25,11 +25,11 @@ namespace COLID.RegistrationService.Services.Authorization
 
             if (allowAnonymous)
             {
-                services.AddScoped<IUserInfoService, AnonymousUserInfoService>();
+                services.AddTransient<IUserInfoService, AnonymousUserInfoService>();
             }
             else
             {
-                services.AddScoped<IUserInfoService, UserInfoService>();
+                services.AddTransient<IUserInfoService, UserInfoService>();
             }
 
             services.AddAuthorization(options =>

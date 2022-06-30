@@ -8,5 +8,7 @@ namespace COLID.Graph.TripleStore.Transactions
         void Commit();
 
         void AddUpdateString(SparqlParameterizedString parameterizedString);
+
+        string GetSparqlString();
     }
 }

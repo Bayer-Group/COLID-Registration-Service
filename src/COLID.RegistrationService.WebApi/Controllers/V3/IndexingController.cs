@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
 using COLID.Identity.Requirements;
+using System;
+using COLID.Graph.TripleStore.DataModels.Resources;
 
 namespace COLID.RegistrationService.WebApi.Controllers.V3
 {
@@ -16,7 +18,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
     [ApiVersion(Constants.API.Version.V3)]
     [Route("api/v{version:apiVersion}/reindex")]
     [Produces(MediaTypeNames.Application.Json)]
-    [ApiExplorerSettings(IgnoreApi = true)]
+    //[ApiExplorerSettings(IgnoreApi = true)]
     public class IndexingController : Controller
     {
         private readonly IReindexingService _indexingService;
@@ -44,6 +46,6 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
             await _indexingService.Reindex();
 
             return Ok();
-        }
+        }       
     }
 }

@@ -7,6 +7,7 @@ using AutoMapper;
 using COLID.Cache.Services;
 using COLID.Common.Extensions;
 using COLID.Exception.Models;
+using COLID.Graph.Metadata.Constants;
 using COLID.Graph.Metadata.DataModels.Metadata;
 using COLID.Graph.Metadata.DataModels.Validation;
 using COLID.Graph.Metadata.Services;
@@ -41,6 +42,12 @@ namespace COLID.RegistrationService.Services.Validation
         }
 
         #region Shacl Validation
+        /// <summary>
+        /// has side effects! updates triplestore
+        /// </summary>
+        /// <param name="entity"></param>
+        /// <param name="metadataProperties"></param>
+        /// <returns></returns>
         public async Task<ValidationResult> ValidateEntity(Entity entity, IList<MetadataProperty> metadataProperties)
         {
             var resourceGraph = GetResourceGraph(entity, metadataProperties);
@@ -50,7 +57,24 @@ namespace COLID.RegistrationService.Services.Validation
             var report = processor.Validate(resourceGraph);
 
             var validationResult = CreateValidationResult(report);
+            NTriplesWriter rdfNTriplesWriter = new NTriplesWriter();
 
+            validationResult.Triples = VDS.RDF.Writing.StringWriter.Write(resourceGraph, rdfNTriplesWriter);
+            return await Task.FromResult(validationResult);
+        }
+
+        public async Task<ValidationResult> ValidateEntity(List<Entity> entities, IList<MetadataProperty> metadataProperties)
+        {
+            var resourceGraph = GetResourceGraph(entities, metadataProperties);
+            var shapesGraph = GetShapesGraph();
+            
+            var processor = new ShapesGraph(shapesGraph);
+            var report = processor.Validate(resourceGraph);
+
+            var validationResult = CreateValidationResult(report);
+            
+            
+            
             return await Task.FromResult(validationResult);
         }
 
@@ -74,6 +98,7 @@ namespace COLID.RegistrationService.Services.Validation
 
         /// <summary>
         /// Converts the entity into an rdf graph
+        /// has side effects! updates triplestore
         /// </summary>
         /// <param name="entity">Entity to be converted</param>
         /// <param name="metadataProperties">Metadata of the entity to be converted</param>
@@ -88,10 +113,31 @@ namespace COLID.RegistrationService.Services.Validation
                 string entityType = entity.Properties.GetValueOrNull(Graph.Metadata.Constants.RDF.Type, true).ToString();
                 metadataProperties = _metadataService.GetMetadataForEntityType(entityType);
             }
-            var resourceInsertString = _entityRepository.GenerateInsertQuery(entity, metadataProperties, string.Empty, null);
+            var resourceInsertString = _entityRepository.GenerateInsertQuery(entity, metadataProperties, null);
 
             store.ExecuteUpdate(resourceInsertString.ToString());
+            //store.SaveToFile("abcd",);
+            
+            return store.Graphs.FirstOrDefault();
+        }
 
+        /// <summary>
+        /// Converts the entity into an rdf graph
+        /// </summary>
+        /// <param name="entities">List of entities to be converted</param>
+        /// <param name="metadataProperties">Metadata of the entity to be converted</param>
+        /// <returns>RDf graph of entity</returns>
+        private IGraph GetResourceGraph(List<Entity> entities, IList<MetadataProperty> metadataProperties)
+        {
+            var store = new TripleStore();
+
+            //Create InsertString from resource
+            foreach (Entity entity in entities)
+            {
+                var resourceInsertString = _entityRepository.GenerateInsertQuery(entity, metadataProperties, null);
+                store.ExecuteUpdate(resourceInsertString.ToString());
+            }
+            
             return store.Graphs.FirstOrDefault();
         }
 

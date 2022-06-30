@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using COLID.Common.Extensions;
+using COLID.Graph.Metadata.Constants;
 using COLID.Graph.Metadata.DataModels.Validation;
+using COLID.Graph.Metadata.Services;
 using COLID.Graph.TripleStore.Extensions;
 using COLID.RegistrationService.Repositories.Interface;
 using COLID.RegistrationService.Services.Validation.Models;
@@ -13,12 +15,14 @@ namespace COLID.RegistrationService.Services.Validation.Validators.Keys
     internal class VersionValidator : BaseValidator
     {
         private readonly IResourceRepository _resourceRepository;
+        private readonly IMetadataService _metadataService;
 
         protected override string Key => Graph.Metadata.Constants.Resource.HasVersion;
 
-        public VersionValidator(IResourceRepository resourceRepository)
+        public VersionValidator(IResourceRepository resourceRepository, IMetadataService metadataService)
         {
             _resourceRepository = resourceRepository;
+            _metadataService = metadataService;
         }
 
         protected override void InternalHasValidationResult(EntityValidationFacade validationFacade, KeyValuePair<string, List<dynamic>> properties)
@@ -71,8 +75,10 @@ namespace COLID.RegistrationService.Services.Validation.Validators.Keys
                 {
                     return;
                 }
-                
-                var versions = _resourceRepository.GetAllVersionsOfResourceByPidUri(pidUri).ToArray();
+                var graphList = new HashSet<Uri>();
+                graphList.Add(_metadataService.GetInstanceGraph(PIDO.PidConcept));
+                graphList.Add(_metadataService.GetInstanceGraph("draft"));
+                var versions = _resourceRepository.GetAllVersionsOfResourceByPidUri(pidUri, graphList).ToArray();
 
                 if (versions.IsNullOrEmpty())
                 {

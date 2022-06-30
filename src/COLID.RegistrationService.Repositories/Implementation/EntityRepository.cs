@@ -6,6 +6,7 @@ using COLID.Graph.Metadata.Repositories;
 using COLID.Graph.TripleStore.Repositories;
 using COLID.Graph.TripleStore.Transactions;
 using COLID.RegistrationService.Repositories.Interface;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Entity = COLID.Graph.TripleStore.DataModels.Base.Entity;
 
@@ -13,35 +14,27 @@ namespace COLID.RegistrationService.Repositories.Implementation
 {
     internal class EntityRepository : BaseRepository<Entity>, IEntityRepository
     {
-        protected override string InsertingGraph => MetadataGraphConfiguration.HasMetadataGraph;
-
-        protected override IEnumerable<string> QueryGraphs => new List<string>() { MetadataGraphConfiguration.HasConsumerGroupGraph, MetadataGraphConfiguration.HasECOGraph, MetadataGraphConfiguration.HasExtendedUriTemplateGraph, MetadataGraphConfiguration.HasKeywordsGraph, MetadataGraphConfiguration.HasMetadataGraph, MetadataGraphConfiguration.HasPidUriTemplatesGraph, MetadataGraphConfiguration.HasShaclConstraintsGraph };
-
         public EntityRepository(
+            IConfiguration configuration,
             ITripleStoreRepository tripleStoreRepository,
             ILogger<EntityRepository> logger,
-            IMetadataGraphConfigurationRepository metadataGraphConfigurationRepository) : base(tripleStoreRepository, metadataGraphConfigurationRepository, logger)
+            IMetadataGraphConfigurationRepository metadataGraphConfigurationRepository) : base(configuration, tripleStoreRepository, logger)
         {
         }
 
-        public override void CreateEntity(Entity newEntity, IList<MetadataProperty> metadataProperty)
-        {
-            throw new NotImplementedException();
-        }
-
-        public override void UpdateEntity(Entity entity, IList<MetadataProperty> metadataProperties)
+        public override void UpdateEntity(Entity entity, IList<MetadataProperty> metadataProperties, Uri namedGraph)
         {
             throw new NotImplementedException();
         }
 
-        public override void DeleteEntity(string id)
+        public override void DeleteEntity(string id, Uri namedGraph)
         {
             throw new NotImplementedException();
         }
 
         public override ITripleStoreTransaction CreateTransaction()
         {
-            throw new NotImplementedException();
+            return _tripleStoreRepository.CreateTransaction();
         }
     }
 }

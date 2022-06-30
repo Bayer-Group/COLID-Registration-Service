@@ -34,8 +34,9 @@ namespace COLID.Graph.TripleStore.Extensions
                             //You may want to inspect the DataType and Language properties and generate
                             //a different string here
                             data.Type = Shacl.NodeKinds.Literal;
-                            data.Value = ((ILiteralNode)node).Value;
                             data.DataType = ((ILiteralNode)node).DataType?.OriginalString;
+                            data.Value = ((ILiteralNode)node).Value;
+                            data.Language = ((ILiteralNode)node).Language;
                             break;
 
                         default:

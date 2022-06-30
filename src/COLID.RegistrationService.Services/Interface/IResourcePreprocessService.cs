@@ -2,21 +2,11 @@
 using System.Threading.Tasks;
 using COLID.Graph.Metadata.DataModels.Resources;
 using COLID.Graph.Metadata.DataModels.Validation;
-using COLID.RegistrationService.Common.DataModel.Resources;
+using COLID.Graph.TripleStore.DataModels.Resources;
 using COLID.RegistrationService.Services.Validation.Models;
 
 namespace COLID.RegistrationService.Services.Interface
 {
-    /// <summary>
-    /// Emun to specify the different valid resource actions.
-    /// </summary>
-    public enum ResourceCrudAction
-    {
-        Create,
-        Update,
-        Publish
-    }
-
     /// <summary>
     /// Service to handle all resource preprocessing operations.
     /// </summary>
@@ -39,6 +29,6 @@ namespace COLID.RegistrationService.Services.Interface
         ///3. the facade with all transformed data.
         ///
         /// </returns>
-        Task<Tuple<ValidationResult, bool, EntityValidationFacade>> ValidateAndPreProcessResource(string resourceId, ResourceRequestDTO resourceRequestDTO, ResourcesCTO resourcesCTO, ResourceCrudAction resourceCrudAction, bool nestedValidation = false, string consumerGroup = null);
+        Task<Tuple<ValidationResult, bool, EntityValidationFacade>> ValidateAndPreProcessResource(string resourceId, ResourceRequestDTO resourceRequestDTO, ResourcesCTO resourcesCTO, ResourceCrudAction resourceCrudAction, bool nestedValidation = false, string consumerGroup = null, bool changeResourceType = false);
     }
 }

@@ -11,11 +11,11 @@ using COLID.RegistrationService.Common.DataModel.Resources;
 using COLID.RegistrationService.Common.Enums.ColidEntry;
 using COLID.RegistrationService.Common.Extensions;
 using COLID.RegistrationService.Tests.Common.Builder;
-using COLID.RegistrationService.Tests.Common.Extensions;
 using COLID.RegistrationService.Tests.Common.Utils;
 using COLID.RegistrationService.Tests.Functional.Authorization;
 using COLID.RegistrationService.Tests.Functional.Extensions;
 using COLID.Graph.TripleStore.DataModels.Base;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -25,6 +25,7 @@ using Xunit.Abstractions;
 using COLID.Graph.Metadata.DataModels.Validation;
 using COLID.Graph.Metadata.DataModels.Resources;
 using COLID.RegistrationService.Common.DataModel.Resources.Comparison;
+using COLID.RegistrationService.Tests.Unit.Extensions;
 
 namespace COLID.RegistrationService.Tests.Functional.Controllers.V3
 {
@@ -67,7 +68,7 @@ namespace COLID.RegistrationService.Tests.Functional.Controllers.V3
             Assert.Equal("https://pid.bayer.com/URI1010", resource.PidUri.ToString());
             Assert.Null(resource.BaseUri);
             Assert.Null(resource.PreviousVersion);
-            Assert.Null(resource.LaterVersion);
+            Assert.NotNull(resource.LaterVersion); //LaterVersion is a Draft Resource which is retrieved from draft Graph-> Assert Checks if draft LaterVersion will be retrieved
             Assert.Null(resource.PublishedVersion);
 
             // == Properties
@@ -91,14 +92,52 @@ namespace COLID.RegistrationService.Tests.Functional.Controllers.V3
             Assert.True(property.ContainsLicensedData("false"));
             Assert.True(property.ContainsVersion("2"));
             Assert.True(property.ContainsType(EnumExtension.GetDescription(RegistrationService.Common.Enums.ColidEntry.Type.GenericDataset)));
-            Assert.True(property.ContainsIsDerivedFromDataset("https://pid.bayer.com/URI5002"));
             Assert.True(property.ContainsIsPersonalData("false"));
+            Assert.True(property.CheckHasLaterVersion("https://pid.bayer.com/kos/19050#d8d8f921-cf1d-43d8-af0e-aaaaaaaaaaaa"));
             Assert.True(property.ContainsHasConsumerGroup("https://pid.bayer.com/kos/19050#bf2f8eeb-fdb9-4ee1-ad88-e8932fa8753c"));
-            Assert.True(property.ContainsHasHistoricVersion("https://pid.bayer.com/kos/19050#b2461db8-7280-4224-b7e5-678ef67e0c6a"));
+            //Assert.True(property.ContainsHasHistoricVersion("https://pid.bayer.com/kos/19050#b2461db8-7280-4224-b7e5-678ef67e0c6a"));
 
             Assert.Equal("2019-12-19T14:24:09Z", property[Graph.Metadata.Constants.Resource.DateCreated].First().ToString("s") + "Z");
             Assert.Equal("2019-12-19T14:24:31Z", property[Graph.Metadata.Constants.Resource.DateModified].First().ToString("s") + "Z");
+
+            ////////////////////////////////////////////// Draft
+            // Arrange
+            var pidUri_draft = "https://pid.bayer.com/URI1010Draft";
+            var entryLifecycleStatus_draft = Graph.Metadata.Constants.Resource.ColidEntryLifecycleStatus.Draft;
+            var resourceResponse_draft = await GetResource(pidUri_draft, entryLifecycleStatus_draft);
+            var resource_draft = resourceResponse_draft.Resource;
+
+            // == Header
+            Assert.Equal("https://pid.bayer.com/kos/19050#d8d8f921-cf1d-43d8-af0e-aaaaaaaaaaaa", resource_draft.Id);
+            Assert.Equal("https://pid.bayer.com/URI1010Draft", resource_draft.PidUri.ToString());
+            Assert.Null(resource_draft.BaseUri);
+            Assert.NotNull(resource_draft.PreviousVersion); //PreviousVersion is a published resource which is retrieved from published Graph-> Assert Checks if published previousversions will be retrieved
+            Assert.Null(resource_draft.LaterVersion);
+            Assert.Null(resource_draft.PublishedVersion);
+
+            // == Properties
+            var property_draft = resource_draft.Properties;
+
+
+            Assert.True(property_draft.ContainsResourceDefinition("ID1002"));
+            Assert.True(property_draft.ContainsLabel("test123"));
+            Assert.True(property_draft.ContainsLifecycleStatus(EnumExtension.GetDescription(LifecycleStatus.Released)));
+            Assert.True(property_draft.ContainsEntryLifecycleStatus(ColidEntryLifecycleStatus.Draft.GetDescription()));
+            Assert.True(property_draft.ContainsInformationClassification("https://pid.bayer.com/kos/19050/Open"));
+            Assert.True(property_draft.ContainsLastChangeUser("simon.lansing.ext@bayer.com"));
+            Assert.True(property_draft.ContainsAuthor("testuser.ext@bayer.com"));
+            Assert.True(property_draft.ContainsLicensedData("false"));
+            Assert.True(property_draft.ContainsVersion("3"));
+            Assert.True(property_draft.ContainsType(EnumExtension.GetDescription(RegistrationService.Common.Enums.ColidEntry.Type.GenericDataset)));
+            Assert.True(property_draft.ContainsIsPersonalData("false"));
+            Assert.True(property_draft.ContainsHasConsumerGroup("https://pid.bayer.com/kos/19050#bf2f8eeb-fdb9-4ee1-ad88-e8932fa8753c"));
+
+            Assert.Equal("2019-12-19T14:24:09Z", property_draft[Graph.Metadata.Constants.Resource.DateCreated].First().ToString("s") + "Z");
+            Assert.Equal("2019-12-19T14:24:31Z", property_draft[Graph.Metadata.Constants.Resource.DateModified].First().ToString("s") + "Z");
+
+
         }
+
 
         [Fact]
         public async Task Get_ResourceByPidUriAndLifecycleStatus_Error_NotFound()
@@ -120,7 +159,7 @@ namespace COLID.RegistrationService.Tests.Functional.Controllers.V3
         {
             // Arrange
             var pidUri = "https://pid.bayer.com/URI1010";
-            var pidEntryLifecycleStatus = Graph.Metadata.Constants.Resource.ColidEntryLifecycleStatus.Historic;
+            var pidEntryLifecycleStatus = "someOtherLifecycleStatusOtherThanDraftOrPublished";
             var fullPath = $"{_apiPathV3}?pidUri={pidUri}&lifecycleStatus={pidEntryLifecycleStatus}";
 
             // Act
@@ -183,7 +222,7 @@ namespace COLID.RegistrationService.Tests.Functional.Controllers.V3
 
             var actualResource = new ResourceBuilder()
                 .GenerateSampleData(pidUri, PIDURI_TEMPLATE)
-                .WithHistoricVersion(pidUri)
+                //.WithHistoricVersion(pidUri)
                 .WithLaterVersion(pidUri)
                 .BuildRequestDto();
 
@@ -480,6 +519,45 @@ namespace COLID.RegistrationService.Tests.Functional.Controllers.V3
             WriteLine("Actual: ", resourceWriteResult.Resource);
 
             AssertResourceRequestWithEntity(editedResourceRequest, resourceWriteResult.Resource);
+        }
+        [Fact]
+        public async Task Edit_For_Unchanged_Resource_Returns_EditedResource()
+        {
+            var pidUri1 = $"https://pid.bayer.com/constraint/c{_random.Next(0, 9999999).ToString("D7")}";
+            var resourceCreateWriteResult = await CreateResource(pidUri1);
+            await PublishResource(pidUri1);
+
+            var editedResourceRequest = new ResourceRequestDTO() { Properties = resourceCreateWriteResult.Resource.Properties };
+
+            var resourceWriteResult = await EditResource(resourceCreateWriteResult.Resource.PidUri, editedResourceRequest);
+
+            // Assert
+            Assert.Equal(HttpStatusCode.BadRequest, resourceWriteResult.Response.StatusCode);
+
+        }
+
+        [Fact]
+        public async Task Publish_And_Edit_Returns_ResourcesWithSameIdAndPidUri()
+        {
+            var pidUri1 = $"https://pid.bayer.com/constraint/c{_random.Next(0, 9999999).ToString("D7")}";
+            var resourceCreateWriteResult = await CreateResource(pidUri1);
+
+             
+            var publishedResource = await PublishResource(pidUri1);
+
+            var editedResourceRequest = new ResourceRequestDTO() { Properties = resourceCreateWriteResult.Resource.Properties };
+            editedResourceRequest.Properties[Graph.Metadata.Constants.Resource.HasLabel] = new List<dynamic> { "this is a very fine edited resource" };
+            var resourceWriteResult = await EditResource(resourceCreateWriteResult.Resource.PidUri, editedResourceRequest);
+
+            // Assert
+            ValidateValidColidResourceCreationResponse(publishedResource, pidUri1);
+            ValidateValidColidResourceCreationResponse(resourceWriteResult, pidUri1);
+
+ 
+            AssertResourceRequestWithEntity(editedResourceRequest, resourceWriteResult.Resource);
+            Assert.Equal(publishedResource.Resource.Id, resourceWriteResult.Resource.Id);
+            Assert.Equal(publishedResource.Resource.PidUri, resourceWriteResult.Resource.PidUri);
+
         }
 
         [Fact]
@@ -819,6 +897,7 @@ namespace COLID.RegistrationService.Tests.Functional.Controllers.V3
             await PublishResource(pidUri);
             await MarkForDeletionResource(pidUri);
 
+          //  DeleteRevisionHistoryChain
             var result = await DeleteResource(pidUri);
             Assert.Equal(HttpStatusCode.OK, result.Response.StatusCode);
 
@@ -890,7 +969,7 @@ namespace COLID.RegistrationService.Tests.Functional.Controllers.V3
             await CreateResource(pidUri3);
 
             var pidUris = new string[] { pidUri1, pidUri2, pidUri3 };
-            var result = await DeleteMarkedForDeletionResources(pidUris);
+            var result = await DeleteMarkedForDeletionResources(null,pidUris);
             var resultObject = JsonConvert.DeserializeObject<IList<ResourceMarkedOrDeletedResult>>(result.Content);
 
             _output.WriteLine(result.Content);
@@ -920,7 +999,7 @@ namespace COLID.RegistrationService.Tests.Functional.Controllers.V3
             await CreateLocks(pidUri1, pidUri2, pidUri3);
 
             var pidUris = new string[] { pidUri1, pidUri2, pidUri3 };
-            var result = await DeleteMarkedForDeletionResources(pidUris);
+            var result = await DeleteMarkedForDeletionResources(null,pidUris);
             var deleteMarkedForDeletionResourcesResult = JsonConvert.DeserializeObject<IList<ResourceMarkedOrDeletedResult>>(result.Content);
 
             _output.WriteLine(result.Content);
@@ -944,7 +1023,7 @@ namespace COLID.RegistrationService.Tests.Functional.Controllers.V3
             await MarkForDeletionResource(pidUri2);
 
             var pidUris = new string[] { pidUri1, pidUri2 };
-            var result = await DeleteMarkedForDeletionResources(pidUris);
+            var result = await DeleteMarkedForDeletionResources(null,pidUris);
             var deleteMarkedForDeletionResourcesResult = JsonConvert.DeserializeObject<IList<ResourceMarkedOrDeletedResult>>(result.Content);
 
             _output.WriteLine(result.Content);
@@ -974,7 +1053,7 @@ namespace COLID.RegistrationService.Tests.Functional.Controllers.V3
             await CreateLocks(pidUri1, pidUri2);
 
             var pidUris = new string[] { pidUri1, pidUri2 };
-            var result = await DeleteMarkedForDeletionResources(pidUris);
+            var result = await DeleteMarkedForDeletionResources(null,pidUris);
             var deleteMarkedForDeletionResourcesResults = JsonConvert.DeserializeObject<IList<ResourceMarkedOrDeletedResult>>(result.Content);
 
             _output.WriteLine(result.Content);
@@ -994,10 +1073,9 @@ namespace COLID.RegistrationService.Tests.Functional.Controllers.V3
             await CreateResource(pidUri2);
             await PublishResource(pidUri1);
             await PublishResource(pidUri2);
-            await CreateLocks(pidUri1, pidUri2);
 
             var pidUris = new string[] { pidUri1, pidUri2 };
-            var result = await DeleteMarkedForDeletionResources(pidUris);
+            var result = await DeleteMarkedForDeletionResources(null,pidUris);
             var resourceMarkedOrDeletedResults = JsonConvert.DeserializeObject<IList<ResourceMarkedOrDeletedResult>>(result.Content);
 
             _output.WriteLine(result.Content);
@@ -1029,7 +1107,7 @@ namespace COLID.RegistrationService.Tests.Functional.Controllers.V3
             await MarkForDeletionResource(publishedAndMarked);
 
             var pidUris = new string[] { notExists, draft, published, publishedAndMarked };
-            var result = await DeleteMarkedForDeletionResources(pidUris);
+            var result = await DeleteMarkedForDeletionResources(null,pidUris);
 
 
             _output.WriteLine(result.Content);
@@ -1051,17 +1129,136 @@ namespace COLID.RegistrationService.Tests.Functional.Controllers.V3
         }
         #endregion
 
+        #region Link Creation
+        [Fact]
+        public async Task Create_Link_Between_Two_Resources_Success()
+        {
+            var parentResourcePidUri1 = "https://pid.bayer.com/06a4a152-8eb1-4092-99d5-9e0104d5ec2d/";
+            var linkedResourcePidUri2 = "https://pid.bayer.com/03a411s3-ajw1-3392-dpq8-5ea90pd9ic3a/";
+            var linktype = "https://pid.bayer.com/kos/19050/isDerivedFromDataset";
+
+            ColidResourceResponse parentResource =  await AddResourceLink(_client, parentResourcePidUri1, linktype, linkedResourcePidUri2);
+            var linkedResource = await GetResource(linkedResourcePidUri2, Graph.Metadata.Constants.Resource.ColidEntryLifecycleStatus.Published);
+
+
+            Assert.Equal(HttpStatusCode.OK, parentResource.Response.StatusCode);
+            
+            Assert.Equal(parentResource.Resource.PidUri.ToString(), parentResourcePidUri1);
+            Assert.Equal(parentResource.Resource.Links.Count, 2);
+            Assert.Equal(parentResource.Resource.Links.Count, 2);
+            Assert.False(parentResource.Resource.Properties.ContainsKey(linktype));
+
+            Assert.Equal(linkedResource.Resource.PidUri.ToString(), linkedResourcePidUri2);
+            Assert.Equal(linkedResource.Resource.Links.Count, 1);
+            Assert.False(linkedResource.Resource.Properties.ContainsKey(linktype));
+
+        }
+        [Fact]
+        public async Task Create_Link_Between_Two_Resources_NotExistingResource()
+        {
+            var parentResourcePidUri1 = "https://pid.bayer.com/06a4a152-8eb1-4092-99d5-9e0104d5ec2x/";
+            var linkedResourcePidUri2 = "https://pid.bayer.com/03a411s3-ajw1-3392-dpq8-5ea90pd9ic3a/";
+            var linktype = "https://pid.bayer.com/kos/19050/isDerivedFromDataset";
+
+            ColidResourceResponse parentResource = await AddResourceLink(_client, parentResourcePidUri1, linktype, linkedResourcePidUri2);
+
+            Assert.Equal(HttpStatusCode.NotFound, parentResource.Response.StatusCode);
+        }
+
+        [Fact]
+        public async Task Create_Link_Between_Two_Resources_LinkNotAllowed()
+        {
+            var parentResourcePidUri1 = "https://pid.bayer.com/06a4a152-8eb1-4092-99d5-9e0104d5ec2d/";
+            var linkedResourcePidUri2 = "https://pid.bayer.com/03a411s3-ajw1-3392-dpq8-5ea90pd9ic3a/";
+            var linktype = "https://pid.bayer.com/kos/19050/someFantasyLink";
+
+            ColidResourceResponse parentResource = await AddResourceLink(_client, parentResourcePidUri1, linktype, linkedResourcePidUri2);
+
+            Assert.Equal(HttpStatusCode.BadRequest, parentResource.Response.StatusCode);
+        }
+
+        [Fact]
+        public async Task Create_Link_To_Same_Resource_NotAllowed()
+        {
+            var parentResourcePidUri1 = "https://pid.bayer.com/06a4a152-8eb1-4092-99d5-9e0104d5ec2d/";
+            var linkedResourcePidUri2 = "https://pid.bayer.com/06a4a152-8eb1-4092-99d5-9e0104d5ec2d/";
+            var linktype = "https://pid.bayer.com/kos/19050/someFantasyLink";
+
+            ColidResourceResponse parentResource = await AddResourceLink(_client, parentResourcePidUri1, linktype, linkedResourcePidUri2);
+
+            Assert.Equal(HttpStatusCode.BadRequest, parentResource.Response.StatusCode);
+        }
+
+        [Fact]
+        public async Task Remove_Link_Between_Two_Resources_Success()
+        {
+            var parentResourcePidUri = "https://pid.bayer.com/e257221b-ebed-4c57-b19f-a0bc7e3e0aed/";
+            var linkedResourcePidUri = "https://pid.bayer.com/f08fdeaa-3d38-442a-ba32-2a138d46b609/";
+            var linktype = "https://pid.bayer.com/kos/19050/sameDatasetAs";
+
+            ColidResourceResponse parentResourceBeforeLinkDeletion = await GetResource(parentResourcePidUri);//, Graph.Metadata.Constants.Resource.ColidEntryLifecycleStatus.Published);
+            ColidResourceResponse parentResourceAfterDel = await RemoveResourceLink(_client, parentResourcePidUri, linktype, linkedResourcePidUri,false);
+
+            Assert.Equal(HttpStatusCode.OK, parentResourceBeforeLinkDeletion.Response.StatusCode);
+            Assert.Equal(parentResourceBeforeLinkDeletion.Resource.PidUri.ToString(), parentResourcePidUri);
+            Assert.Equal(parentResourceBeforeLinkDeletion.Resource.Links.Count, 1);
+            Assert.False(parentResourceBeforeLinkDeletion.Resource.Properties.ContainsKey(linktype));
+         
+            Assert.Equal(HttpStatusCode.OK, parentResourceAfterDel.Response.StatusCode);
+            Assert.Equal(parentResourceAfterDel.Resource.PidUri.ToString(), parentResourcePidUri);
+            Assert.Equal(parentResourceAfterDel.Resource.Links.Count, 0);
+            Assert.False(parentResourceAfterDel.Resource.Properties.ContainsKey(linktype));
+        }
+  
+        [Fact]
+        public async Task Remove_Link_Between_Two_Resources_NotExistingResource()
+        {
+            var parentResourcePidUri1 = "https://pid.bayer.com/06a4a152-8eb1-4092-99d5-9e0104d5ec2x/";
+            var linkedResourcePidUri2 = "https://pid.bayer.com/03a411s3-ajw1-3392-dpq8-5ea90pd9ic3a/";
+            var linktype = "https://pid.bayer.com/kos/19050/isDerivedFromDataset";
+
+            ColidResourceResponse parentResource = await RemoveResourceLink(_client, parentResourcePidUri1, linktype, linkedResourcePidUri2,false);
+
+            Assert.Equal(HttpStatusCode.NotFound, parentResource.Response.StatusCode);
+        }
+
+        [Fact]
+        public async Task Remove_Link_Between_Two_Resources_LinkNotAllowed()
+        {
+            var parentResourcePidUri1 = "https://pid.bayer.com/06a4a152-8eb1-4092-99d5-9e0104d5ec2d/";
+            var linkedResourcePidUri2 = "https://pid.bayer.com/03a411s3-ajw1-3392-dpq8-5ea90pd9ic3a/";
+            var linktype = "https://pid.bayer.com/kos/19050/someFantasyLink";
+
+            ColidResourceResponse parentResource = await RemoveResourceLink(_client, parentResourcePidUri1, linktype, linkedResourcePidUri2,false);
+
+            Assert.Equal(HttpStatusCode.BadRequest, parentResource.Response.StatusCode);
+        }
+
+        [Fact]
+        public async Task Remove_Link_To_Same_Resource_NotAllowed()
+        {
+            var parentResourcePidUri1 = "https://pid.bayer.com/06a4a152-8eb1-4092-99d5-9e0104d5ec2d/";
+            var linkedResourcePidUri2 = "https://pid.bayer.com/06a4a152-8eb1-4092-99d5-9e0104d5ec2d/";
+            var linktype = "https://pid.bayer.com/kos/19050/someFantasyLink";
+
+            ColidResourceResponse parentResource = await RemoveResourceLink(_client, parentResourcePidUri1, linktype, linkedResourcePidUri2,false);
+
+            Assert.Equal(HttpStatusCode.BadRequest, parentResource.Response.StatusCode);
+        }
+
+        #endregion
+
         #region Helper methods to call api
 
         private Task<ColidResourceResponse> GetResource(string pidUri, string entryLifecycleStatus = "")
         {
             return GetResource(_client, pidUri, entryLifecycleStatus);
         }
-
+ 
         private async Task<ColidResourceResponse> GetResource(HttpClient client, string pidUri, string entryLifecycleStatus = "")
         {
             var url = $"{_apiPathV3}?pidUri={pidUri}";
-            if (string.IsNullOrWhiteSpace(entryLifecycleStatus))
+            if (!string.IsNullOrWhiteSpace(entryLifecycleStatus))
             {
                 url += $"&lifecycleStatus={entryLifecycleStatus}";
             }
@@ -1106,6 +1303,53 @@ namespace COLID.RegistrationService.Tests.Functional.Controllers.V3
             _output.WriteLine(JsonConvert.SerializeObject(result));
 
             return new ColidResourceResponse(response, content, result.Resource, result.ValidationResult);
+        }
+         
+        private async Task<ColidResourceResponse> AddResourceLink(HttpClient client, string pidUri, string linktype, string pidUriToLink, string requester = "anonymous@anonymous.com")
+        {
+
+            var queryParams = new Dictionary<string, string> { { "pidUri", pidUri }, { "linkType", linktype }, { "pidUriToLink", pidUriToLink }, { "requester", requester } };
+            var requestUri = QueryHelpers.AddQueryString(_apiPathV3+ "/addLink", queryParams);
+            var request = new HttpRequestMessage(HttpMethod.Post, requestUri);
+
+
+            // Act
+            var response = await client.SendAsync(request);
+            var content = await response.Content.ReadAsStringAsync().ConfigureAwait(true);
+            
+            Assert.NotNull(content);
+            var result = JsonConvert.DeserializeObject<Resource>(content);
+            Assert.NotNull(result);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _output.WriteLine(result.ToString());
+            }
+
+            return new ColidResourceResponse(response, content, result);
+        }
+
+        private async Task<ColidResourceResponse> RemoveResourceLink(HttpClient client, string pidUri, string linktype, string pidUriToUnLink, bool returnTargetResource, string requester = "anonymous@anonymous.com")
+        {
+
+            var queryParams = new Dictionary<string, string> { { "pidUri", pidUri }, { "linkType", linktype }, { "pidUriToUnLink", pidUriToUnLink }, { "returnTargetResource", returnTargetResource.ToString().ToLower() }, { "requester", requester } };
+            var requestUri = QueryHelpers.AddQueryString(_apiPathV3 + "/removeLink", queryParams);
+            var request = new HttpRequestMessage(HttpMethod.Post, requestUri);
+
+            // Act
+            var response = await client.SendAsync(request);
+            var content = await response.Content.ReadAsStringAsync().ConfigureAwait(true);
+
+            Assert.NotNull(content);
+            var result = JsonConvert.DeserializeObject<Resource>(content);
+            Assert.NotNull(result);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _output.WriteLine(result.ToString());
+            }
+
+            return new ColidResourceResponse(response, content, result);
         }
 
         private async Task<ColidResourceResponse> EditResource(Uri pidUri, ResourceRequestDTO resourceDto)
@@ -1169,18 +1413,25 @@ namespace COLID.RegistrationService.Tests.Functional.Controllers.V3
             return new ColidResourceResponse(response, content);
         }
 
-        private async Task<ColidResourceResponse> DeleteResource(string pidUri)
+        private async Task<ColidResourceResponse> DeleteResource(string pidUri, string requester = "anonymous@anonymous.com")
         {
-            var response = await _client.DeleteAsync($"{_apiPathV3}?pidUri={pidUri}");
+            var queryParams = new Dictionary<string, string> { { "pidUri", pidUri }, { "requester", requester } };
+            var request = QueryHelpers.AddQueryString(_apiPathV3, queryParams);
+            var response = await _client.DeleteAsync(request);
             var content = await response.Content.ReadAsStringAsync().ConfigureAwait(true);
             return new ColidResourceResponse(response, content);
 
         }
 
-        private async Task<ColidResourceResponse> DeleteMarkedForDeletionResources(params string[] pidUri)
+        private async Task<ColidResourceResponse> DeleteMarkedForDeletionResources(string requesterparameter, params string[] pidUri)
         {
-            var request = new HttpRequestMessage(HttpMethod.Delete, $"{_apiPathV3}/resourceList")
+            string requester = requesterparameter == null ? "anonymous@anonymous.com" : requesterparameter;
+
+            var queryParams = new Dictionary<string, string> { { "requester", requester }};
+            var requestUri = QueryHelpers.AddQueryString(_apiPathV3+"/resourceList", queryParams);
+            var request = new HttpRequestMessage(HttpMethod.Put, requestUri)
             {
+                
                 Content = new StringContent(JsonConvert.SerializeObject(pidUri), Encoding.UTF8, MediaTypeNames.Application.Json),
             };
 
@@ -1190,7 +1441,7 @@ namespace COLID.RegistrationService.Tests.Functional.Controllers.V3
             return new ColidResourceResponse(response, content);
         }
 
-        #endregion
+        #endregion 
 
         #region Helper methods
 

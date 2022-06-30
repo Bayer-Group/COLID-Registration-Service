@@ -22,8 +22,8 @@ namespace COLID.RegistrationService.Tests.Unit.Services.Comparison
         {
             var idsUnderTest = new List<string>() { firstId, secondId };
 
-            var ex = Assert.Throws<ArgumentException>(() => Guard.CorrectIdCount(idsUnderTest));
-            Assert.Equal("id cannot be null, empty, or only whitespace.", ex.Message);
+            var ex = Assert.Throws<ArgumentNullException>(() => Guard.CorrectIdCount(idsUnderTest));
+            Assert.Equal("Value cannot be null. (Parameter 'id')", ex.Message);
         }
 
         [Fact]

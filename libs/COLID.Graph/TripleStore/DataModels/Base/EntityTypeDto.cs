@@ -9,6 +9,7 @@ namespace COLID.Graph.TripleStore.DataModels.Base
 
         public string Description => Properties.GetValueOrNull(Metadata.Constants.RDFS.Comment, true);
 
+
         public bool Instantiable => IsInstantiable();
 
         public IList<EntityTypeDto> SubClasses { get; set; }

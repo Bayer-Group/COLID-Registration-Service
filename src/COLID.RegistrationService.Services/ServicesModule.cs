@@ -1,10 +1,8 @@
-﻿using Amazon;
-using Amazon.S3;
-using AutoMapper;
+﻿using AutoMapper;
+using COLID.AWS;
+using COLID.AWS.DataModels;
 using COLID.Cache;
 using COLID.Graph.Metadata.Services;
-using COLID.Graph.TripleStore.AWS;
-using COLID.Graph.TripleStore.DataModels.AWS;
 using COLID.Graph.TripleStore.MappingProfiles;
 using COLID.MessageQueue.Services;
 using COLID.RegistrationService.Services.Configuration;
@@ -30,9 +28,12 @@ namespace COLID.RegistrationService.Services
         {
             services.AddBaseServicesModule(configuration);
             services.AddDistributedLockModule(configuration);
+            services.AddAmazonWebServiceModule(configuration);
+            services.AddTransient<IIronMountainApiService, IronMountainApiService>();
+
             return services;
         }
-        
+
         /// <summary>
         /// This will register all the supported functionality by Repositories module.
         /// </summary>
@@ -42,10 +43,12 @@ namespace COLID.RegistrationService.Services
         {
             services.AddBaseServicesModule(configuration);
             services.AddLockModule(configuration);
+            services.AddAmazonWebServiceModule(configuration);
+            services.AddTransient<IIronMountainApiService, IronMountainApiService>();
 
             return services;
         }
-        
+
         /// <summary>
         /// This will register all the supported functionality by Repositories module.
         /// </summary>
@@ -55,10 +58,12 @@ namespace COLID.RegistrationService.Services
         {
             services.AddBaseServicesModule(configuration);
             services.AddDistributedLockModule(configuration);
+            services.AddAmazonWebServiceModule(configuration);
+            services.AddTransient<IIronMountainApiService, IronMountainApiService>();
 
             return services;
         }
-        
+
         /// <summary>
         /// This will register all the supported functionality by Repositories module.
         /// </summary>
@@ -68,10 +73,12 @@ namespace COLID.RegistrationService.Services
         {
             services.AddBaseServicesModule(configuration);
             services.AddLockModule(configuration);
+            services.AddAmazonWebServiceModule(configuration);
+            services.AddTransient<IIronMountainApiService, IronMountainApiService>();
 
             return services;
         }
-        
+
         /// <summary>
         /// This will register all the supported functionality by Repositories module.
         /// </summary>
@@ -85,12 +92,12 @@ namespace COLID.RegistrationService.Services
                 typeof(EntityWithPidUriTemplateTypeCheckProfile),
                 typeof(ExtendedUriTemplateProfile),
                 typeof(MetadataGraphConfigurationProfile),
-                typeof(KeywordProfile),
                 typeof(MetadataPropertyProfile),
                 typeof(PidUriTemplateProfile));
 
             services.Configure<ColidAppDataServiceTokenOptions>(configuration.GetSection("ColidAppDataServiceTokenOptions"));
             services.Configure<ColidIndexingCrawlerServiceTokenOptions>(configuration.GetSection("ColidIndexingCrawlerServiceTokenOptions"));
+            services.Configure<ColidSearchServiceTokenOptions>(configuration.GetSection("ColidSearchServiceTokenOptions"));
             services.Configure<AmazonWebServicesOptions>(configuration.GetSection("AmazonWebServicesOptions"));
 
             services.AddTransient<IStatusService, StatusService>();
@@ -100,17 +107,24 @@ namespace COLID.RegistrationService.Services
             services.AddSingleton<IMessageQueuePublisher>(x => x.GetRequiredService<ReindexingService>());
 
             services.AddTransient<IResourceService, ResourceService>();
+            services.AddTransient<IMessageQueueReceiver, ResourceService>();
+            services.AddTransient<IMessageQueuePublisher, ResourceService>();
+            //services.AddSingleton<ResourceService>();
+            //services.AddSingleton<IResourceService>(x => x.GetRequiredService<ResourceService>());
+            //services.AddSingleton<IMessageQueueReceiver>(x => x.GetRequiredService<ResourceService>());
+            //services.AddSingleton<IMessageQueuePublisher>(x => x.GetRequiredService<ResourceService>());
+
+            services.AddTransient<IRevisionService, RevisionService>();
             services.AddTransient<IResourceLinkingService, ResourceLinkingService>();
+            services.AddTransient<IAttachmentService, AttachmentService>();
             services.AddTransient<IConsumerGroupService, ConsumerGroupService>();
             services.AddTransient<IPidUriTemplateService, PidUriTemplateService>();
             services.AddTransient<IExtendedUriTemplateService, ExtendedUriTemplateService>();
-            services.AddTransient<IProxyConfigService, ProxyConfigService>();
             services.AddTransient<IResourcePreprocessService, ResourcePreprocessService>();
             services.AddTransient<IEntityService, EntityService>();
-            services.AddTransient<IKeywordService, KeywordService>();
             services.AddTransient<IIdentifierService, IdentifierService>();
             services.AddTransient<IDistributionEndpointService, DistributionEndpointService>();
-            services.AddTransient<IHistoricResourceService, HistoricResourceService>();
+            //services.AddTransient<IHistoricResourceService, HistoricResourceService>();
             services.AddTransient<ITaxonomyService, TaxonomyService>();
             services.AddTransient<IGraphManagementService, GraphManagementService>();
 
@@ -120,15 +134,28 @@ namespace COLID.RegistrationService.Services
             services.AddTransient<IValidationService, ValidationService>();
             services.AddTransient<IIdentifierValidationService, IdentifierValidationService>();
 
-            services.AddTransient<IAmazonS3Service, AmazonS3Service>();
-
             services.AddTransient<IResourceComparisonService, ResourceComparisonService>();
             services.AddTransient<IDifferenceCalculationService, DifferenceCalculationService>();
             services.AddTransient<ISimilarityCalculationService, SimilarityCalculationService>();
+            services.AddTransient<IAttachmentService, AttachmentService>();
+            services.AddTransient<IImportService, ImportService>();
+
+            services.AddSingleton<EndpointTestService>();
+            services.AddSingleton<IEndpointTestService>(x => x.GetRequiredService<EndpointTestService>());
+            services.AddSingleton<IMessageQueueReceiver>(x => x.GetRequiredService<EndpointTestService>());
+            services.AddSingleton<IMessageQueuePublisher>(x => x.GetRequiredService<EndpointTestService>());
+
+            services.AddSingleton<ProxyConfigService>();
+            services.AddSingleton<IProxyConfigService>(x => x.GetRequiredService<ProxyConfigService>());
+            services.AddSingleton<IMessageQueuePublisher>(x => x.GetRequiredService<ProxyConfigService>());
+            services.AddSingleton<IMessageQueueReceiver>(x => x.GetRequiredService<ProxyConfigService>());
+
+            services.AddTransient<IExportService, ExportService>();
 
             // Must be injected as the only instance of a request so that all generated identifiers are stored in the state of the service.
             // TODO: What the heck? Refactor with new Microservice for PID URI Generation
             services.AddScoped<IPidUriGenerationService, PidUriGenerationService>();
+
 
             return services;
         }

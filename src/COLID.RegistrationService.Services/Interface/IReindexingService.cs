@@ -1,10 +1,9 @@
-﻿using System.Collections.Generic;
-using System.Threading.Tasks;
-using COLID.Graph.Metadata.DataModels.Metadata;
-using COLID.Graph.Metadata.DataModels.Resources;
+﻿using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using COLID.Graph.Metadata.DataModels.Resources;
 using COLID.Graph.TripleStore.DataModels.Base;
-using COLID.RegistrationService.Common.DataModel.Resources;
-
+using COLID.Graph.TripleStore.DataModels.Resources;
 namespace COLID.RegistrationService.Services.Interface
 {
     /// <summary>
@@ -16,44 +15,70 @@ namespace COLID.RegistrationService.Services.Interface
         /// Starts the re-indexing on indexing crawler service.
         /// </summary>
         Task Reindex();
+                
+        /// <summary>
+        /// Starts the indexing process of the new resource towards on indexing crawler service.  
+        /// </summary>
+        /// <param name="pidUri">Pid Uri of resource to be indexed</param>
+        /// <param name="resource">Resource to be indexed</param>        /// <param name="resourceVersions">Versions of resource to be indexed</param>
+        void IndexNewResource(Uri pidUri, Resource resource, IList<VersionOverviewCTO> resourceVersions);
 
         /// <summary>
-        /// Published actual resource and finds all deleted links to update these resources as well.
+        /// Starts the indexing process of the updated resource towards on indexing crawler service.
         ///
-        /// <para>
-        /// Outbound<br />
-        ///   - Actual -> Crawler<br />
-        ///   - Deleted -> Registration (Only Update)<br />
-        /// Inbound -> Crawler<br />
-        /// Versions -> Crawler
-        /// </para>
+        /// Besides the current resource (draft) also the indexed published resource is updated.
         /// </summary>
-        /// <param name="resource">Actual resource</param>
-        /// <param name="repoResource">Related resource in repository</param>
-        void SendResourcePublished(Resource resource, Entity repoResource, IList<MetadataProperty> metadataProperties);
+        /// <param name="pidUri">Pid Uri of resource to be indexed</param>
+        /// <param name="resource">Resource to be indexed</param>
+        /// <param name="repoResources">Resources that were stored in the database before the current process.</param>
+        void IndexUpdatedResource(Uri pidUri, Entity resource, ResourcesCTO repoResources);
 
         /// <summary>
-        /// Delete resource and update all linked resources.
-        ///
-        /// Outbound -> RegistrationService
-        /// Inbound -> RegistrationService
-        /// Versions -> Update one of the versioned resources in the crawler
-        ///
-        /// Crawler check if resource is published
+        /// Starts the indexing process of the updated (linked) resource towards on indexing crawler service.
         /// </summary>
-        /// <param name="resource">Resource to be deleted</param>
-        void SendResourceDeleted(Resource resource, IList<string> inboundProperties, IList<MetadataProperty> metadataProperties);
+        /// <param name="pidUri">Pid Uri of resource to be indexed</param>
+        /// <param name="resource">Resource to be indexed</param>
+        /// <param name="repoResources">Resources that were stored in the database before the current process.</param>
+        void IndexLinkedResource(Uri pidUri, Entity resource, ResourcesCTO repoResources);
 
         /// <summary>
-        /// Update actual linked resource.
+        /// Starts the indexing process of the updated resource on indexing crawler service,
+        /// as well as a resource which is still in the linked list.
+        /// This will update all other versioned resources.
         /// </summary>
-        /// <param name="resource">Pid entry</param>
-        void SendResourceLinked(Resource resource);
+        /// <param name="pidUri">Pid Uri of resource to be indexed</param>
+        /// <param name="resource">Resource to be indexed.</param>
+        ///  /// <param name="unlinkedPidUri">Unlinked Pid Uri of resource to be indexed</param>
+        /// <param name="unlinkedListResource">Unlinked resource to be indexed.</param>
+        void IndexUnlinkedResource(Uri pidUri, ResourcesCTO resource, Uri unlinkedPidUri, ResourcesCTO unlinkedListResource);
 
         /// <summary>
-        /// Updated the resource that is no longer linked and a resource from the versions chain to update the complete chain via crawler.
+        /// Starts the indexing process of the published resource towards on indexing crawler service.
+        /// Draft resource will be deleted on index.
         /// </summary>
-        /// <param name="resource"></param>
-        void SendResourceUnlinked(Resource resource);
+        /// <param name="pidUri">Pid Uri of resource to be indexed</param>
+        /// <param name="resource">Resource to be indexed</param>
+        /// <param name="repoResources">Resources that were stored in the database before the current process.</param>
+        void IndexPublishedResource(Uri pidUri, Entity resource, ResourcesCTO repoResources);
+
+        /// <summary>
+        /// Starts the indexing process of the marked for deletion resource towards on indexing crawler service.
+        /// </summary>
+        /// <param name="pidUri">Pid Uri of resource to be indexed</param>
+        /// <param name="resource">Resource to be indexed</param>
+        /// <param name="repoResources">Resources that were stored in the database before the current process.</param>
+        void IndexMarkedForDeletionResource(Uri pidUri, Entity resource, ResourcesCTO repoResources);
+
+        /// <summary>
+        /// Starts the deletion process of the resource towards on indexing crawler service.
+        /// 
+        /// depending on the lifecycle status only the draft is deleted.
+        /// If there is only one published resource in the index,
+        /// it will be removed and the resource is no longer present in the index. 
+        /// </summary>
+        /// <param name="pidUri">Pid Uri of resource to be indexed</param>
+        /// <param name="resource">Resource to be indexed</param>
+        /// <param name="repoResources">Resources that were stored in the database before the current process.</param>
+        void IndexDeletedResource(Uri pidUri, Entity resource, ResourcesCTO repoResources);
     }
 }

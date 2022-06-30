@@ -44,5 +44,33 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
 
             return Ok(proxyConfig);
         }
+        /// <summary>
+        /// Rebuild Proxy Config DynamoDb.
+        /// </summary>
+        [HttpPut]
+        public IActionResult RebuildProxyConfiguration()
+        {
+            _proxyConfigService.proxyConfigRebuild();
+
+            return Ok();
+        }
+        /// <summary>
+        /// Returns the NGINX proxy configuration for all published COLID entries.
+        /// </summary>
+        /// <returns>The NGINX proxy configuration for all published COLID entries</returns>
+        /// <response code="200">Returns the NGINX proxy configuration for all published COLID entries</response>
+        /// <response code="404">If the NGINX proxy configuration can not be generated</response>
+        /// <response code="500">If an unexpected error occurs</response>
+        [HttpGet("v2")]
+        public IActionResult GetProxyConfigurationV2()
+        {
+            var proxyConfig = _proxyConfigService.GetProxyConfigForNewEnvironment();
+
+            if (string.IsNullOrWhiteSpace(proxyConfig))
+            {
+                return NotFound("No proxy config found.");
+            }
+            return Ok(proxyConfig);
+        }
     }
 }

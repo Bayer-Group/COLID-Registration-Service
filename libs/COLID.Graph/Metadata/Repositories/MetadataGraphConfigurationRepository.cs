@@ -11,6 +11,7 @@ using COLID.Graph.Metadata.DataModels.MetadataGraphConfiguration;
 using COLID.Graph.TripleStore.Extensions;
 using COLID.Graph.TripleStore.Repositories;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using VDS.RDF.Query;
 
@@ -18,30 +19,31 @@ namespace COLID.Graph.Metadata.Repositories
 {
     internal class MetadataGraphConfigurationRepository : BaseRepository<MetadataGraphConfiguration>, IMetadataGraphConfigurationRepository
     {
-        protected override string InsertingGraph => Constants.MetadataGraphConfiguration.Type;
-
-        protected override IEnumerable<string> QueryGraphs => new List<string> { InsertingGraph };
+        private readonly Uri _namedGraph;
 
         private readonly ICacheService _cacheService;
 
         private const string _cachePrefix = "MetadataGraphConfigurationService";
 
         public MetadataGraphConfigurationRepository(
+            IConfiguration configuration,
             ITripleStoreRepository tripleStoreRepository,
             ILogger<MetadataGraphConfigurationRepository> logger,
-            ICacheService cacheService) : base(tripleStoreRepository, null, logger)
+            ICacheService cacheService) : base(configuration, tripleStoreRepository, logger)
         {
             _cacheService = cacheService;
+
+            _namedGraph = new Uri(Constants.MetadataGraphConfiguration.Type);
         }
 
 
-        public override void CreateEntity(MetadataGraphConfiguration newEntity, IList<MetadataProperty> metadataProperty)
+        public override void CreateEntity(MetadataGraphConfiguration newEntity, IList<MetadataProperty> metadataProperty, Uri namedGraph)
         {
             _cacheService.Clear();
-            base.CreateEntity(newEntity, metadataProperty);
+            base.CreateEntity(newEntity, metadataProperty, _namedGraph);
         }
 
-        public override void DeleteEntity(string id)
+        public override void DeleteEntity(string id, Uri namedGraph)
         {
             throw new InvalidOperationException();
         }
@@ -64,7 +66,7 @@ namespace COLID.Graph.Metadata.Repositories
                     ORDER BY DESC(xsd:dateTime(?startDateTime))"
                 };
 
-                parameterizedString.SetUri("mgcGraph", new Uri(QueryGraphs.First()));
+                parameterizedString.SetUri("mgcGraph", _namedGraph);
                 parameterizedString.SetUri("hasStartDateTime", new Uri(Constants.EnterpriseCore.HasStartDateTime));
                 parameterizedString.SetUri("editorialNote", new Uri(Constants.EnterpriseCore.EditorialNote));
                 parameterizedString.SetPlainLiteral("graphs",
@@ -120,7 +122,7 @@ namespace COLID.Graph.Metadata.Repositories
                     }"
                 };
 
-                parameterizedString.SetUri("mgcGraph", new Uri(QueryGraphs.First()));
+                parameterizedString.SetUri("mgcGraph", _namedGraph);
                 parameterizedString.SetUri("mgcType", new Uri(Constants.MetadataGraphConfiguration.Type));
                 parameterizedString.SetUri("hasStartDateTime", new Uri(Constants.EnterpriseCore.HasStartDateTime));
 
@@ -171,7 +173,7 @@ namespace COLID.Graph.Metadata.Repositories
             }
         }
 
-        public IList<string> GetGraphs(string graphType, string configIdentifier = "")
+        public ISet<Uri> GetGraphs(string graphType, string configIdentifier = "")
         {
             // This statement is called, if we insert into graph inside of ValidationService
             if (string.IsNullOrWhiteSpace(graphType))
@@ -179,20 +181,20 @@ namespace COLID.Graph.Metadata.Repositories
                 return null;
             }
 
-            IEnumerable<string> cachedGraphs;
+            ISet<Uri> cachedGraphs;
             if (string.IsNullOrWhiteSpace(configIdentifier))
             {
                 var latestConfig = GetLatestConfiguration();
-                cachedGraphs = _cacheService.GetValue<IEnumerable<string>>($"{_cachePrefix}:{graphType}:{latestConfig.Id}");
+                cachedGraphs = _cacheService.GetValue<ISet<Uri>>($"{_cachePrefix}:{graphType}:{latestConfig.Id}");
             }
             else
             {
-                cachedGraphs = _cacheService.GetValue<IEnumerable<string>>($"{_cachePrefix}:{graphType}:{configIdentifier}");
+                cachedGraphs = _cacheService.GetValue<ISet<Uri>>($"{_cachePrefix}:{graphType}:{configIdentifier}");
             }
 
             if (cachedGraphs != null)
             {
-                return cachedGraphs.ToList();
+                return cachedGraphs;
             }
 
             MetadataGraphConfiguration selectedConfig;
@@ -202,30 +204,30 @@ namespace COLID.Graph.Metadata.Repositories
             }
             else
             {
-                selectedConfig = base.GetEntityById(configIdentifier);
+                selectedConfig = base.GetEntityById(configIdentifier, new HashSet<Uri> { _namedGraph });
             }
 
             var graphList = selectedConfig.Properties.GetValueOrNull(graphType, false);
-            var graphs = new List<string>();
+            var graphs = new HashSet<Uri>();
             foreach (var graph in graphList)
             {
-                graphs.Add((string)graph);
+                graphs.Add(new Uri(graph));
             }
 
             if (string.IsNullOrWhiteSpace(configIdentifier))
             {
-                _cacheService.Set<IEnumerable<string>>($"{_cachePrefix}:{graphType}:{selectedConfig.Id}", graphs);
+                _cacheService.Set<IEnumerable<Uri>>($"{_cachePrefix}:{graphType}:{selectedConfig.Id}", graphs);
             }
             else
             {
-                _cacheService.Set<IEnumerable<string>>($"{_cachePrefix}:{graphType}:{configIdentifier}", graphs);
+                _cacheService.Set<IEnumerable<Uri>>($"{_cachePrefix}:{graphType}:{configIdentifier}", graphs);
             }
             return graphs;
         }
 
-        public IList<string> GetGraphs(IEnumerable<string> graphTypes)
+        public ISet<Uri> GetGraphs(IEnumerable<string> graphTypes)
         {
-            var graphList = new List<string>();
+            var graphList = new HashSet<Uri>();
 
             if (!graphTypes.IsNullOrEmpty())
             {
@@ -244,7 +246,7 @@ namespace COLID.Graph.Metadata.Repositories
             return graphList;
         }
 
-        public override void UpdateEntity(MetadataGraphConfiguration entity, IList<MetadataProperty> metadataProperties)
+        public override void UpdateEntity(MetadataGraphConfiguration entity, IList<MetadataProperty> metadataProperties, Uri namedGraph)
         {
             throw new InvalidOperationException();
         }

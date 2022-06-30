@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text;
 using System.Threading.Tasks;
-using COLID.Graph.TripleStore.AWS;
+using COLID.AWS.DataModels;
 using COLID.Graph.Triplestore.Exceptions;
 using COLID.RegistrationService.Common.DataModel.Graph;
 using Microsoft.AspNetCore.Http;
@@ -21,7 +22,7 @@ namespace COLID.RegistrationService.Services.Interface
         /// 4. Graph was used in the past or is new -> archivied
         /// </summary>
         /// <returns>List of graphs</returns>
-        public IList<GraphDto> GetGraphs();
+        public IList<GraphDto> GetGraphs(bool includeRevisionGraphs);
         
         /// <summary>
         /// Deletes a graph unless it is used by the system.
@@ -44,5 +45,11 @@ namespace COLID.RegistrationService.Services.Interface
         /// </summary>
         /// <param name="loadId">the id to fetch the status for</param>
         public Task<NeptuneLoaderStatusResponse> GetGraphImportStatus(Guid loadId);
+
+        /// <summary>
+        /// Download the graph with the given name in ttl format.
+        /// </summary>
+        /// <param name="graph">Graph name to be downloaded</param>
+        public Task<Stream> DownloadGraph(Uri graphName);
     }
 }

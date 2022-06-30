@@ -2,6 +2,7 @@
 using System.Linq;
 using COLID.Graph.Metadata.DataModels.Metadata;
 using COLID.Graph.Metadata.Extensions;
+using COLID.Graph.TripleStore.Extensions;
 using COLID.RegistrationService.Services.Validation.Models;
 
 namespace COLID.RegistrationService.Services.Validation.Validators
@@ -18,7 +19,7 @@ namespace COLID.RegistrationService.Services.Validation.Validators
 
         protected virtual string Group { get; }
 
-        protected virtual bool IsTaxonomy { get; }
+        protected virtual string FieldType { get; }
 
         public void HasValidationResult(EntityValidationFacade validationFacade, KeyValuePair<string, List<dynamic>> property)
         {
@@ -36,7 +37,12 @@ namespace COLID.RegistrationService.Services.Validation.Validators
 
         protected bool IsMatch(string key, MetadataProperty metadata)
         {
-            return MetadataRangeMatches(metadata) || MetadataDatatypeMatches(metadata) || MetadataGroupMatches(metadata) || MetadataKeyMatches(key) || MetadataTaxonomyMatches(metadata);
+            return MetadataKeyMatches(key) || MetadataFieldTypeMatches(metadata) ||  MetadataRangeMatches(metadata) || MetadataDatatypeMatches(metadata) || MetadataGroupMatches(metadata) || MetadataTaxonomyMatches(metadata);
+        }
+
+        private bool MetadataFieldTypeMatches(MetadataProperty metadata)
+        {
+            return !string.IsNullOrWhiteSpace(FieldType) && metadata.Properties.TryGetValue(Graph.Metadata.Constants.PIDO.Shacl.FieldType, out var fieldType) &&  fieldType == FieldType;
         }
 
         private bool MetadataKeyMatches(string key)
@@ -46,7 +52,7 @@ namespace COLID.RegistrationService.Services.Validation.Validators
 
         private bool MetadataRangeMatches(MetadataProperty metadata)
         {
-            return (!string.IsNullOrWhiteSpace(Range) && metadata.Properties.TryGetValue(Graph.Metadata.Constants.Shacl.Range, out var range) && range == Range);
+            return !string.IsNullOrWhiteSpace(Range) && metadata.Properties.TryGetValue(Graph.Metadata.Constants.Shacl.Range, out var range) && range == Range;
         }
 
         private bool MetadataGroupMatches(MetadataProperty metadata)
@@ -63,7 +69,7 @@ namespace COLID.RegistrationService.Services.Validation.Validators
 
         private bool MetadataTaxonomyMatches(MetadataProperty metadata)
         {
-            return metadata != null && metadata.IsControlledVocabulary(out var range) && IsTaxonomy;
+            return metadata != null && metadata.IsControlledVocabulary(out var range) && FieldType == Graph.Metadata.Constants.PIDO.Shacl.FieldTypes.Hierarchy;
         }
     }
 }

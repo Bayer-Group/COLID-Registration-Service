@@ -1,13 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
-using System.Text;
+﻿using System.Collections.Generic;
 using COLID.Cache.Extensions;
 using Xunit;
 
 namespace COLID.Cache.Tests.Extensions
 {
-    [ExcludeFromCodeCoverage]
     public class ObjectExtensionTests
     {
         [Fact]

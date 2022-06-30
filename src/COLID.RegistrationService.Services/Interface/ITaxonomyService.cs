@@ -21,5 +21,11 @@ namespace COLID.RegistrationService.Services.Interface
         /// <param name="taxonomyType">The type of the taxonomy to be searched for</param>
         /// <returns>List of taxonomies</returns>
         IList<TaxonomyResultDTO> GetTaxonomiesAsPlainList(string taxonomyType);
+
+        /// <summary>
+        /// Get all taxonomies to resolve labels in excel export
+        /// </summary>
+        /// <returns></returns>
+        IList<Taxonomy> GetAllTaxonomies();
     }
 }

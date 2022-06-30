@@ -24,6 +24,7 @@ namespace COLID.RegistrationService.Tests.Functional.Controllers.V3
 
         private readonly string _deprecatedConsumerGroup =
             "https://pid.bayer.com/kos/19050#695533d3-391f-4249-81f9-f1674d1ea9dc";
+
         public ConsumerGroupControllerV3Tests(FunctionTestsFixture factory)
         {
             _factory = factory;

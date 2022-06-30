@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Mime;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using COLID.AWS.DataModels;
+using COLID.AWS.Interface;
 using COLID.Common.Extensions;
 using COLID.Common.Utilities;
 using COLID.Exception.Models;
@@ -12,14 +13,14 @@ using COLID.Exception.Models.Business;
 using COLID.Graph.Metadata.DataModels.MetadataGraphConfiguration;
 using COLID.Graph.Metadata.Services;
 using COLID.Graph.Triplestore.Exceptions;
-using COLID.Graph.TripleStore.AWS;
 using COLID.Graph.TripleStore.Repositories;
 using COLID.RegistrationService.Common.DataModel.Graph;
 using COLID.RegistrationService.Repositories.Interface;
 using COLID.RegistrationService.Services.Interface;
 using COLID.StatisticsLog.Services;
 using Microsoft.AspNetCore.Http;
-using Microsoft.VisualBasic;
+using Microsoft.Extensions.Options;
+using VDS.RDF.Writing;
 
 namespace COLID.RegistrationService.Services.Implementation
 {
@@ -31,10 +32,11 @@ namespace COLID.RegistrationService.Services.Implementation
         private readonly IAuditTrailLogService _auditTrailLogService;
         private readonly IAmazonS3Service _awsS3Service;
         private readonly INeptuneLoaderConnector _neptuneLoader;
-        private readonly Regex _regex = new Regex(@"[\W\/]+");
+        private readonly AmazonWebServicesOptions _awsConfig;
 
-        public GraphManagementService(IGraphManagementRepository graphManagementRepository, IGraphRepository graphRepository, 
-            IMetadataGraphConfigurationService graphConfiguration, IAuditTrailLogService auditTrailLogService, IAmazonS3Service awsS3Service, INeptuneLoaderConnector neptuneLoader)
+        public GraphManagementService(IGraphManagementRepository graphManagementRepository, IGraphRepository graphRepository,
+            IMetadataGraphConfigurationService graphConfiguration, IAuditTrailLogService auditTrailLogService, IAmazonS3Service awsS3Service,
+            INeptuneLoaderConnector neptuneLoader, IOptionsMonitor<AmazonWebServicesOptions> awsConfig)
         {
             _graphManagementRepo = graphManagementRepository;
             _graphConfigurationService = graphConfiguration;
@@ -42,11 +44,12 @@ namespace COLID.RegistrationService.Services.Implementation
             _graphRepo = graphRepository;
             _awsS3Service = awsS3Service;
             _neptuneLoader = neptuneLoader;
+            _awsConfig = awsConfig.CurrentValue;
         }
 
-        public IList<GraphDto> GetGraphs()
+        public IList<GraphDto> GetGraphs(bool includeRevisionGraphs=false)
         {
-            var graphNames = _graphManagementRepo.GetGraphs();
+            var graphNames = _graphManagementRepo.GetGraphs(includeRevisionGraphs);
             var graphConfigs = _graphConfigurationService.GetConfigurationOverview();
 
             var currentGraphConfig = graphConfigs.FirstOrDefault();
@@ -109,16 +112,31 @@ namespace COLID.RegistrationService.Services.Implementation
             Guard.IsValidUri(graphName);
             CheckFileTypeForTtl(turtleFile);
 
-            var s3Key = await _awsS3Service.UploadFile(turtleFile);
+            var fileUploadInfo = await _awsS3Service.UploadFileAsync(_awsConfig.S3BucketForGraphs, turtleFile);
 
             var graphExists = _graphRepo.CheckIfNamedGraphExists(graphName);
             if (graphExists && !overwriteExisting)
             {
                 throw new GraphAlreadyExistsException(graphName);
             }
-            
-            var loaderResponse = await _neptuneLoader.LoadGraph(s3Key, graphName);
+
+            var loaderResponse = await _neptuneLoader.LoadGraph(fileUploadInfo.S3KeyName, graphName);
             return loaderResponse;
+        }
+
+        public async Task<Stream> DownloadGraph(Uri graphName)
+        {
+            Guard.IsValidUri(graphName);
+
+            var result = _graphManagementRepo.GetGraph(graphName);
+            var stringAsStream = new MemoryStream();
+            var StreamWriter = new StreamWriter(stringAsStream);
+            CompressingTurtleWriter tw = new CompressingTurtleWriter();
+            tw.Save(result, StreamWriter, true);
+            StreamWriter.Flush();
+            stringAsStream.Position = 0;
+
+            return stringAsStream;
         }
 
         private static void CheckFileTypeForTtl(IFormFile turtleFile)
@@ -134,6 +152,5 @@ namespace COLID.RegistrationService.Services.Implementation
             var status = await _neptuneLoader.GetStatus(loadId);
             return status;
         }
-
     }
 }

@@ -5,8 +5,8 @@ using System.Linq;
 using COLID.Graph.Metadata.DataModels.Metadata;
 using COLID.Graph.Metadata.DataModels.Resources;
 using COLID.Graph.Tests.Builder;
+using COLID.Graph.TripleStore.DataModels.Resources;
 using COLID.RegistrationService.Services.Authorization.UserInfo;
-using COLID.RegistrationService.Services.Interface;
 using COLID.RegistrationService.Services.Validation.Models;
 using COLID.RegistrationService.Services.Validation.Validators.Datatypes;
 using COLID.RegistrationService.Tests.Common.Builder;
@@ -34,10 +34,10 @@ namespace COLID.RegistrationService.Tests.Unit.Services.Validation.Validators.Da
         }
 
         [Theory]
-        [InlineData("2020-03-19T12:06:09.6509493Z", "2020-03-19T13:06:09.6509493+01:00")]
-        [InlineData("Thu, 19 Mar 2020 12:09:04 GMT", "2020-03-19T13:09:04.0000000+01:00")]
-        [InlineData("2020-03-19T12:09:17", "2020-03-19T12:09:17.0000000")]
-        [InlineData("2020-03-19 12:09:40Z", "2020-03-19T13:09:40.0000000+01:00")]
+        [InlineData("2020-03-19T12:06:09.6509493Z", "2020-03-19T18:36:09.6500000+01:00")]
+        [InlineData("Thu, 19 Mar 2020 12:09:04 GMT", "2020-03-19T18:39:04.0000000+01:00")]
+        [InlineData("2020-03-19T12:09:17", "2020-03-19T17:39:17.0000000")]
+        [InlineData("2020-03-19 12:09:40Z", "2020-03-19T18:39:40.0000000+01:00")]
         public void InternalHasValidationResult_Success(string actualDateTime, string expectedDateTime)
         {
             // Arrange

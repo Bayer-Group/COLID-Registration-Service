@@ -237,7 +237,7 @@ namespace COLID.RegistrationService.Tests.Functional.Controllers.V3
             var updateContentAfterEdit = await searchResultAfterEdit.Content.ReadAsStringAsync().ConfigureAwait(false);
             var updatedEntity = JsonConvert.DeserializeObject<BaseEntityResultDTO>(updateContentAfterEdit);
 
-            Assert.Equal(new List<string> { newRoute }, updatedEntity.Properties[RegistrationService.Common.Constants.PidUriTemplate.HasRoute]);
+            Assert.Equal(new List<string> { newRoute }, updatedEntity.Properties[COLID.Graph.Metadata.Constants.PidUriTemplate.HasRoute]);
 
             // Cleanup TPL
             var deleteResult = await _client.DeleteAsync(searchUrl);
@@ -378,7 +378,7 @@ namespace COLID.RegistrationService.Tests.Functional.Controllers.V3
             var updateContentAfterDeletion = await searchResultAfterDeletion.Content.ReadAsStringAsync().ConfigureAwait(false);
             var updatedEntity = JsonConvert.DeserializeObject<BaseEntityResultDTO>(updateContentAfterDeletion);
 
-            Assert.Equal(new List<string> { RegistrationService.Common.Constants.PidUriTemplate.LifecycleStatus.Deprecated }, updatedEntity.Properties[RegistrationService.Common.Constants.PidUriTemplate.HasLifecycleStatus]);
+            Assert.Equal(new List<string> { COLID.Graph.Metadata.Constants.PidUriTemplate.LifecycleStatus.Deprecated }, updatedEntity.Properties[COLID.Graph.Metadata.Constants.PidUriTemplate.HasLifecycleStatus]);
         }
 
         /// <summary>
@@ -461,7 +461,7 @@ namespace COLID.RegistrationService.Tests.Functional.Controllers.V3
             var updateContentAfterDeletion = await searchResultAfterDeletion.Content.ReadAsStringAsync().ConfigureAwait(false);
             var updatedEntity = JsonConvert.DeserializeObject<BaseEntityResultDTO>(updateContentAfterDeletion);
 
-            Assert.Equal(new List<string> { RegistrationService.Common.Constants.PidUriTemplate.LifecycleStatus.Active }, updatedEntity.Properties[RegistrationService.Common.Constants.PidUriTemplate.HasLifecycleStatus]);
+            Assert.Equal(new List<string> { COLID.Graph.Metadata.Constants.PidUriTemplate.LifecycleStatus.Active }, updatedEntity.Properties[COLID.Graph.Metadata.Constants.PidUriTemplate.HasLifecycleStatus]);
 
             // Cleanup
             var cleanupResult = await _client.DeleteAsync(searchUrl);
@@ -535,15 +535,15 @@ namespace COLID.RegistrationService.Tests.Functional.Controllers.V3
         private void AssertResultProperties(IDictionary<string, List<dynamic>> properties, string baseUrl, string idLength, string idType, string suffix, string route = "")
         {
             Assert.NotNull(properties);
-            Assert.Equal(new List<string> { RegistrationService.Common.Constants.PidUriTemplate.Type }, properties[Graph.Metadata.Constants.RDF.Type]);
-            Assert.Equal(new List<string> { baseUrl }, properties[RegistrationService.Common.Constants.PidUriTemplate.HasBaseUrl]);
-            Assert.Equal(new List<string> { idLength }, properties[RegistrationService.Common.Constants.PidUriTemplate.HasIdLength]);
-            Assert.Equal(new List<string> { idType }, properties[RegistrationService.Common.Constants.PidUriTemplate.HasPidUriTemplateIdType]);
-            Assert.Equal(new List<string> { suffix }, properties[RegistrationService.Common.Constants.PidUriTemplate.HasPidUriTemplateSuffix]);
+            Assert.Equal(new List<string> { COLID.Graph.Metadata.Constants.PidUriTemplate.Type }, properties[Graph.Metadata.Constants.RDF.Type]);
+            Assert.Equal(new List<string> { baseUrl }, properties[COLID.Graph.Metadata.Constants.PidUriTemplate.HasBaseUrl]);
+            Assert.Equal(new List<string> { idLength }, properties[COLID.Graph.Metadata.Constants.PidUriTemplate.HasIdLength]);
+            Assert.Equal(new List<string> { idType }, properties[COLID.Graph.Metadata.Constants.PidUriTemplate.HasPidUriTemplateIdType]);
+            Assert.Equal(new List<string> { suffix }, properties[COLID.Graph.Metadata.Constants.PidUriTemplate.HasPidUriTemplateSuffix]);
 
             if (!string.IsNullOrWhiteSpace(route))
             {
-                Assert.Equal(new List<string> { route }, properties[RegistrationService.Common.Constants.PidUriTemplate.HasRoute]);
+                Assert.Equal(new List<string> { route }, properties[COLID.Graph.Metadata.Constants.PidUriTemplate.HasRoute]);
             }
         }
     }

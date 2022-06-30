@@ -4,6 +4,7 @@ using System.Linq;
 using COLID.Graph.TripleStore.DataModels.Attributes;
 using COLID.Graph.TripleStore.DataModels.Base;
 using COLID.Graph.TripleStore.Extensions;
+using COLID.RegistrationService.Common.DataModel.Resources;
 
 namespace COLID.Graph.Metadata.DataModels.Resources
 {
@@ -14,13 +15,14 @@ namespace COLID.Graph.Metadata.DataModels.Resources
         public Uri BaseUri => GetIdentifier(Constants.Resource.BaseUri);
         public VersionOverviewCTO PreviousVersion => FindVersionInList(-1);
         public VersionOverviewCTO LaterVersion => FindVersionInList(1);
+        public Dictionary<string, List<LinkingMapping>> Links { get; set; }
         public string PublishedVersion { get; set; }
         public IList<VersionOverviewCTO> Versions { get; set; }
 
         // TODO: PLEASE remove this getter function call stuff in an entity object ..
         private VersionOverviewCTO FindVersionInList(int index)
         {
-            if (Versions == null)
+            if (Versions == null || PidUri == null)
             {
                 return null;
             }

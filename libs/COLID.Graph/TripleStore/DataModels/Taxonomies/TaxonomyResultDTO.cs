@@ -6,7 +6,7 @@ namespace COLID.Graph.TripleStore.DataModels.Taxonomies
 {
     public class TaxonomyResultDTO : BaseEntityResultDTO
     {
-        public bool HasParent => Properties.Any(p => p.Key == Graph.Metadata.Constants.SKOS.Broader);
+        public bool HasParent => Properties.Any(p => p.Key == COLID.Graph.Metadata.Constants.SKOS.Broader);
 
         public bool HasChild => Children.Any();
 

@@ -6,14 +6,15 @@ using COLID.RegistrationService.Repositories.Interface;
 using COLID.RegistrationService.Services.Interface;
 using COLID.RegistrationService.Services.Extensions;
 using AutoMapper;
+using COLID.Graph.Metadata.Constants;
 using COLID.Graph.Metadata.Services;
-using COLID.Graph.TripleStore.DataModels.Base;
 using COLID.Graph.Metadata.DataModels.Validation;
 using COLID.Graph.Metadata.Extensions;
 using COLID.RegistrationService.Common.DataModel.Validation;
 using COLID.Graph.TripleStore.Extensions;
-using COLID.RegistrationService.Common.DataModel.Resources;
 using COLID.Graph.Metadata.DataModels.Resources;
+using Entity = COLID.Graph.TripleStore.DataModels.Base.Entity;
+using COLID.Exception.Models.Business;
 
 namespace COLID.RegistrationService.Services.Validation
 {
@@ -68,40 +69,54 @@ namespace COLID.RegistrationService.Services.Validation
             var baseUriResults = GetDuplicateResultsByIdentifierType(Graph.Metadata.Constants.Resource.BaseUri, resource, out var baseUri);
             var targetUriResults = GetDuplicateResultsByTargetUri(resource, out var targetUri);
 
-            // TODO: Piduri has no entry then duiplicate, or if entry/entryDraft is not actual resource
-
-            if (CheckIdentifierIsDuplicate(pidUriResults, resource, resourceId))
+            // allow the pidURI to be duplicate when changing resource type
+            if (pidUri!=null && pidUri!=string.Empty)
             {
-                var pidUriValidationResult = new ValidationResultProperty(resource.Id, Graph.Metadata.Constants.EnterpriseCore.PidUri, pidUri, Common.Constants.Validation.DuplicateField, ValidationResultSeverity.Violation, ValidationResultPropertyType.DUPLICATE);
+                if (pidUriResults.Count==2 && pidUriResults[0].Type!=pidUriResults[1].Type && resource.Id!=null)
+                {
+                    pidUriResults.Clear();
+                }
+            }
+
+            // TODO: Piduri has no entry then duplicate, or if entry/entryDraft is not actual resource
+            if (CheckIdentifierIsDuplicate(pidUriResults, resource, resourceId, out bool orphanedPid))
+            {
+                var message = orphanedPid ? Common.Constants.Validation.DuplicateFieldOrphaned : Common.Constants.Validation.DuplicateField;
+                var pidUriValidationResult = new ValidationResultProperty(resource.Id, Graph.Metadata.Constants.EnterpriseCore.PidUri, pidUri, message, ValidationResultSeverity.Violation, ValidationResultPropertyType.DUPLICATE);
                 duplicateErrors.Add(pidUriValidationResult);
             }
 
-            if (CheckBaseUriIsDuplicate(baseUriResults, resource, resourceId, pidUri, previousVersion))
+            if (CheckBaseUriIsDuplicate(baseUriResults, resource, resourceId, pidUri, previousVersion, out bool orphanedBaseUri))
             {
-                var baseUriValidatioResult = new ValidationResultProperty(resource.Id, Graph.Metadata.Constants.Resource.BaseUri, baseUri, Common.Constants.Validation.DuplicateField, ValidationResultSeverity.Violation, ValidationResultPropertyType.DUPLICATE, null);
+                var message = orphanedBaseUri ? Common.Constants.Validation.DuplicateFieldOrphaned : Common.Constants.Validation.DuplicateField;
+                var baseUriValidatioResult = new ValidationResultProperty(resource.Id, Graph.Metadata.Constants.Resource.BaseUri, baseUri, message, ValidationResultSeverity.Violation, ValidationResultPropertyType.DUPLICATE, null);
                 duplicateErrors.Add(baseUriValidatioResult);
             }
 
-            if (CheckIdentifierIsDuplicate(targetUriResults, resource, resourceId))
+            if (CheckIdentifierIsDuplicate(targetUriResults, resource, resourceId, out _))
             {
                 var targetUriValidationResult = new ValidationResultProperty(resource.Id, Graph.Metadata.Constants.Resource.DistributionEndpoints.HasNetworkAddress, targetUri, Common.Constants.Validation.DuplicateField, ValidationResultSeverity.Info,  ValidationResultPropertyType.DUPLICATE);
-                duplicateErrors.Add(targetUriValidationResult);
+                duplicateErrors.Add(targetUriValidationResult); 
             }
 
             foreach (var property in resource.Properties)
             {
-                foreach (var prop in property.Value)
+                // TODO: Check metadata property type is permanent identifier 
+                if (property.Key != Graph.Metadata.Constants.EnterpriseCore.PidUri && property.Key != Graph.Metadata.Constants.Resource.BaseUri)
                 {
-                    if (DynamicExtension.IsType<Entity>(prop, out Entity parsedProp) && property.Key != Graph.Metadata.Constants.EnterpriseCore.PidUri && property.Key != Graph.Metadata.Constants.Resource.BaseUri)
+                    foreach (var prop in property.Value)
                     {
-                        duplicateErrors.AddRange(CheckDuplicatesInRepository(parsedProp, resourceId, string.Empty));
+                        if (DynamicExtension.IsType<Entity>(prop, out Entity entity))
+                        {
+                            duplicateErrors.AddRange(CheckDuplicatesInRepository(entity, resourceId, string.Empty));
+                        }
                     }
                 }
             }
 
             return duplicateErrors;
         }
-
+         
         /// <summary>
         /// Checks if an identifier in format of an uri is unique. 
         /// The base uri is a special kind of identifier and is therefore checked separately.
@@ -110,16 +125,17 @@ namespace COLID.RegistrationService.Services.Validation
         /// <param name="resource">Id of the entity to be checked</param>
         /// <param name="resourceId">Resource id of the main entry (parent entry id)</param>
         /// <returns></returns>
-        private bool CheckIdentifierIsDuplicate(IList<DuplicateResult> pidUriResults, Entity resource, string resourceId)
+        private bool CheckIdentifierIsDuplicate(IList<DuplicateResult> pidUriResults, Entity resource, string resourceId, out bool orphaned )
         {
             string resourceType = resource.Properties.GetValueOrNull(Graph.Metadata.Constants.RDF.Type, true);
-
+            orphaned = false;
             if (pidUriResults.IsNullOrEmpty())
             {
                 return false;
             }
             else if (pidUriResults.IsAnyDraftAndPublishedNull())
             {
+                orphaned = true;
                 return true;
             }
             else if (string.IsNullOrWhiteSpace(resourceId))
@@ -148,9 +164,10 @@ namespace COLID.RegistrationService.Services.Validation
         /// <param name="resourceId">Resource id of the main entry (parent entry id)</param>
         /// <param name="pidUri">Pid uri of resource to be checked</param>
         /// <param name="previousVersion">Pid uri of the previous version of the resource to be checked</param>
-        private bool CheckBaseUriIsDuplicate(IList<DuplicateResult> baseUriResults, Entity resource, string resourceId, string pidUri, string previousVersion)
+        private bool CheckBaseUriIsDuplicate(IList<DuplicateResult> baseUriResults, Entity resource, string resourceId, string pidUri, string previousVersion, out bool orphanedBaseUri)
         {
             string resourceType = resource.Properties.GetValueOrNull(Graph.Metadata.Constants.RDF.Type, true);
+            orphanedBaseUri = false;
 
             if (baseUriResults.IsNullOrEmpty())
             {
@@ -158,6 +175,7 @@ namespace COLID.RegistrationService.Services.Validation
             } 
             else if (baseUriResults.IsAnyDraftAndPublishedNull() || baseUriResults.IsAnyWithDifferentIdentifierType(Graph.Metadata.Constants.Resource.BaseUri))
             {
+                orphanedBaseUri = true;
                 return true;
             }
             else if (string.IsNullOrWhiteSpace(resourceId) && string.IsNullOrWhiteSpace(previousVersion))
@@ -257,24 +275,84 @@ namespace COLID.RegistrationService.Services.Validation
         private IList<DuplicateResult> CheckTargetUriDuplicate(string duplicateRequestTargetUri)
         {
             var leafResourceTypes = _metadataService.GetInstantiableEntityTypes(Graph.Metadata.Constants.Resource.Type.FirstResouceType);
-            return _resourceRepository.CheckTargetUriDuplicate(duplicateRequestTargetUri, leafResourceTypes);
+            var graphList = new HashSet<Uri>();
+            graphList.Add(GetInstanceGraph());
+            graphList.Add(GetDraftInstanceGraph());
+            return _resourceRepository.CheckTargetUriDuplicate(duplicateRequestTargetUri, leafResourceTypes, graphList, GetMetadataGraphs());
         }
 
         private IList<VersionOverviewCTO> GetVersions(string pidUriString, string previousVersionString)
         {
+            var graphList = new HashSet<Uri>();
+            graphList.Add(GetInstanceGraph());
+            graphList.Add(GetDraftInstanceGraph());
+
             if (Uri.TryCreate(previousVersionString, UriKind.Absolute, out var previousVersion))
             {
-                return _resourceRepository.GetAllVersionsOfResourceByPidUri(previousVersion);
+                return _resourceRepository.GetAllVersionsOfResourceByPidUri(previousVersion, graphList);
             }
 
             if (Uri.TryCreate(pidUriString, UriKind.Absolute, out var pidUri))
             {
-                return _resourceRepository.GetAllVersionsOfResourceByPidUri(pidUri);
+                return _resourceRepository.GetAllVersionsOfResourceByPidUri(pidUri, graphList);
             }
 
             return new List<VersionOverviewCTO>();
         }
+        /*public List<Uri> getNamedGraphsList(string pidUri)
+        {
+            var namedGraphList = new List<Uri>();
 
+            var graphExists = checkIfResourceExistAndReturnNamedGraph(new Uri(pidUri));
+            var draftExist = graphExists.GetValueOrDefault(GetDraftInstanceGraph());
+            var publishedExist = graphExists.GetValueOrDefault(GetInstanceGraph());
+
+            if (draftExist)
+            {
+                namedGraphList.Add(GetDraftInstanceGraph());
+            }
+
+            if (publishedExist)
+            {
+                namedGraphList.Add(GetInstanceGraph());
+            }
+            return namedGraphList;
+        }*/
         #endregion
+        private Dictionary<Uri, bool> checkIfResourceExistAndReturnNamedGraph(Uri pidUri)
+        {
+            var resourceTypes = _metadataService.GetInstantiableEntityTypes(Graph.Metadata.Constants.Resource.Type.FirstResouceType);
+            var draftExist = _resourceRepository.CheckIfExist(pidUri, resourceTypes, GetDraftInstanceGraph());
+            var publishExist = _resourceRepository.CheckIfExist(pidUri, resourceTypes, GetInstanceGraph());
+
+            if (!draftExist && !publishExist)
+            {
+                throw new EntityNotFoundException("The requested resource does not exist in the database.",
+                    pidUri.ToString());
+            }
+
+            var resourceExists = new Dictionary<Uri, bool>();
+            resourceExists.Add(GetDraftInstanceGraph(), draftExist);
+            resourceExists.Add(GetInstanceGraph(), publishExist);
+            return resourceExists;
+        }
+
+        private Uri GetInstanceGraph()
+        {
+            var graph = _metadataService.GetInstanceGraph(PIDO.PidConcept);
+            return graph;
+        }
+
+        private Uri GetDraftInstanceGraph()
+        {
+            var graph = _metadataService.GetInstanceGraph("draft");
+            return graph;
+        }
+
+        private ISet<Uri> GetMetadataGraphs()
+        {
+            var graph3 = _metadataService.GetMetadataGraphs();
+            return graph3;
+        }
     }
 }

@@ -23,7 +23,7 @@ namespace COLID.RegistrationService.Services.MappingProfiles
 
             switch (entityType)
             {
-                case Common.Constants.PidUriTemplate.Type:
+                case COLID.Graph.Metadata.Constants.PidUriTemplate.Type:
                     var flatPidUriTemplate = _pidUriTemplateService.GetFlatPidUriTemplateByPidUriTemplate(source);
                     return _pidUriTemplateService.FormatPidUriTemplateName(flatPidUriTemplate);
             }

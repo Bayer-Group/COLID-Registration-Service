@@ -1,12 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using AutoMapper;
 using COLID.Cache.Extensions;
 using COLID.Cache.Services;
 using COLID.Common.Extensions;
 using COLID.Exception.Models;
 using COLID.Exception.Models.Business;
+using COLID.Graph.Metadata.Constants;
 using COLID.Graph.Metadata.DataModels.Metadata;
 using COLID.Graph.Metadata.DataModels.Validation;
 using COLID.Graph.Metadata.Services;
@@ -68,12 +70,12 @@ namespace COLID.RegistrationService.Services.Implementation
                 throw new BusinessException(Common.Constants.Messages.PidUriTemplate.SameTemplateExists);
             }
 
-            if (repoEntity != null && CheckTemplateHasStatus(repoEntity, Common.Constants.PidUriTemplate.LifecycleStatus.Deprecated))
+            if (repoEntity != null && CheckTemplateHasStatus(repoEntity, COLID.Graph.Metadata.Constants.PidUriTemplate.LifecycleStatus.Deprecated))
             {
                 throw new BusinessException(Common.Constants.Messages.PidUriTemplate.DeprecatedTemplate);
             }
 
-            entity.Properties.AddOrUpdate(Common.Constants.PidUriTemplate.HasLifecycleStatus, new List<dynamic> { Common.Constants.PidUriTemplate.LifecycleStatus.Active });
+            entity.Properties.AddOrUpdate(COLID.Graph.Metadata.Constants.PidUriTemplate.HasLifecycleStatus, new List<dynamic> { COLID.Graph.Metadata.Constants.PidUriTemplate.LifecycleStatus.Active });
 
             return base.CustomValidation(entity, repoEntity, metadataProperties);
         }
@@ -85,6 +87,11 @@ namespace COLID.RegistrationService.Services.Implementation
 
         public void DeleteOrDeprecatePidUriTemplate(string id)
         {
+            var pidUriTemplateGraph = GetInstanceGraph();
+            var historicInstanceGraph = _metadataService.GetHistoricInstanceGraph();
+            var resourceInstanceGraph = _metadataService.GetInstanceGraph(PIDO.PidConcept);
+            var resourceDraftInstanceGraph = _metadataService.GetInstanceGraph("draft");
+
             if (string.IsNullOrWhiteSpace(id))
             {
                 throw new MissingParameterException(Common.Constants.Messages.Request.MissingParameter, new List<string>() { nameof(id) });
@@ -92,7 +99,8 @@ namespace COLID.RegistrationService.Services.Implementation
 
             CheckIfEntityExists(id);
 
-            var consumerGroupReferenceForPidUriTemplate = _repository.CheckPidUriTemplateHasConsumerGroupReference(id, out var referenceId);
+            var consumerGroupGraph = _metadataService.GetInstanceGraph(ConsumerGroup.Type);
+            var consumerGroupReferenceForPidUriTemplate = _repository.CheckPidUriTemplateHasConsumerGroupReference(id, pidUriTemplateGraph, consumerGroupGraph, out var referenceId);
 
             // Throw error of reference exists
             if (consumerGroupReferenceForPidUriTemplate)
@@ -100,11 +108,11 @@ namespace COLID.RegistrationService.Services.Implementation
                 throw new ReferenceException(Common.Constants.Messages.PidUriTemplate.DeleteUnsuccessfulConsumerGroupReference, referenceId);
             }
 
-            var colidEntryReferenceForPidURiTemplate = _repository.CheckPidUriTemplateHasColidEntryReference(id);
+            var colidEntryReferenceForPidURiTemplate = _repository.CheckPidUriTemplateHasColidEntryReference(id, pidUriTemplateGraph, resourceInstanceGraph, resourceDraftInstanceGraph, historicInstanceGraph);
 
             if (!colidEntryReferenceForPidURiTemplate)
             {
-                _repository.DeleteEntity(id);
+                _repository.DeleteEntity(id, pidUriTemplateGraph);
 
                 _auditTrailLogService.AuditTrail($"PID URI template with id {id} deleted.");
                 _cacheService.DeleteRelatedCacheEntries<PidUriTemplateService, PidUriTemplate>(id);
@@ -113,17 +121,17 @@ namespace COLID.RegistrationService.Services.Implementation
 
             var pidUriTemplateResult = GetEntity(id);
 
-            if (CheckTemplateHasStatus(pidUriTemplateResult, Common.Constants.PidUriTemplate.LifecycleStatus.Deprecated))
+            if (CheckTemplateHasStatus(pidUriTemplateResult, COLID.Graph.Metadata.Constants.PidUriTemplate.LifecycleStatus.Deprecated))
             {
                 throw new BusinessException(Common.Constants.Messages.PidUriTemplate.DeleteUnsuccessfulAlreadyDeprecated);
             }
 
-            pidUriTemplateResult.Properties.AddOrUpdate(Common.Constants.PidUriTemplate.HasLifecycleStatus, new List<dynamic> { Common.Constants.PidUriTemplate.LifecycleStatus.Deprecated });
+            pidUriTemplateResult.Properties.AddOrUpdate(COLID.Graph.Metadata.Constants.PidUriTemplate.HasLifecycleStatus, new List<dynamic> { COLID.Graph.Metadata.Constants.PidUriTemplate.LifecycleStatus.Deprecated });
 
             var pidUriTemplate = _mapper.Map<PidUriTemplate>(pidUriTemplateResult);
             var metadataProperties = _metadataService.GetMetadataForEntityType(Type);
 
-            _repository.UpdateEntity(pidUriTemplate, metadataProperties);
+            _repository.UpdateEntity(pidUriTemplate, metadataProperties, pidUriTemplateGraph);
             _cacheService.DeleteRelatedCacheEntries<PidUriTemplateService, PidUriTemplate>(id);
 
             _auditTrailLogService.AuditTrail($"PID URI template with id {id} set as deprecated.");
@@ -138,17 +146,17 @@ namespace COLID.RegistrationService.Services.Implementation
 
             var pidUriTemplateResult = GetEntity(id);
 
-            if (CheckTemplateHasStatus(pidUriTemplateResult, Common.Constants.PidUriTemplate.LifecycleStatus.Active))
+            if (CheckTemplateHasStatus(pidUriTemplateResult, COLID.Graph.Metadata.Constants.PidUriTemplate.LifecycleStatus.Active))
             {
                 throw new BusinessException(Common.Constants.Messages.PidUriTemplate.ReactivationUnsuccessfulAlreadyActive);
             }
 
-            pidUriTemplateResult.Properties.AddOrUpdate(Common.Constants.PidUriTemplate.HasLifecycleStatus, new List<dynamic> { Common.Constants.PidUriTemplate.LifecycleStatus.Active });
+            pidUriTemplateResult.Properties.AddOrUpdate(COLID.Graph.Metadata.Constants.PidUriTemplate.HasLifecycleStatus, new List<dynamic> { COLID.Graph.Metadata.Constants.PidUriTemplate.LifecycleStatus.Active });
 
             var pidUriTemplate = _mapper.Map<PidUriTemplate>(pidUriTemplateResult);
             var metadataProperties = _metadataService.GetMetadataForEntityType(Type);
 
-            _repository.UpdateEntity(pidUriTemplate, metadataProperties);
+            _repository.UpdateEntity(pidUriTemplate, metadataProperties, GetInstanceGraph());
             _cacheService.DeleteRelatedCacheEntries<PidUriTemplateService, PidUriTemplate>(id);
 
             _auditTrailLogService.AuditTrail($"PID URI template with id {id} reactivated.");
@@ -156,7 +164,7 @@ namespace COLID.RegistrationService.Services.Implementation
 
         private bool CheckTemplateHasStatus(EntityBase pidUriTemplate, string status)
         {
-            return pidUriTemplate.Properties.TryGetValue(Common.Constants.PidUriTemplate.HasLifecycleStatus,
+            return pidUriTemplate.Properties.TryGetValue(COLID.Graph.Metadata.Constants.PidUriTemplate.HasLifecycleStatus,
                        out var statusList) &&
                    statusList.Any(s => s == status);
         }
@@ -165,7 +173,7 @@ namespace COLID.RegistrationService.Services.Implementation
         {
             var pidUriTemplateFlattened = _cacheService.GetOrAdd($"flattened:{id}", () =>
             {
-                var pidUriTemplate = _repository.GetEntityById(id);
+                var pidUriTemplate = _repository.GetEntityById(id, new HashSet<Uri> { GetInstanceGraph() });
                 return GetFlatPidUriTemplateByPidUriTemplate(pidUriTemplate);
             });
             return pidUriTemplateFlattened;
@@ -190,22 +198,22 @@ namespace COLID.RegistrationService.Services.Implementation
                 Id = pidUriTemplate.Id
             };
 
-            string idTypeProp = pidUriTemplate.Properties.GetValueOrNull(Common.Constants.PidUriTemplate.HasPidUriTemplateIdType, true);
+            string idTypeProp = pidUriTemplate.Properties.GetValueOrNull(COLID.Graph.Metadata.Constants.PidUriTemplate.HasPidUriTemplateIdType, true);
 
             if (!string.IsNullOrWhiteSpace(idTypeProp))
             {
                 result.IdType = _metadataService.GetPrefLabelForEntity(idTypeProp);
             }
 
-            string suffixProp = pidUriTemplate.Properties.GetValueOrNull(Common.Constants.PidUriTemplate.HasPidUriTemplateSuffix, true);
+            string suffixProp = pidUriTemplate.Properties.GetValueOrNull(COLID.Graph.Metadata.Constants.PidUriTemplate.HasPidUriTemplateSuffix, true);
             if (!string.IsNullOrWhiteSpace(suffixProp))
             {
                 result.Suffix = _metadataService.GetPrefLabelForEntity(suffixProp);
             }
 
-            result.BaseUrl = pidUriTemplate.Properties.GetValueOrNull(Common.Constants.PidUriTemplate.HasBaseUrl, true) ?? string.Empty;
-            result.Route = pidUriTemplate.Properties.GetValueOrNull(Common.Constants.PidUriTemplate.HasRoute, true) ?? string.Empty;
-            int.TryParse(pidUriTemplate.Properties.GetValueOrNull(Common.Constants.PidUriTemplate.HasIdLength, true) ?? "0", out int idLength);
+            result.BaseUrl = pidUriTemplate.Properties.GetValueOrNull(COLID.Graph.Metadata.Constants.PidUriTemplate.HasBaseUrl, true) ?? string.Empty;
+            result.Route = pidUriTemplate.Properties.GetValueOrNull(COLID.Graph.Metadata.Constants.PidUriTemplate.HasRoute, true) ?? string.Empty;
+            int.TryParse(pidUriTemplate.Properties.GetValueOrNull(COLID.Graph.Metadata.Constants.PidUriTemplate.HasIdLength, true) ?? "0", out int idLength);
             result.IdLength = idLength;
 
             return result;
@@ -215,6 +223,22 @@ namespace COLID.RegistrationService.Services.Implementation
         {
             var pidUriFormat = "{0}{1}{{{2}:{3}}}{4}";
             return string.Format(pidUriFormat, pidUriTemplate.BaseUrl, pidUriTemplate.Route, pidUriTemplate.IdType, pidUriTemplate.IdLength, pidUriTemplate.Suffix);
+        }
+
+        public override async Task<PidUriTemplateWriteResultCTO> CreateEntity(PidUriTemplateRequestDTO pidUriTemplateRequest)
+        {
+            var result = await base.CreateEntity(pidUriTemplateRequest);
+
+            try
+            {
+                _cacheService.DeleteRelatedCacheEntries<PidUriTemplateService, PidUriTemplate>();
+            }
+            catch (System.Exception ex)
+            {
+               _logger.LogError(ex, $"Error occured deleting cache for PIDUriTemplate: {ex.Message}", ex.InnerException);
+            }
+
+            return result;
         }
     }
 }

@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using COLID.Graph.Metadata.DataModels.Metadata;
+using VDS.RDF.Parsing.Tokens;
 
 namespace COLID.Graph.Tests.Builder
 {
@@ -147,6 +148,7 @@ namespace COLID.Graph.Tests.Builder
                 .WithMinCount("1")
                 .WithOrder("3")
                 .WithDomain(Graph.Metadata.Constants.Resource.Type.MathematicalModel)
+                .WithFieldType(Graph.Metadata.Constants.PIDO.Shacl.FieldTypes.Hierarchy)
                 .Build();
 
             _prop.Add(dateCreatedProperty);
@@ -346,6 +348,7 @@ namespace COLID.Graph.Tests.Builder
                 .WithDomain(Graph.Metadata.Constants.PIDO.PidConcept)
                 .WithDescription("This property is used to assign a list of keywords to a resource like free tagging fields.")
                 .WithRange(Graph.Metadata.Constants.Keyword.Type)
+                .WithFieldType(Graph.Metadata.Constants.PIDO.Shacl.FieldTypes.ExtendableList)
                 .Build();
 
             _prop.Add(pidUriProperty);

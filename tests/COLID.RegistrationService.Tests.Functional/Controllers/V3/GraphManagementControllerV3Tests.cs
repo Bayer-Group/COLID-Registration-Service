@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -18,12 +19,38 @@ namespace COLID.RegistrationService.Tests.Functional.Controllers.V3
         private readonly HttpClient _client;
         private readonly FunctionTestsFixture _factory;
         private readonly string _apiPath = "api/v3/graph";
+        private const string _mimetypeOctetStream = "application/octet-stream";
 
         public GraphManagementControllerV3Tests(FunctionTestsFixture factory, ITestOutputHelper output)
         {
             _output = output;
             _factory = factory;
             _client = _factory.CreateClient();
+        }
+
+        [Fact]
+        public async Task DownloadGraph_Returns_File()
+        {
+            // Act
+            var graph = HttpUtility.UrlEncode("https://pid.bayer.com/resource/1.0");
+            var result = await _client.GetAsync($"{_apiPath}/download?graph={graph}");
+            //Assert
+            Assert.NotNull(result);
+            Assert.Equal(HttpStatusCode.OK, result.StatusCode);
+            Assert.Equal(_mimetypeOctetStream, result.Content.Headers.ContentType.MediaType);
+            string filename = result.Content.Headers.ContentDisposition.FileNameStar;
+            Assert.Equal("ttl", filename.Substring(filename.Length - 3));
+        }
+
+        [Fact]
+        public async Task DownloadGraph_Returns_NotFoundException()
+        {
+            // Act
+            var graph = HttpUtility.UrlEncode("https://pid.bayer.com/resource/xy");
+            var result = await _client.GetAsync($"{_apiPath}/download?graph={graph}");
+            //Assert
+            Assert.NotNull(result);
+            Assert.Equal(HttpStatusCode.NotFound, result.StatusCode);
         }
 
         [Fact]
@@ -41,7 +68,7 @@ namespace COLID.RegistrationService.Tests.Functional.Controllers.V3
             var unreferencedGraphs = graphs.Where(g => g.Status == RegistrationService.Common.Enums.Graph.GraphStatus.Unreferenced && string.IsNullOrWhiteSpace(g.StartTime));
             var historicGraphs = graphs.Where(g => g.Status == RegistrationService.Common.Enums.Graph.GraphStatus.Historic && !string.IsNullOrWhiteSpace(g.StartTime));
 
-            Assert.Equal(12, activeGraphs.Count());
+            Assert.Equal(14, activeGraphs.Count());
             Assert.Equal(2, unreferencedGraphs.Count());
             Assert.Single(historicGraphs);
         }

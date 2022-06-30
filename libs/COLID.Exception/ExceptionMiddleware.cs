@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Net;
 using System.Net.Mime;
 using System.Threading.Tasks;
@@ -61,7 +62,7 @@ namespace COLID.Exception
             catch (System.Exception exception)
             {
                 _logger.LogError(exception, exception.Message);
-                var generalException = new GeneralException("An unhandled exception has occurred.", exception);
+                var generalException = new GeneralException($"An unhandled exception has occurred: {exception.Message}", exception);
                 await HandleExceptionAsync(httpContext, generalException);
             }
         }
@@ -73,8 +74,8 @@ namespace COLID.Exception
         /// <returns>True, if this exceptions is of the</returns>
         private bool IsBusinessException(System.Exception exception)
         {
-            return exception is ArgumentException || exception is FormatException || exception is JsonReaderException || exception is InvalidCastException;
-
+            return exception is ArgumentException || exception is FormatException || exception is JsonReaderException ||
+                   exception is InvalidCastException  || exception is FileNotFoundException;
         }
 
         /// <summary>

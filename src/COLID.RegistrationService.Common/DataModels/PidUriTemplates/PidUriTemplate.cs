@@ -3,7 +3,7 @@ using COLID.Graph.TripleStore.DataModels.Base;
 
 namespace COLID.RegistrationService.Common.DataModel.PidUriTemplates
 {
-    [Type(Constants.PidUriTemplate.Type)]
+    [Type(COLID.Graph.Metadata.Constants.PidUriTemplate.Type)]
     public class PidUriTemplate : Entity
     {
     }

@@ -19,7 +19,7 @@ namespace COLID.StatisticsLog.DataModel
 
         public long? ElapsedMilliseconds { get; set; }
 
-        public Dictionary<string, object> AdditionalInfo { get; set; } = new Dictionary<string, object>();
+        public Dictionary<string, dynamic> AdditionalInfo { get; set; } = new Dictionary<string, dynamic>();
 
         public LogEntry()
         {

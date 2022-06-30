@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
+using COLID.Graph.TripleStore.DataModels.Resources;
 using COLID.Graph.TripleStore.Extensions;
 using COLID.RegistrationService.Services.Authorization.UserInfo;
-using COLID.RegistrationService.Services.Interface;
 using COLID.RegistrationService.Services.Validation.Models;
 
 namespace COLID.RegistrationService.Services.Validation.Validators.Keys
