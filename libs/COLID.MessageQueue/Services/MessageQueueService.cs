@@ -161,7 +161,7 @@ namespace COLID.MessageQueue.Services
         {
             var props = _channel.CreateBasicProperties();
             props.Priority = basicProperty?.Priority ?? 0;
-            props.CorrelationId = _correlationContext.CorrelationContext.CorrelationId;
+            props.CorrelationId = _correlationContext.CorrelationContext == null ? Guid.NewGuid().ToString() : _correlationContext.CorrelationContext.CorrelationId;
 
             return props;
         }

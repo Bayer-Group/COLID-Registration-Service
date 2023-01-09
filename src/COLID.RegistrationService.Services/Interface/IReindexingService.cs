@@ -79,6 +79,6 @@ namespace COLID.RegistrationService.Services.Interface
         /// <param name="pidUri">Pid Uri of resource to be indexed</param>
         /// <param name="resource">Resource to be indexed</param>
         /// <param name="repoResources">Resources that were stored in the database before the current process.</param>
-        void IndexDeletedResource(Uri pidUri, Entity resource, ResourcesCTO repoResources);
+        void IndexDeletedResource(Uri pidUri, Entity resource, ResourcesCTO repoResources);        
     }
 }

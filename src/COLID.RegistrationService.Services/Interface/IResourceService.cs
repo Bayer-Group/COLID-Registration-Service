@@ -37,6 +37,15 @@ namespace COLID.RegistrationService.Services.Interface
         IList<Resource> GetByPidUris(List<Uri> pidUris);
 
         /// <summary>
+        /// Gets all resource links of the published Graph 
+        /// </summary>
+        /// <param name="resources"></param>
+        /// <param name="pidUris"></param>
+        /// <param name="namedGraph"></param>
+        /// <param name="LinkTypeList"></param>
+        public void GetLinksOfPublishedResources(List<Resource> resources, IList<Uri> pidUris, Uri namedGraph, ISet<string> LinkTypeList);
+
+        /// <summary>
         /// Gets the single resource with its properties and nested objects. References to other resources (linked resources) will be ignored.
         /// </summary>
         /// <param name="pidUri">The unique PID URI of the resource</param>
@@ -63,18 +72,39 @@ namespace COLID.RegistrationService.Services.Interface
         ResourcesCTO GetResourcesByPidUri(Uri pidUri);
 
         /// <summary>
+        /// Retrieves all resources of a specified consumer group from today to the specified end date for review
+        /// </summary>
+        /// <param name="endDate">Latest Datetime allowed</param>
+        /// <param name="consumerGroup">consumer group of the resource</param>
+        /// <returns>A transport object containing all resources due for review</returns>
+        IList<Resource> GetDueResources(Uri consumerGroup, DateTime endDate);
+
+        /// <summary>
+        /// Confirms a review cycle for given resource without publishing it.
+        /// </summary>
+        /// <param name="pidUri">Latest Datetime allowed</param>
+        /// <returns>A transport object containing the resource the review was confirmed for</returns>
+        Task ConfirmReviewCycleForResource(Uri pidUri);
+
+        /// <summary>
         /// Searches for resources filtered by given criteria parameters.
         /// </summary>
         /// <param name="searchCriteria">Criteria parameters to search for</param>
         /// <returns>Overview of resources matching the search criteria</returns>
         ResourceOverviewCTO SearchByCriteria(ResourceSearchCriteriaDTO resourceSearchObject);
-
+        
         /// <summary>
         /// Gets the list of all distribution endpoints of one resource.
         /// </summary>
         /// <param name="pidUri">The unique PID URI of the resource</param>
         /// <returns>List of all distribution endpints of one resource</returns>
         IList<DistributionEndpoint> GetDistributionEndpoints(Uri pidUri);
+
+        /// <summary>
+        /// Checks all due resources for review and notifies responsible people
+        /// </summary>
+        /// <returns>Status of Notification Job</returns>
+        Task<Dictionary<string, string>> NotifyForDueReviews();
 
         /// <summary>
         /// Gets the list of all distribution endpoints of one resource.
@@ -118,7 +148,7 @@ namespace COLID.RegistrationService.Services.Interface
         /// <param name="linkType"></param>
         /// <param name="pidUriToLink"></param>
         /// <returns>Resource containing new created links</returns>
-        Task<Resource> AddResourceLink(string pidUri, string linkType, string pidUriToLink, string requester);
+        Task<Resource> AddResourceLink(string pidUri, string linkType, string pidUriToLink, string requester, bool createHistoryObject = true, bool checkRequester = true);
         /// <summary>
         /// Removes a new link from the resource with the given pid uri.
         /// </summary>
@@ -249,5 +279,10 @@ namespace COLID.RegistrationService.Services.Interface
         /// </summary>
         /// <param name="pidUri">Pid Uri of resource to be indexed</param>
         Task IndexUpdatedResource(Uri pidUri);
+
+        /// <summary>
+        /// link repair 
+        /// </summary>
+        void linkFix();
     }
 }

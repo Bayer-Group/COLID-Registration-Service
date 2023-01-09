@@ -15,6 +15,11 @@ namespace COLID.Cache.Services
             return false;
         }
 
+        public bool Exists<T>(string key, Func<T> function)
+        {            
+            return false;            
+        }
+
         public T GetValue<T>(string key)
         {
             return default;
@@ -119,14 +124,31 @@ namespace COLID.Cache.Services
 
         public void Delete(string key, Action method)
         {
-            method.Invoke();
+            // do nothing
         }
 
         public void Delete(object o, Action method)
         {
-            method.Invoke();
+            // do nothing
         }
 
         #endregion Delete
+
+        public string BuildCacheEntryKey(string suffix)
+        {            
+            return suffix.ToLower();
+        }
+
+        public string BuildCacheEntryKey(string suffix, Action method)
+        {
+            var calledClassName = method?.Target?.GetType().DeclaringType?.Name ?? method?.Target?.GetType().Name;
+            return BuildCacheEntryKey($"{calledClassName}:{suffix}");
+        }
+
+        public string BuildCacheEntryKey<T>(string suffix, Func<T> function)
+        {
+            var calledClassName = function?.Target?.GetType().DeclaringType?.Name ?? function?.Target?.GetType().Name;
+            return BuildCacheEntryKey($"{calledClassName}:{suffix}");
+        }
     }
 }

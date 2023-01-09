@@ -1,15 +1,16 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
-using System.Security;
+using System.Security;
 using System.Text;
-using System.Text.RegularExpressions;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Web;
 using Amazon;
 using Amazon.Runtime;
-using Amazon.Runtime.Internal.Util;
+using Amazon.Runtime.Internal.Util;
 using Amazon.S3;
 using Amazon.S3.Model;
 using COLID.AWS.DataModels;
@@ -39,42 +40,42 @@ namespace COLID.AWS.Implementation
         {
             var awsCredentials = await GetECSCredentials();
             if (!_awsConfig.UseLocalCredentials)
-            {
+            {
                 return new AmazonS3Client(awsCredentials.AccessKeyId, awsCredentials.SecretAccessKey, awsCredentials.Token);
             }
             return new AmazonS3Client(awsCredentials.AccessKeyId, awsCredentials.SecretAccessKey, RegionEndpoint.GetBySystemName(_awsConfig.S3Region));
         }
 
-        private async Task<AmazonWebServicesSecurityCredentials> GetECSCredentials()
-        {
-            try
-            {
-                string uri = System.Environment.GetEnvironmentVariable(ECSTaskCredentials.ContainerCredentialsURIEnvVariable);
-                if (!string.IsNullOrEmpty(uri))
-                {
-                    IWebProxy webProxy = System.Net.WebRequest.GetSystemWebProxy();
-                    var ecsTaskCredentials = new ECSTaskCredentials(webProxy);
-                    var credentials = ecsTaskCredentials.GetCredentials();
-
-                    return new AmazonWebServicesSecurityCredentials()
-                    {
-                        AccessKeyId= credentials.AccessKey,
-                        SecretAccessKey=credentials.SecretKey,
-                        Token=credentials.Token 
-                    };
-                }
-            }
-            catch (SecurityException e)
-            {
-                Logger.GetLogger(typeof(ECSTaskCredentials)).Error(e, "Failed to access environment variable {0}", ECSTaskCredentials.ContainerCredentialsURIEnvVariable);
-            }
+        private async Task<AmazonWebServicesSecurityCredentials> GetECSCredentials()
+        {
+            try
+            {
+                string uri = System.Environment.GetEnvironmentVariable(ECSTaskCredentials.ContainerCredentialsURIEnvVariable);
+                if (!string.IsNullOrEmpty(uri))
+                {
+                    IWebProxy webProxy = System.Net.WebRequest.GetSystemWebProxy();
+                    var ecsTaskCredentials = new ECSTaskCredentials(webProxy);
+                    var credentials = ecsTaskCredentials.GetCredentials();
+
+                    return new AmazonWebServicesSecurityCredentials()
+                    {
+                        AccessKeyId= credentials.AccessKey,
+                        SecretAccessKey=credentials.SecretKey,
+                        Token=credentials.Token 
+                    };
+                }
+            }
+            catch (SecurityException e)
+            {
+                Logger.GetLogger(typeof(ECSTaskCredentials)).Error(e, "Failed to access environment variable {0}", ECSTaskCredentials.ContainerCredentialsURIEnvVariable);
+            }
            
             return new AmazonWebServicesSecurityCredentials
             {
                 Expiration = DateTime.Now.AddMonths(36).ToString(),
                 AccessKeyId = _awsConfig.AccessKeyId,
                 SecretAccessKey = _awsConfig.SecretAccessKey
-            };
+            };
         }
 
         private async Task<AmazonWebServicesSecurityCredentials> GetCredentials()
@@ -126,6 +127,42 @@ namespace COLID.AWS.Implementation
             }
         }
 
+        public async Task<Dictionary<string, Stream>> GetAllFileAsync(string bucketName)
+        {
+            Guard.ArgumentNotNullOrWhiteSpace(bucketName, "bucket name can not be null");
+
+            Dictionary<string, Stream> fileContents = new Dictionary<string, Stream>();
+            try
+            {
+                //Get S3 Client
+                using var client = await GetAmazonS3Client();
+                
+                //Get List of Files from S3
+                ListObjectsResponse response = await client.ListObjectsAsync(new ListObjectsRequest
+                {
+                    BucketName = bucketName
+                });
+                
+                //Loop through each file
+                foreach (S3Object obj in response.S3Objects)
+                {                    
+                    //Read files
+                    GetObjectResponse objResponse = await client.GetObjectAsync(new GetObjectRequest
+                    {
+                        BucketName = bucketName,
+                        Key = obj.Key
+                    });
+                        
+                    fileContents.Add(obj.Key, objResponse.ResponseStream);                    
+                }
+                return fileContents;
+            }
+            catch (AmazonS3Exception ex)
+            {
+                throw HandleAmazonServiceException(ex);
+            }
+        }
+
         public async Task<AmazonS3FileUploadInfoDto> UploadFileAsync(string bucketName, IFormFile file) => await UploadFileAsync(bucketName, string.Empty, file);
 
         public virtual async Task<AmazonS3FileUploadInfoDto> UploadFileAsync(string bucketName, string fileObjectPathPrefix, IFormFile file, bool isPresigned = false)
@@ -145,7 +182,7 @@ namespace COLID.AWS.Implementation
             string getUrl = string.Empty;
 
             try
-            {
+            {
                 var response = new PutObjectResponse();
                 var filePath = Path.GetTempFileName();
                 await using var stream = File.Create(filePath);
@@ -159,7 +196,7 @@ namespace COLID.AWS.Implementation
                     ContentType = file.ContentType
                 };
 
-                response = await client.PutObjectAsync(request);
+                response = await client.PutObjectAsync(request);
                 if ((int)response.HttpStatusCode >= 200 && (int)response.HttpStatusCode <= 299) // IsSuccessStatusCode
                 {
                     return new AmazonS3FileUploadInfoDto
@@ -171,9 +208,9 @@ namespace COLID.AWS.Implementation
                         S3KeyName =  GenerateS3KeyName(bucketName, fileObjectPath),
                         S3ObjectUrl = GenerateS3ObjectUrl(bucketName, fileObjectPath)
                     };
-                }
+                }
                     throw new TechnicalException($"AWS S3 doesn't return a success status code: {response.HttpStatusCode} for request with ID {response.ResponseMetadata.RequestId}");
-
+
             }
             catch (AmazonS3Exception ex)
             {
@@ -201,8 +238,8 @@ namespace COLID.AWS.Implementation
             {
                 throw HandleAmazonServiceException(ex);
             }
-        }
-
+        }
+
         public virtual string GenerateS3KeyName(string bucketName, string fileObjectPath)
         {
             return
@@ -240,24 +277,24 @@ namespace COLID.AWS.Implementation
                 HttpStatusCode.BadRequest => new ArgumentException(ex.Message, ex),
                 _ => new TechnicalException($"An AWS S3 error occurred: {ex.Message}, status code: {ex.StatusCode}", ex)
             };
-        }
-        private static HttpWebResponse UploadObject(string url, IFormFile file)
-        {
-            //url = url.Replace("https", "http");
-            HttpWebRequest httpRequest = WebRequest.Create(url) as HttpWebRequest;
-            httpRequest.Method = "PUT";
-            using (Stream dataStream = httpRequest.GetRequestStream())
-            {
-                var buffer = new byte[8000];
-                using (var ms = new MemoryStream())
-                {
-                    file.CopyTo(ms);
-                    ms.Position = 0;
-                    ms.CopyTo(dataStream);
-                }
-            }
-            HttpWebResponse response = httpRequest.GetResponse() as HttpWebResponse;
-            return response;
+        }
+        private static HttpWebResponse UploadObject(string url, IFormFile file)
+        {
+            //url = url.Replace("https", "http");
+            HttpWebRequest httpRequest = WebRequest.Create(url) as HttpWebRequest;
+            httpRequest.Method = "PUT";
+            using (Stream dataStream = httpRequest.GetRequestStream())
+            {
+                var buffer = new byte[8000];
+                using (var ms = new MemoryStream())
+                {
+                    file.CopyTo(ms);
+                    ms.Position = 0;
+                    ms.CopyTo(dataStream);
+                }
+            }
+            HttpWebResponse response = httpRequest.GetResponse() as HttpWebResponse;
+            return response;
         }
     }
 }

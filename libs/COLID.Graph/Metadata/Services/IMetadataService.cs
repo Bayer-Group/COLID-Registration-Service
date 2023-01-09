@@ -58,9 +58,10 @@ namespace COLID.Graph.Metadata.Services
         /// <returns>a <see cref="EntityTypeDto"/> including the hierarchy</returns>
         IList<ResourceHierarchyDTO> GetResourceTypeHierarchyDmp(string firstEntityType);
 
-
-
-
+        /// <summary>
+        /// Returns all the Link Types  present in metadata graphs.
+        /// </summary>
+        Dictionary<string, string> GetLinkTypes(); 
 
         /// <summary>
         /// Fetches the category filters in neptune raw format.
@@ -121,6 +122,14 @@ namespace COLID.Graph.Metadata.Services
         /// <param name="firstEntityType">URI of a resource type to search for</param>
         /// <returns>a list of entity types</returns>
         IList<string> GetInstantiableEntityTypes(string firstEntityType);
+
+        /// <summary>
+        /// Determines all instantiable entity types of a given entity uri and stores them in a list.
+        /// This function is only allowed for instances in the colid editor.
+        /// </summary>
+        /// <param name="firstEntityType">URI of a resource type to search for</param>
+        /// <returns>a list of entity type DTOs</returns>
+        IList<EntityTypeDto> GetInstantiableEntity(string firstEntityType);
 
         /// <summary>
         /// Fetches all Shacl and stores them in a graph.
@@ -186,5 +195,11 @@ namespace COLID.Graph.Metadata.Services
         /// <param name="entityType">entity type to use</param>
         /// <returns>the validation schema</returns>
         List<Entity> GetLinkedEntityTypes (List<Entity> entityType);
+
+        /// <summary>
+        /// Get all distribution endpoint types
+        /// </summary>
+        /// <returns></returns>
+        Dictionary<string, string> GetDistributionEndpointTypes();
     }
 }

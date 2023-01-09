@@ -13,6 +13,7 @@ using COLID.Graph.TripleStore.Extensions;
 using COLID.Identity.Extensions;
 using COLID.Identity.Services;
 using COLID.RegistrationService.Common.DataModel.DistributionEndpoints;
+using COLID.RegistrationService.Common.DataModels.TransferObjects;
 using COLID.RegistrationService.Services.Configuration;
 using COLID.RegistrationService.Services.DataModel;
 using COLID.RegistrationService.Services.Interface;
@@ -37,6 +38,9 @@ namespace COLID.RegistrationService.Services.Implementation
         private readonly string AppDataServiceConsumerGroupApi;
         private readonly string AppDataServiceColidEntryApi;
         private readonly string AppDataServiceGraphApi;
+        private readonly string AppDataServiceUserApi;
+        private readonly string AppDataServiceMessagesApi;
+        private readonly string AppDataServiceMessageTemplatesApi;
         private readonly string AppDataServiceNotifyInvalidDistributionEndpointApi;
 
         private readonly string AppDataServiceDeleteByAdditionalInfoApi;
@@ -63,6 +67,9 @@ namespace COLID.RegistrationService.Services.Implementation
             AppDataServiceConsumerGroupApi = $"{serverUrl}/api/consumerGroups";
             AppDataServiceColidEntryApi = $"{serverUrl}/api/colidEntries";
             AppDataServiceGraphApi = $"{serverUrl}/api/activeDirectory";
+            AppDataServiceUserApi = $"{serverUrl}/api/Users";
+            AppDataServiceMessagesApi = $"{serverUrl}/api/Messages";
+            AppDataServiceMessageTemplatesApi = $"{serverUrl}/api/MessageTemplates";
             AppDataServiceNotifyInvalidDistributionEndpointApi = $"{serverUrl}/api/Messages/notifyUserAboutInvalidDistributionEndpoint";
 
             AppDataServiceDeleteByAdditionalInfoApi = $"{serverUrl}/api/Messages/deleteByAdditionalInfo";
@@ -203,7 +210,52 @@ namespace COLID.RegistrationService.Services.Implementation
                 return true;
             }
         }
-        
+
+        public async Task<List<ColidUserDto>> GetAllColidUser()
+        {
+            var appDataServiceGraphUserAndGroupApi = $"{AppDataServiceUserApi}";
+
+            using (var httpClient = _clientFactory.CreateClient())
+            {
+                var response = await AquireTokenAndSendToAppDataService(httpClient, HttpMethod.Get, appDataServiceGraphUserAndGroupApi, null);
+
+                if (!response.IsSuccessStatusCode )
+                {
+                    var message = "Something went wrong while getting all persons from colid";
+                    var result = await response.Content.ReadAsStringAsync();
+                    _logger.LogError(message, result);
+                    throw new TechnicalException(message);
+                }
+
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+
+                List<ColidUserDto> userList = JsonConvert.DeserializeObject<List<ColidUserDto>>(jsonResponse);
+                return userList;
+            }
+        }
+
+        public async Task<List<MessageTemplateDto>> GetAllMessageTemplates()
+        {
+
+            using (var httpClient = _clientFactory.CreateClient())
+            {
+                var response = await AquireTokenAndSendToAppDataService(httpClient, HttpMethod.Get, this.AppDataServiceMessageTemplatesApi, null);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var message = "Something went wrong while getting all message templates";
+                    var result = await response.Content.ReadAsStringAsync();
+                    _logger.LogError(message, result);
+                    throw new TechnicalException(message);
+                }
+
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+
+                List<MessageTemplateDto> MessageTemplateList = JsonConvert.DeserializeObject<List<MessageTemplateDto>>(jsonResponse);
+                return MessageTemplateList;
+            }
+        }
+
         private async Task<HttpResponseMessage> AquireTokenAndSendToAppDataService(HttpClient httpClient, HttpMethod httpMethod, string endpointUrl, object requestBody)
         {
             var accessToken = await _tokenService.GetAccessTokenForWebApiAsync();
@@ -217,6 +269,27 @@ namespace COLID.RegistrationService.Services.Implementation
             if (!response.IsSuccessStatusCode)
             {
                 throw new GeneralException(errorMessage);
+            }
+        }
+
+        public async Task SendGenericMessage(string subject, string body, string email)
+        {
+            var AppDataServiceMessagesApi = $"{this.AppDataServiceMessagesApi}/sendGenericMessage";
+
+            using (var httpClient = _clientFactory.CreateClient())
+            {
+                var colidEntrySubscriptionDto = new MessageUserDto() { Subject = subject, Body = body, UserEmail = email };
+                var response = await AquireTokenAndSendToAppDataService(httpClient, HttpMethod.Put, AppDataServiceMessagesApi, colidEntrySubscriptionDto);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var message = "Something went wrong while sending message to user";
+                    throw new TechnicalException(message);
+                }
+
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+
+                  
             }
         }
     }

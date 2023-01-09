@@ -32,5 +32,20 @@ namespace COLID.RegistrationService.Repositories.Interface
         /// <param name="metadataNamedGraphs"></param>
         /// <returns></returns>
         IList<Taxonomy> GetTaxonomies(ISet<Uri> metadataNamedGraphs);
+
+        /// <summary>
+        /// Generates a taxonomy dynamically based upon top and broader concepts
+        /// </summary>
+        /// <param name="type">The type of the taxonomy to be searched for</param>
+        /// <param name="metadataNamedGraphs">All metadata graphs to be searched in< </param>
+        /// <returns>Plain list of taxonomy</returns>
+        IList<Taxonomy> BuildTaxonomy(string type, ISet<Uri> metadataNamedGraphs);
+
+        /// <summary>
+        /// Get all taxonomy labels for excel export
+        /// </summary>
+        /// <param name="metadataNamedGraphs"></param>
+        /// <returns></returns>
+        IList<TaxonomyLabel> GetTaxonomyLabels(ISet<Uri> metadataNamedGraphs);
     }
 }

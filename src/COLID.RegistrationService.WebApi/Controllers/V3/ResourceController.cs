@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net.Mime;
+using System.Threading;
 using System.Threading.Tasks;
 using COLID.Common.DataModel.Attributes;
 using COLID.Graph.Metadata.DataModels.Resources;
@@ -96,6 +97,62 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
             var result = _resourceService.SearchByCriteria(resourceSearchDTO);
 
             return Ok(result);
+        }
+
+        /// <summary>
+        /// Checks all due resources for review and notifies responsible people 
+        /// </summary>
+        /// <returns>Status of Notification process</returns>
+        /// <response code="200">Status of Notification process</response>
+        /// <response code="500">If an unexpected error occurs</response>
+        [HttpPut]
+        [Route("notifyDueReviews")]
+        [ValidateActionParameters]
+        [ProducesResponseType(typeof(Dictionary<string, string>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
+        public IActionResult GetResourceDueForReview()
+        {
+            var result = _resourceService.NotifyForDueReviews().Result;
+
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Returns a list of resources that are due for review latest on the specified date.
+        /// </summary>
+        /// <param name="consumerGroup">The consumer group of the resources to be retrieved</param>
+        /// <param name="endDate">The end date specified in yyyy-mm-dd or mm.dd.yyyy  </param>
+        /// <returns>A list containing resources that are due for review</returns>
+        /// <response code="200">Returns a list containing resources that are due for review</response>
+        /// <response code="500">If an unexpected error occurs</response>
+        [HttpGet]
+        [Route("dueReviews")]
+        [ValidateActionParameters]
+        [ProducesResponseType(typeof(IList<Resource>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
+        public IActionResult GetResourceDueForReview([FromQuery, NotRequired] Uri consumerGroup, DateTime endDate)
+        {
+            var result = _resourceService.GetDueResources(consumerGroup, endDate);
+
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Confirms a review cycle for given resource without publishing it.
+        /// </summary>
+        /// <returns>A transfer object for the resource the review should be confirmed for</returns>
+        /// <response code="200">A transfer object for the resource the review should be confirmed for</response>
+        /// <response code="500">If an unexpected error occurs</response>
+        [HttpPut]
+        [Route("confirmReview")]
+        [ValidateActionParameters]
+        [ProducesResponseType(typeof(IList<ResourceOverviewDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
+        public IActionResult ConfirmReviewCycleForResource([FromQuery] Uri pidUri)
+        {
+            _resourceService.ConfirmReviewCycleForResource(pidUri);
+
+            return Ok();
         }
 
         /// <summary> 
@@ -677,7 +734,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         /// <param name="pidUri">Pid Uri of resource to be indexed</param>
         /// <returns></returns>
         [HttpPost]
-        [ValidateActionParameters]        
+        [ValidateActionParameters]
         [Route("indexUpdatedResource")]
         [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
@@ -687,6 +744,24 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
             _resourceService.IndexUpdatedResource(pidUri);
             return Ok();
         }
+
+        /// <summary>
+        /// link repair
+        /// </summary>
+        /// <returns></returns>
+        [HttpPost]
+        [Route("linkFix")]
+        [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
+        public IActionResult linkFix()
+        {
+            Thread background = new Thread(() => _resourceService.linkFix());
+            background.Start();
+
+            return NoContent();
+        }
+
     }
 }
 

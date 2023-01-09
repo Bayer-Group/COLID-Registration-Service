@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using COLID.Graph.Metadata.DataModels.Resources;
 using COLID.Graph.TripleStore.DataModels.Base;
 using COLID.RegistrationService.Common.DataModel.DistributionEndpoints;
+using COLID.RegistrationService.Common.DataModels.TransferObjects;
 
 namespace COLID.RegistrationService.Services.Interface
 {
@@ -44,7 +45,19 @@ namespace COLID.RegistrationService.Services.Interface
         /// <param name="id">The person id to check.</param>
         /// <returns>True if exists otherwise false</returns>
         bool CheckPerson(string id);
-        
+
+        /// <summary>
+        /// Checks if a person exists in colid
+        /// </summary>
+        /// <returns>True if exists otherwise false</returns>
+        Task<List<ColidUserDto>> GetAllColidUser();
+
+        /// <summary>
+        /// Gets all existing MessageTemplateDtos
+        /// </summary>
+        /// <returns>list of messagetemplates</returns>
+        Task<List<MessageTemplateDto>> GetAllMessageTemplates();
+
         /// <summary>
         /// Notify user about invalid distribution endpoint
         /// </summary>
@@ -64,5 +77,14 @@ namespace COLID.RegistrationService.Services.Interface
         /// <param name="checkUnsuccessful"></param>
         /// <returns></returns>
         Task<List<(string pidUri, DateTime createdAt)>> GetByAdditionalInfoAsync(List<string> checkUnsuccessful);
+
+        /// <summary>
+        /// sends generic message to colid user
+        /// </summary>
+        /// <param name="subject"></param>
+        /// <param name="body"></param>
+        /// <param name="email"></param>
+        /// <returns></returns>
+        Task SendGenericMessage(string subject, string body, string email);
     }
 }

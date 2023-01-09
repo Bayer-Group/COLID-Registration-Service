@@ -37,6 +37,7 @@ using COLID.MessageQueue.Services;
 using COLID.MessageQueue.Configuration;
 using Microsoft.Extensions.Options;
 using COLID.MessageQueue.Datamodel;
+using COLID.Identity.Constants;
 
 namespace COLID.RegistrationService.Services.Implementation
 {
@@ -54,6 +55,7 @@ namespace COLID.RegistrationService.Services.Implementation
         private readonly IUserInfoService _userInfoService;
         private readonly IReindexingService _indexingService;
         private readonly IRemoteAppDataService _remoteAppDataService;
+        private readonly IConsumerGroupService _consumerGroupService;
         private readonly IValidationService _validationService;
         private readonly ILockServiceFactory _lockServiceFactory;
         private readonly IAttachmentService _attachmentService;
@@ -84,6 +86,7 @@ namespace COLID.RegistrationService.Services.Implementation
             IUserInfoService userInfoService,
             IReindexingService ReindexingService,
             IRemoteAppDataService remoteAppDataService,
+            IConsumerGroupService consumerGroupService,
             IValidationService validationService,
             ILockServiceFactory lockServiceFactory,
             IRevisionService revisionService,
@@ -104,6 +107,7 @@ namespace COLID.RegistrationService.Services.Implementation
             _userInfoService = userInfoService;
             _indexingService = ReindexingService;
             _remoteAppDataService = remoteAppDataService;
+            _consumerGroupService = consumerGroupService;
             _validationService = validationService;
             _lockServiceFactory = lockServiceFactory;
             _attachmentService = attachmentService;
@@ -159,6 +163,21 @@ namespace COLID.RegistrationService.Services.Implementation
             }
             return resources;
         }
+
+        public IList<Resource> GetDueResources(Uri consumerGroup, DateTime endDate)
+        {
+            var resourceTypes = _metadataService.GetInstantiableEntityTypes(Graph.Metadata.Constants.Resource.Type.FirstResouceType);
+            Uri instanceGraphUri = GetResourceInstanceGraph();
+            IList<Resource> dueResourceList = _resourceRepository.GetDueResources(consumerGroup, endDate, instanceGraphUri, resourceTypes);
+
+            return dueResourceList;
+        }
+
+        public void GetLinksOfPublishedResources(List<Resource> resources, IList<Uri> pidUris, Uri namedGraph, ISet<string> LinkTypeList)
+        {
+            _resourceRepository.GetLinksOfPublishedResources(resources, pidUris, namedGraph, LinkTypeList);
+        }
+
         public Resource SetLinksInResource(Resource resource, Dictionary<string, List<LinkingMapping>>? outboundLinks)
         {
             Dictionary<string, List<LinkingMapping>> outboundlinks;
@@ -216,10 +235,11 @@ namespace COLID.RegistrationService.Services.Implementation
             }
         }
 
-        public async Task<Resource> AddResourceLink(string pidUri, string linkType, string pidUriToLink, string requester)
+        public async Task<Resource> AddResourceLink(string pidUri, string linkType, string pidUriToLink, string requester, bool createHistoryObject = true, bool checkRequester = true)
         {
+            if (checkRequester)
+                CheckRequesterIsValid(requester);
 
-            CheckRequesterIsValid(requester);
             if (pidUri == pidUriToLink)
             {
                 throw new BusinessException("The Resource cannot be linked to itself");
@@ -263,7 +283,10 @@ namespace COLID.RegistrationService.Services.Implementation
             {
                 //Create new Link triple in published graph for this resource with Piduri @piduri
                 _resourceRepository.CreateLinkPropertyWithGivenPid(new Uri(resource.Id), new Uri(linkType), pidUriToLink, GetResourceInstanceGraph());
-                await CreateLinkHistoryEntryAsync(new Uri(resource.Id), linkType, new Uri(pidUriToLink), requester);
+
+                if (createHistoryObject) { 
+                    await CreateLinkHistoryEntryAsync(new Uri(resource.Id), linkType, new Uri(pidUriToLink), requester);
+                }
 
                 transaction.Commit();
             }
@@ -312,10 +335,94 @@ namespace COLID.RegistrationService.Services.Implementation
             _resourceRepository.CreateLinkHistoryEntry(LinkHistoryEntryDto, GetLinkHistoryGraph(), GetResourceInstanceGraph());
         }
 
+        public async void linkFix()
+        {
+            int counter = 0;
+            _logger.LogInformation("linkFixScript: link fix started");
+
+            var linkHistories = _resourceRepository.GetLinkHistoryRecords(GetLinkHistoryGraph());
+
+            var linkList = COLID.Graph.Metadata.Constants.Resource.LinkTypes.AllLinkTypes;
+            Uri draftGraphUri = GetResourceDraftInstanceGraph();
+            Uri instanceGraphUri = GetResourceInstanceGraph();
+            foreach (var linkHistory in linkHistories)
+            {
+                Uri linkstart = null;
+                Uri linkend = null;
+                var linkType = linkHistory.HasLinkType;
+                var author = linkHistory.Author;
+
+                try
+                {
+                    linkstart =  _resourceRepository.GetPidUriById(linkHistory.HasLinkStart, draftGraphUri, instanceGraphUri);
+                    linkend = _resourceRepository.GetPidUriById(linkHistory.HasLinkEnd, draftGraphUri, instanceGraphUri);
+                    if (linkstart == null || linkend == null)
+                    {
+                        SetLinkHistoryEntryStatusToDeleted(linkHistory.Id, "colid@bayer.com");
+                        continue;
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    _logger.LogInformation("linkFixScriptERROR: link start or link end is null");
+                    _logger.LogInformation("linkFixScriptERROR " + ex.Message);
+                }
+
+
+                try
+                {
+                    var currentLinkList = _resourceRepository.GetOutboundLinksOfPublishedResource(linkstart, instanceGraphUri, linkList);
+                    bool linkMissing = false;
+
+                    if (!currentLinkList.ContainsKey(linkType.ToString()))
+                    {
+                        linkMissing = true;
+                    }
+                    else
+                    {
+                        currentLinkList.TryGetValue(linkType.ToString(), out List<LinkingMapping> links);
+                        if (!links.Exists(x => x.PidUri == linkend.ToString()))
+                        {
+                            linkMissing = true;
+                        }
+                    }
+
+                    if (linkMissing)
+                    {
+                        _logger.LogInformation("linkFixScript: link will be fixed for ={linkstart}", linkstart);
+                        counter++;
+                        AddResourceLink(linkstart.ToString(), linkType.ToString(), linkend.ToString(), author.ToString(), false, false);
+                    }
+
+                }
+                catch (System.Exception ex)
+                {
+                    _logger.LogInformation("linkFixScriptERROR: something went wrong during link fixing process ");
+                    _logger.LogInformation("linkFixScriptERROR " + ex.Message);
+
+                }
+
+
+            }
+            _logger.LogInformation("linkFixScript: Link fix successful ={counter}", counter);
+
+        }
+
         private async Task SetLinkHistoryEntryStatusToDeleted(Uri linkStartRecordId, Uri linkType, Uri linkEnd, string requester)
         {
 
             var linkHistoryRecord = _resourceRepository.GetLinkHistoryRecord(linkStartRecordId, linkType, linkEnd, GetLinkHistoryGraph(), GetResourceInstanceGraph());
+
+            //Remove Link Status
+            _resourceRepository.DeleteAllProperties(linkHistoryRecord, new Uri(LinkHistory.HasLinkStatus), GetLinkHistoryGraph());
+            // update Status deleted, deleted by and date
+            _resourceRepository.CreateProperty(linkHistoryRecord, new Uri(LinkHistory.HasLinkStatus), new Uri(LinkHistory.LinkStatus.Deleted), GetLinkHistoryGraph());
+            _resourceRepository.CreateProperty(linkHistoryRecord, new Uri(LinkHistory.DeletedBy), requester, GetLinkHistoryGraph());
+            _resourceRepository.CreateProperty(linkHistoryRecord, new Uri(LinkHistory.DateDeleted), $"{DateTime.UtcNow.ToString("o")}^^xsd:dateTime", GetLinkHistoryGraph());
+        }
+
+        private async Task SetLinkHistoryEntryStatusToDeleted(Uri linkHistoryRecord, string requester)
+        {
 
             //Remove Link Status
             _resourceRepository.DeleteAllProperties(linkHistoryRecord, new Uri(LinkHistory.HasLinkStatus), GetLinkHistoryGraph());
@@ -383,6 +490,13 @@ namespace COLID.RegistrationService.Services.Implementation
             var newResource = SetLinksInResource(resource, resource.Links);
 
             await includeLinksBeforeIndexingResource(new Uri(pidUri), resource, oldResources, new Uri(pidUriToUnLink), GetResourcesByPidUri(new Uri(pidUriToUnLink)));
+
+
+
+            //temporärer fixxx
+            var oldResourcesToUnlink = GetResourcesByPidUri(new Uri(pidUriToUnLink));
+            _indexingService.IndexPublishedResource(new Uri(pidUriToUnLink), oldResourcesToUnlink.Published, oldResourcesToUnlink);
+
  
             if (returnTargetResource)
             {
@@ -869,6 +983,7 @@ namespace COLID.RegistrationService.Services.Implementation
             ignoredProperties.Add(COLID.Graph.Metadata.Constants.Resource.HasRevision);
             ignoredProperties.Add(COLID.Graph.Metadata.Constants.Resource.LastChangeUser);
             ignoredProperties.Add(COLID.Graph.Metadata.Constants.Resource.HasSourceID);
+            ignoredProperties.Add(COLID.Graph.Metadata.Constants.Resource.MetadataGraphConfiguration);
             ignoredProperties.AddRange(COLID.Graph.Metadata.Constants.Resource.LinkTypes.AllLinkTypes);
 
 
@@ -982,6 +1097,129 @@ namespace COLID.RegistrationService.Services.Implementation
             return false;
         }
 
+        public async Task ConfirmReviewCycleForResource(Uri pidUri)
+        {
+            //set next review Date
+            var resourcesCTO = GetResourcesByPidUri(pidUri);
+            var reviewPolicy = resourcesCTO.Published.Properties.GetValueOrNull(Graph.Metadata.Constants.Resource.HasResourceReviewCyclePolicy, true);
+            var currentDueDate = resourcesCTO.Published.Properties.GetValueOrNull(Graph.Metadata.Constants.Resource.HasNextReviewDueDate, true);
+
+            if (reviewPolicy == null || currentDueDate == null)
+            {
+                throw new BusinessException("The selected resource does not have any review policy or current due date set.");
+            }
+
+            var newValues = new Dictionary<string, dynamic>()
+                {
+                    { Graph.Metadata.Constants.Resource.HasLastReviewDate,DateTime.Now.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'Z'")},
+                    { Graph.Metadata.Constants.Resource.HasLastReviewer,_userInfoService.GetEmail()},
+                    { Graph.Metadata.Constants.Resource.HasNextReviewDueDate,calculateNextReviewDate(reviewPolicy)[0] }
+                };
+
+            await PublishWithGivenKeys(null, resourcesCTO, newValues);
+        }
+
+        public async Task SetPublishedResourceToDeprecated(Uri pidUri)
+        {
+            //set next review Date
+            var resourcesCTO = GetResourcesByPidUri(pidUri);
+            var newValues = new Dictionary<string, dynamic>()
+                {
+                    { Graph.Metadata.Constants.Resource.DateModified,DateTime.Now.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'Z'")},
+                    { Graph.Metadata.Constants.Resource.LastChangeUser,Users.BackgroundProcessUser},
+                    { Graph.Metadata.Constants.Resource.LifecycleStatus,Graph.Metadata.Constants.ConsumerGroup.LifecycleStatus.Deprecated  }
+                };
+
+            await PublishWithGivenKeys(null, resourcesCTO, newValues);
+        }
+
+        public async Task PublishWithGivenKeys(Uri pidUri, ResourcesCTO optionalResource, Dictionary<string, dynamic> newValues)
+        {
+            using (var lockService = _lockServiceFactory.CreateLockService())
+            {
+                List<string> keysToCheck = newValues.Keys.ToList();
+                ResourcesCTO resourcesCTO = null;
+                if (pidUri != null)
+                {
+                    CheckIfResourceExist(pidUri);
+                    await lockService.CreateLockAsync(pidUri.ToString());
+                    resourcesCTO = GetResourcesByPidUri(pidUri);
+                }
+                else
+                {
+                    Entity pid = optionalResource.Published.Properties.GetValueOrNull(Graph.Metadata.Constants.Resource.hasPID, true);
+                    pidUri = new Uri(pid.Id);
+                    resourcesCTO = optionalResource;
+                }
+
+                if (!resourcesCTO.HasPublished)
+                {
+                    throw new BusinessException("The resource you have selected has no published version available.");
+                }
+
+                Dictionary<string, List<dynamic>> props = new Dictionary<string, List<dynamic>>();
+                resourcesCTO.Published.Properties.ToList().ForEach(x =>
+                {
+                    if (keysToCheck.Contains(x.Key) && x.Value[0] is string)
+                    {
+                        string jsonString = System.Text.Json.JsonSerializer.Serialize(x.Value[0]);
+                        string targetObj = System.Text.Json.JsonSerializer.Deserialize<string>(jsonString);
+
+                        List<dynamic> newList = new List<dynamic>();
+                        newList.Add(targetObj);
+                        props.Add(x.Key, newList);
+                    }
+                    else
+                    {
+                        props.Add(x.Key, x.Value);
+                    }
+                });
+                Entity resourceCopy = new Entity(resourcesCTO.Published.Id, props);
+
+
+                foreach (var element in newValues)
+                {
+                    //Set or Update LastReviewDate to Today
+                    if (resourceCopy.Properties.ContainsKey(element.Key))
+                    {
+                        resourceCopy.Properties[element.Key][0] = element.Value;
+                    }
+                    else
+                    {
+                        List<dynamic> valueList = new List<dynamic>();
+                        valueList.Add(element.Value);
+                        resourceCopy.Properties.Add(element.Key, valueList);
+                    }
+
+                }
+
+                string entityType = resourcesCTO.GetPublishedOrDraftVersion().Properties
+                    .GetValueOrNull(RDF.Type, true).ToString();
+                var metadata = _metadataService.GetMetadataForEntityType(entityType);
+                var selectedRevisionMetadata = metadata.Where(x => keysToCheck.Contains(x.Key)).ToList();
+
+                using (var transaction = _resourceRepository.CreateTransaction())
+                {
+                    // Try to delete published and all inbound edges are changed to the new entry.
+                    _resourceRepository.DeletePublished(pidUri,
+                        new Uri(resourcesCTO.Published.Id), GetResourceInstanceGraph());
+
+                    Resource resourceToBeIndexed = null;
+                    //Füge die neue resource mit den aktualisierten werten in den resource graphen
+                    //Füge additionals und removals in seperate graphen --> Verlinke die resource zu der Änderungstabelle
+                    Resource updatedResource = await _revisionService.AddAdditionalsAndRemovals(resourcesCTO.Published, resourceCopy, selectedRevisionMetadata);
+                    resourceToBeIndexed = getResourceToBeIndexedBySettingLinks(updatedResource, metadata, null);  // mitPidUri
+
+                    Resource LatVersionIdResources = (Resource)SetHasLaterVersionResourceId(resourceToBeIndexed);
+
+                    _resourceRepository.Create(LatVersionIdResources, metadata, GetResourceInstanceGraph());
+
+                    transaction.Commit();
+                    _indexingService.IndexPublishedResource(pidUri, resourceToBeIndexed, resourcesCTO); //pidUris drin
+                }
+            }
+        }
+
         public async Task<ResourceWriteResultCTO> PublishResource(Uri pidUri)
         {
                     CheckIfResourceExist(pidUri);
@@ -991,6 +1229,21 @@ namespace COLID.RegistrationService.Services.Implementation
                     await lockService.CreateLockAsync(pidUri.ToString());
 
                     var resourcesCTO = GetResourcesByPidUri(pidUri);
+
+                    //set next review Date
+                    var reviewPolicy = resourcesCTO.Draft.Properties.GetValueOrNull(Graph.Metadata.Constants.Resource.HasResourceReviewCyclePolicy, true);
+                    if (reviewPolicy != null)
+                    {
+                        var nextReviewDate = calculateNextReviewDate(reviewPolicy);
+                        if (resourcesCTO.Draft.Properties.ContainsKey(Graph.Metadata.Constants.Resource.HasNextReviewDueDate))
+                        {
+                            resourcesCTO.Draft.Properties[Graph.Metadata.Constants.Resource.HasNextReviewDueDate] = nextReviewDate;
+                        }
+                        else
+                        {
+                            resourcesCTO.Draft.Properties.Add(Graph.Metadata.Constants.Resource.HasNextReviewDueDate, nextReviewDate);
+                        }
+                     }
 
                     if (resourcesCTO.HasPublishedAndNoDraft)
                     {
@@ -1042,6 +1295,7 @@ namespace COLID.RegistrationService.Services.Implementation
                                 await Task.WhenAll(tasks);
                             }
 
+                       
                             //Füge die neue resource mit den aktualisierten werten in den resource graphen
                             //Füge additionals und removals in seperate graphen --> Verlinke die resource zu der Änderungstabelle
                             Resource updatedResource = await _revisionService.AddAdditionalsAndRemovals(resourcesCTO.Published, resourcesCTO.Draft);
@@ -1061,11 +1315,14 @@ namespace COLID.RegistrationService.Services.Implementation
                         }
                         else
                         {
+                            
                             //validationFacade.RequestResource = SetHasLaterVersionResourceId(validationFacade.RequestResource);
                             await _revisionService.InitializeResourceInAdditionalsGraph(validationFacade.RequestResource, validationFacade.MetadataProperties);
 
                             resourceToBeIndexed = getResourceToBeIndexedBySettingLinks(validationFacade.RequestResource, metadata, null);
                             var LatVersionIdResources = SetHasLaterVersionResourceId(resourceToBeIndexed);
+
+
                             _resourceRepository.Create(LatVersionIdResources, metadata, GetResourceInstanceGraph());  // 
 
                         }
@@ -1085,6 +1342,13 @@ namespace COLID.RegistrationService.Services.Implementation
 
                     return new ResourceWriteResultCTO(validationFacade.RequestResource, validationResult);
                 }
+        }
+        private List<dynamic> calculateNextReviewDate(dynamic reviewPolicy)
+        {
+            List<dynamic> nextReviewDate = new List<dynamic>();
+            var nextDate = DateTime.Now.AddMonths(Int32.Parse(reviewPolicy)).ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'Z'");
+            nextReviewDate.Add(nextDate);
+            return nextReviewDate;
         }
 
         private Resource getResourceToBeIndexedBySettingLinks(Resource resourceToBeIndexed, IList<MetadataProperty> metadata, Dictionary<string, List<LinkingMapping>> links)
@@ -1417,16 +1681,27 @@ namespace COLID.RegistrationService.Services.Implementation
         private void CheckRequesterIsValid(string requester)
         {
             Guard.IsValidEmail(requester);            
-            if (!_userInfoService.HasApiToApiPrivileges() && requester != _userInfoService.GetEmail())
+            if (!_userInfoService.HasApiToApiPrivileges() && requester != _userInfoService.GetEmail() && _userInfoService.GetEmail() != Users.BackgroundProcessUser)
             {
+                _logger.LogError("CheckRequesterError: " + requester  + " UnserInfoService: "+ _userInfoService.GetEmail() + " HasApiToApiPrivileges: " + _userInfoService.HasApiToApiPrivileges().ToString());
                 throw new BusinessException(Common.Constants.Messages.Resource.Delete.MarkedDeletedFailedInvalidRequester);
             }
 
-            var validRequester = _remoteAppDataService.CheckPerson(requester);            
-            if (!validRequester)
+            try
             {
-                throw new BusinessException(Common.Constants.Messages.Resource.Delete.MarkedDeletedFailedInvalidRequester);
+                var validRequester = _remoteAppDataService.CheckPerson(requester);
+                if (!validRequester)
+                {
+                    _logger.LogError("CheckRequesterError: " + requester + " UnserInfoService: " + _userInfoService.GetEmail());
+                    throw new BusinessException(Common.Constants.Messages.Resource.Delete.MarkedDeletedFailedInvalidRequester);
+                }
             }
+            catch(System.Exception ex)
+            {
+                _logger.LogError("CheckRequesterError: " + requester + " UnserInfoService: " + _userInfoService.GetEmail());
+                throw;
+            }
+            
         }
 
         public string UnmarkResourceAsDeleted(Uri pidUri)
@@ -1735,5 +2010,84 @@ namespace COLID.RegistrationService.Services.Implementation
                 _logger.LogInformation("Indexing: Complete for Updated resource: {pidUri}", pidUri.ToString());
             }
         }
+
+        public async Task<Dictionary<string, string>> NotifyForDueReviews()
+        {
+            var userList = await _remoteAppDataService.GetAllColidUser();
+            var messageTemplateList = await _remoteAppDataService.GetAllMessageTemplates();
+            var duewarningTemplate = messageTemplateList.First(x => x.Type == "ReviewDueWarning");
+            var deprecatedNotificationTemplate = messageTemplateList.First(x => x.Type == "ReviewDeprecatedNotification");
+            var consumerGroupList = _consumerGroupService.GetEntities(null);
+            Dictionary<string, string> emailList = new Dictionary<string, string>();
+
+            var resources = GetDueResources(null,DateTime.Today.AddDays(10)) ; // give me all resources which are due in the next 10 days
+
+            foreach(Resource resource in resources)
+            {
+                var pidUri = resource.PidUri;
+                var consumerGroup = resource.Properties.GetValueOrNull(Graph.Metadata.Constants.Resource.HasConsumerGroup, true);
+                var label = resource.Properties.GetValueOrNull(Graph.Metadata.Constants.Resource.HasLabel, true);
+                var consumergroup_object = consumerGroupList.First(x => x.Id == consumerGroup);
+                var consumergroup_DefaultDeprecatedValue = consumerGroupList.First(x => x.Id == consumerGroup).Properties.GetValueOrNull(Graph.Metadata.Constants.ConsumerGroup.DefaultDeprecationTime, true);
+                int deprecationTime = consumergroup_DefaultDeprecatedValue != null ? Int32.Parse(consumergroup_DefaultDeprecatedValue) : 90;
+                Dictionary<bool, string> messageType = new Dictionary<bool, string>()
+                {
+                    { false,  duewarningTemplate.Body.Replace("%COLID_LABEL%", label).Replace("%COLID_PID_URI%", pidUri.ToString())},
+                    { true, deprecatedNotificationTemplate.Body.Replace("%COLID_LABEL%", label).Replace("%COLID_PID_URI%", pidUri.ToString()).Replace("%DEPRECATION_TIME%", deprecationTime.ToString())}
+                };
+
+                bool deprecated = false;
+                if (resource.Properties.ContainsKey(COLID.Graph.Metadata.Constants.Resource.HasNextReviewDueDate)){
+                    var HasNextReviewDueDate = resource.Properties.GetValueOrNull(Graph.Metadata.Constants.Resource.HasNextReviewDueDate, true);
+                    var date = DateTime.Parse(HasNextReviewDueDate);
+
+                    if (date < DateTime.Today.AddDays(deprecationTime*(-1))) // GET DEFAULT DEPRECATED TIME due date is in the past according to consumer group default depreation time
+                    {
+                        deprecated = true;
+                        await SetPublishedResourceToDeprecated(pidUri);
+                    }
+
+                }
+
+                var messageToSend = messageType.GetValueOrDefault(deprecated);
+                var subjectToSend = deprecated ? deprecatedNotificationTemplate.Subject : duewarningTemplate.Subject;
+
+                if (resource.Properties.ContainsKey(COLID.Graph.Metadata.Constants.Resource.HasDataSteward))
+                {
+                    resource.Properties.TryGetValue(Graph.Metadata.Constants.Resource.HasDataSteward, out var dataStewardList);
+                    foreach(string dataSteward in dataStewardList)
+                    {
+                        var userExist = userList.Exists(x => x.EmailAddress == dataSteward);
+
+                        if (userExist)
+                        {
+                            await _remoteAppDataService.SendGenericMessage(subjectToSend, messageToSend, dataSteward);
+                        }
+                        else
+                        {
+                            emailList.Add(dataSteward,messageToSend);
+                        }
+                    }
+                }
+                else
+                {
+                    var consumergroup_contact = consumerGroupList.First(x => x.Id == consumerGroup).Properties.GetValueOrNull(Graph.Metadata.Constants.ConsumerGroup.HasContactPerson, true); ;
+                    var userExist = userList.Exists(x => x.EmailAddress == consumergroup_contact);
+
+                    if (userExist)
+                    {
+                        await _remoteAppDataService.SendGenericMessage(subjectToSend, messageToSend, consumergroup_contact);
+                    }
+                    else
+                    {
+                        emailList.Add(consumergroup_contact, messageToSend);
+                    }
+                }
+            }
+
+
+            return emailList;
+        }
     }
 }
+

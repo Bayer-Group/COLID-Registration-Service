@@ -449,6 +449,7 @@ namespace COLID.Graph.Metadata.Services
                     Level = level,
                     IsCategory = false,
                     Instantiable = false,
+                    Id = resourceTypeHierarchy.Label + "#",
                     Name = resourceTypeHierarchy.Label
                 };
 
@@ -557,6 +558,7 @@ namespace COLID.Graph.Metadata.Services
                     IsCategory=true,
                     Description = x.Description,
                     Instantiable = false,
+                    Id=x.Name+"#",
                     Name = x.Name,
                 };
 
@@ -570,7 +572,8 @@ namespace COLID.Graph.Metadata.Services
                         IsCategory = true,
                         Id = child + "#" + x.Name,
                         Instantiable = true,
-                        Name = child
+                        Name = child,
+                        ParentName=x.Name
                     });
 
                 });
@@ -598,6 +601,28 @@ namespace COLID.Graph.Metadata.Services
         public void DeleteCategoryFilter(string categoryName)
         {
             _metadataRepository.DeleteCategoryFilter(categoryName);
+        }
+
+        public IList<EntityTypeDto> GetInstantiableEntity(string firstEntityType)
+        {
+            var cachePrefixResourceTypes = $"instantiableResourceTypes:{firstEntityType}";
+            var instantiableResourceTypes = _cacheService.GetOrAdd(cachePrefixResourceTypes,
+                () => _metadataRepository.GetInstantiableEntityTypes(firstEntityType));
+
+            return instantiableResourceTypes;
+        }
+
+        public Dictionary<string, string> GetDistributionEndpointTypes()
+        {
+            var cachePrefixDistributionEndpointTypes = $"distributionEndpointTypes";
+            var distributionEndpointTypes = _cacheService.GetOrAdd(cachePrefixDistributionEndpointTypes,
+                () => _metadataRepository.GetDistributionEndpointTypes());
+
+            return distributionEndpointTypes;
+        }
+        public Dictionary<string, string> GetLinkTypes()
+        {
+            return _metadataRepository.GetLinkTypes(); ;
         }
     }
 }

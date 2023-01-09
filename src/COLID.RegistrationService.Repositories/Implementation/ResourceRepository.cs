@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -117,6 +117,64 @@ namespace COLID.RegistrationService.Repositories.Implementation
             parameterizedString.SetPlainLiteral("pidUris", pidUris.Select(x => x.ToString()).JoinAsValuesList());
             parameterizedString.SetPlainLiteral("resourceTypes", resourceTypes.JoinAsGraphsList());
             parameterizedString.SetPlainLiteral("linkTypes", COLID.Graph.Metadata.Constants.Resource.LinkTypes.AllLinkTypes.JoinAsGraphsList());
+
+            // BuildResourceFromQuery
+            using var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var resultsTask = Task.Factory.StartNew(() => _tripleStoreRepository.QueryTripleStoreResultSet(parameterizedString), cancellationTokenSource.Token);
+            WaitAllTasks(cancellationTokenSource, resultsTask);
+            SparqlResultSet results = resultsTask.Result;
+            var entities = TransformQueryResults(results);
+
+            return entities;
+        }
+
+        public IList<Resource> GetDueResources(Uri consumerGroup, DateTime endDate, Uri namedGraph, IList<string> resourceTypes)
+        {
+            // TODO: Why not type of owl:Class?
+
+            SparqlParameterizedString parameterizedString = new SparqlParameterizedString
+            {
+                CommandText =
+                 @"SELECT DISTINCT ?subject ?predicate ?object ?object_ ?objectPidUri
+                    From @resourceNamedGraph
+                    WHERE { {
+                      ?subject @hasConsumerGroup @consumerGroup.
+                      ?subject @hasNextReviewDate ?date .
+                ?subject @hasLifescyclestatus ?lifecyclestatus .
+                    FILTER( xsd:dateTime(?date)<= @endDate^^xsd:dateTime). 
+                     BIND(?subject as ?object).
+                     ?subject ?predicate ?object_.
+                     FILTER  (?predicate NOT IN (@linkTypes))
+                    OPTIONAL { ?object_ @hasPid ?objectPidUri. }
+                       FILTER (?lifecyclestatus NOT IN (@deprecated))
+                  } UNION {
+                    ?subject @hasConsumerGroup @consumerGroup.
+                      ?subject @hasNextReviewDate ?date
+                    FILTER( xsd:dateTime(?date)<= @endDate^^xsd:dateTime). 
+                    ?subject (rdf:| !rdf:)+ ?object.
+                    ?object ?predicate ?object_.
+                    FILTER NOT EXISTS { ?subject ?lifecyclestatus @deprecated . }
+                    } }"
+            };
+
+
+            parameterizedString.SetUri("hasConsumerGroup", new Uri(Graph.Metadata.Constants.Resource.HasConsumerGroup));
+            parameterizedString.SetUri("hasNextReviewDate", new Uri(Graph.Metadata.Constants.Resource.HasNextReviewDueDate));
+            parameterizedString.SetUri("hasLifescyclestatus", new Uri(Graph.Metadata.Constants.Resource.LifecycleStatus));
+            parameterizedString.SetUri("deprecated", new Uri(Graph.Metadata.Constants.ConsumerGroup.LifecycleStatus.Deprecated));
+            if (consumerGroup is null)
+            {
+                parameterizedString.SetPlainLiteral("consumerGroup", "?consumerGroup");
+            }
+            else
+            {
+                parameterizedString.SetUri("consumerGroup", consumerGroup);
+            }
+            parameterizedString.SetUri("hasPid", new Uri(Graph.Metadata.Constants.EnterpriseCore.PidUri));
+            parameterizedString.SetUri("resourceNamedGraph", namedGraph);
+            parameterizedString.SetLiteral("endDate", endDate.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss.fff'Z'"));
+            parameterizedString.SetPlainLiteral("linkTypes", COLID.Graph.Metadata.Constants.Resource.LinkTypes.AllLinkTypes.JoinAsGraphsList());
+
 
             // BuildResourceFromQuery
             using var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -1741,6 +1799,50 @@ namespace COLID.RegistrationService.Repositories.Implementation
             }
 
             return new Uri(result.GetNodeValuesFromSparqlResult("subject").Value);
+        }
+
+
+        public List<LinkHistoryCreateDto> GetLinkHistoryRecords(Uri linkHistoryGraph)
+        {
+
+            var parametrizedSparql = new SparqlParameterizedString
+            {
+                CommandText =
+                     @"SELECT ?subject ?linkStart ?linkEnd ?linkType ?linkCreator
+                      From @linkHistoryGraph
+                      WHERE {
+                          ?subject @hasLinkStart ?linkStart .
+                          ?subject @hasLinkEnd ?linkEnd . 
+                          ?subject @hasLinkType ?linkType .
+                          ?subject @hasLinkCreator ?linkCreator.
+                          ?subject @hasLinkStatus @Created . 
+                      } "
+            };
+
+            parametrizedSparql.SetUri("linkHistoryGraph", linkHistoryGraph);
+            parametrizedSparql.SetUri("hasLinkStart", new Uri(Graph.Metadata.Constants.LinkHistory.HasLinkStart));
+            parametrizedSparql.SetUri("hasLinkEnd", new Uri(Graph.Metadata.Constants.LinkHistory.HasLinkEnd));
+            parametrizedSparql.SetUri("hasLinkType", new Uri(Graph.Metadata.Constants.LinkHistory.HasLinkType));
+            parametrizedSparql.SetUri("hasLinkStatus", new Uri(Graph.Metadata.Constants.LinkHistory.HasLinkStatus));
+            parametrizedSparql.SetUri("hasLinkCreator", new Uri(Graph.Metadata.Constants.Resource.Author));
+            parametrizedSparql.SetUri("Created", new Uri(Graph.Metadata.Constants.LinkHistory.LinkStatus.Created));
+            var result = _tripleStoreRepository.QueryTripleStoreResultSet(parametrizedSparql).ToList();
+
+            if (!result.Any())
+            {
+                return null;
+            }
+
+            var linkhistories = result.Select(result => new LinkHistoryCreateDto()
+            {
+                Id = new Uri(result.GetNodeValuesFromSparqlResult("subject").Value),
+                HasLinkStart = new Uri(result.GetNodeValuesFromSparqlResult("linkStart").Value),
+                HasLinkEnd = new Uri(result.GetNodeValuesFromSparqlResult("linkEnd").Value),
+                HasLinkType = new Uri(result.GetNodeValuesFromSparqlResult("linkType").Value),
+                Author = result.GetNodeValuesFromSparqlResult("linkCreator").Value
+            });
+
+            return linkhistories.ToList(); 
         }
 
         public void Create(Resource newResource, IList<Graph.Metadata.DataModels.Metadata.MetadataProperty> metadataProperties, Uri namedGraph)

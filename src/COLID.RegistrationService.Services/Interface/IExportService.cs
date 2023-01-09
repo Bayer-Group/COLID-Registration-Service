@@ -17,7 +17,12 @@ namespace COLID.RegistrationService.Services.Interface
     /// </summary>
     public interface IExportService
     {
-        void Export(ExportRequestDto exportRequest);
-        MemoryStream generateExcelTemplate(List<Dictionary<string, List<dynamic>>> resources);       
+        /// <summary>
+        /// Export resource as per search criteria
+        /// </summary>
+        /// <param name="exportRequest">search criteria</param>
+        void Export(ExportRequestDto exportRequest);       
+
+        //MemoryStream generateExcelTemplate(List<Dictionary<string, List<dynamic>>> resources);       
     }
 }

@@ -146,6 +146,82 @@ namespace COLID.RegistrationService.Services.Implementation
             return resource;
         }
 
+        //if only specific metadata should be checked
+        public async Task<Resource> AddAdditionalsAndRemovals(Entity Published, Entity DraftToBePublished, List<MetadataProperty> metaDataToCheck)
+        {
+            if (Published.Properties[COLID.Graph.Metadata.Constants.EnterpriseCore.PidUri][0].Id != DraftToBePublished.Properties[COLID.Graph.Metadata.Constants.EnterpriseCore.PidUri][0].Id)
+            {
+                throw new BusinessException("The resources to be compared do not have the same PidUri");
+            }
+
+            List<string> ignoredProperties = new List<string>();
+            ignoredProperties.Add(COLID.Graph.Metadata.Constants.Resource.HasEntryLifecycleStatus);
+            ignoredProperties.Add(COLID.Graph.Metadata.Constants.Resource.HasRevision);
+            ignoredProperties.Add(COLID.Graph.Metadata.Constants.EnterpriseCore.PidUri);
+            ignoredProperties.Add(COLID.Graph.Metadata.Constants.Resource.HasSourceID);
+
+            if (DraftToBePublished.Properties.ContainsKey(COLID.Graph.Metadata.Constants.Resource.BaseUri) == Published.Properties.ContainsKey(COLID.Graph.Metadata.Constants.Resource.BaseUri))
+                ignoredProperties.Add(COLID.Graph.Metadata.Constants.Resource.BaseUri);
+            ignoredProperties.AddRange(COLID.Graph.Metadata.Constants.Resource.LinkTypes.AllLinkTypes);
+
+            var existingRevisions = Published.Properties.TryGetValue(COLID.Graph.Metadata.Constants.Resource.HasRevision, out List<dynamic> revisionValues) ? revisionValues : new List<dynamic>();
+
+
+            //IList <MetadataProperty> allMetaData = _metadataService.GetMetadataForEntityType(Published.Properties.GetValueOrNull(COLID.Graph.Metadata.Constants.RDF.Type, true));
+
+
+            Dictionary<string, List<dynamic>> additionals = new Dictionary<string, List<dynamic>>();
+            Dictionary<string, List<dynamic>> removals = new Dictionary<string, List<dynamic>>();
+
+            foreach (var metadata in metaDataToCheck)
+            {
+                if (ignoredProperties.Contains(metadata.Key))
+                {
+                    continue;
+                }
+
+                if (Published.Properties.TryGetValue(metadata.Key, out List<dynamic> firstValue) && DraftToBePublished.Properties.TryGetValue(metadata.Key, out List<dynamic> secondValue))
+                {
+                    if (ResourceValueChanged(firstValue, secondValue))
+                    {
+                        additionals.Add(metadata.Key, secondValue);
+                        removals.Add(metadata.Key, firstValue);
+                    }
+                }
+                else if (Published.Properties.TryGetValue(metadata.Key, out List<dynamic> OnlyfirstValue) && !DraftToBePublished.Properties.TryGetValue(metadata.Key, out List<dynamic> NotsecondValue))
+                {
+                    removals.Add(metadata.Key, OnlyfirstValue);
+                }
+                else if (!Published.Properties.TryGetValue(metadata.Key, out List<dynamic> NotfirstValue) && DraftToBePublished.Properties.TryGetValue(metadata.Key, out List<dynamic> OnlysecondValue))
+                {
+                    additionals.Add(metadata.Key, OnlysecondValue);
+                }
+                else
+                {
+                    continue;
+                }
+
+            }
+
+            Resource resource = UpdateResourceProperties(additionals, removals, _mapper.Map<Resource>(Published));
+
+            //if(additionals.Count==1 && removals.Count==1 && additionals.ContainsKey(COLID.Graph.Metadata.Constants.Resource.DateModified))
+
+            string pattern = @"[^Rev]+$";
+            Regex rg = new Regex(pattern);
+            var revList = existingRevisions.Select(x => Int32.Parse(rg.Match(x).Value)).ToList();
+            var max = revList.Max();
+
+            string revisionGraphPrefix = Published.Id + "Rev" + (max + 1);
+            _resourceRepository.CreateProperty(new Uri(Published.Id), new Uri(COLID.Graph.Metadata.Constants.Resource.HasRevision), revisionGraphPrefix, GetResourceInstanceGraph());
+
+            (additionals, removals) = GetFinalAdditionalsAndRemovals(additionals, removals);
+            _resourceRepository.CreateAdditionalsAndRemovalsGraphs(additionals, removals, metaDataToCheck, Published.Id, revisionGraphPrefix);  //letzte revisionwert rausnehmen, counter erhöhen und damit dann die graphen erstellen
+
+
+            return resource;
+        }
+
         private (Dictionary<string, List<dynamic>> additionals, Dictionary<string, List<dynamic>> removals) GetFinalAdditionalsAndRemovals(Dictionary<string, List<dynamic>> additionals, Dictionary<string, List<dynamic>> removals)
         {
             Dictionary<string, List<dynamic>> final_additionals = new Dictionary<string, List<dynamic>>();

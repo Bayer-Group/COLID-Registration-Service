@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using COLID.AWS.DataModels;
@@ -19,6 +20,13 @@ namespace COLID.AWS.Interface
         /// <param name="bucketName">the name of the s3 bucket</param>
         /// <param name="key">the s3 key to use</param>
         Task<AmazonS3FileDownloadDto> GetFileAsync(string bucketName, string key);
+
+        /// <summary>
+        /// Download all file from the given bucket.
+        /// The files will be passed as key value pair where key is the name of the file and the value being the memory stream object within the returned Dictionary.
+        /// </summary>
+        /// <param name="bucketName">the name of the s3 bucket</param>        
+        Task<Dictionary<string, Stream>> GetAllFileAsync(string bucketName);
 
         /// <summary>
         /// Upload a file into the given bucket and returns the full s3 key path.

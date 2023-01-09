@@ -83,5 +83,16 @@ namespace COLID.Graph.Metadata.Repositories
         List<CategoryFilterDTO> GetCategoryFilter(string categoryFilterName);
         void AddCategoryFilter(CategoryFilterDTO categoryFilterDto);
         void DeleteCategoryFilter(string categoryFilterName);
+
+        /// <summary>
+        /// Get all distribution endpoint types
+        /// </summary>
+        /// <returns></returns>
+        Dictionary<string, string> GetDistributionEndpointTypes();
+
+        /// <summary>
+        /// Returns all the Link Types  present in metadata graphs.
+        /// </summary>
+        Dictionary<string, string> GetLinkTypes();
     }
 }

@@ -1,12 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using COLID.AWS.Interface;
 using COLID.Exception.Models;
 using COLID.Graph.Metadata.Constants;
+using COLID.Graph.Metadata.DataModels.Metadata;
 using COLID.Graph.Metadata.DataModels.Resources;
 using COLID.Graph.Metadata.DataModels.Validation;
 using COLID.Graph.Metadata.Services;
@@ -15,6 +18,7 @@ using COLID.Graph.TripleStore.Extensions;
 using COLID.Helper.SQS;
 using COLID.RegistrationService.Repositories.Interface;
 using COLID.RegistrationService.Services.Interface;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -34,7 +38,9 @@ namespace COLID.RegistrationService.Services.Implementation
         private readonly IValidationService _validationService;
         private readonly IIdentifierService _identifierService;
         private readonly IReindexingService _indexingService;
-        private readonly IProxyConfigService _proxyConfigService;
+        private readonly IProxyConfigService _proxyConfigService;        
+        private readonly IImportService _importService;
+        private readonly IRemoteAppDataService _remoteAppDataService;
 
         /// <summary>
         /// Constructer to initialize
@@ -48,7 +54,7 @@ namespace COLID.RegistrationService.Services.Implementation
             IResourcePreprocessService resourcePreprocessService, IResourceService resourceService,
             IResourceRepository resourceRepository, IRevisionService revisionService, IMetadataService metadataService,
             IValidationService validationService, IIdentifierService identifierService, IReindexingService indexingService,
-            IProxyConfigService proxyConfigService)
+            IProxyConfigService proxyConfigService, IImportService importService, IRemoteAppDataService remoteAppDataService)
         {
             _logger = logger;
             _awsSQSHelper = awsSQSHelper;
@@ -60,7 +66,9 @@ namespace COLID.RegistrationService.Services.Implementation
             _validationService = validationService;
             _identifierService = identifierService;
             _indexingService = indexingService;
-            _proxyConfigService = proxyConfigService;
+            _proxyConfigService = proxyConfigService;            
+            _importService = importService;
+            _remoteAppDataService = remoteAppDataService;
         }
 
         /// <summary>
@@ -76,6 +84,7 @@ namespace COLID.RegistrationService.Services.Implementation
             {
                 await AddUpdateResources();
                 await LinkResources();
+                await ImportExcel();
                 await Task.Delay(10000, stoppingToken);
             }
         }
@@ -95,7 +104,7 @@ namespace COLID.RegistrationService.Services.Implementation
         /// <returns></returns>
         private async Task AddUpdateResources()
         {
-            _logger.LogInformation("BackgroundService: Running.... ");
+            //_logger.LogInformation("BackgroundService: Running.... ");
             Stopwatch stpWatch = new Stopwatch();
             stpWatch.Start();
             //Check for msgs in a loop           
@@ -227,7 +236,8 @@ namespace COLID.RegistrationService.Services.Implementation
                                 resourceInstanceGraphs.Add(draftInstanceGraph);
                                 pidUri = _resourceRepository.GetPidUriBySourceId(srcId, resourceInstanceGraphs);
                             }
-                            else
+
+                            if (pidUri != null)
                             {
                                 try
                                 {
@@ -250,14 +260,11 @@ namespace COLID.RegistrationService.Services.Implementation
                                     _logger.LogInformation("BackgroundService: About to Validate New resource: {msg}", msg.Body);
                                     //Validate
                                     var (validationResult, failed, validationFacade) =
-                                        await _resourcePreprocessService.ValidateAndPreProcessResource(newResourceId, resource, new ResourcesCTO(), ResourceCrudAction.Create);
+                                        await _resourcePreprocessService.ValidateAndPreProcessResource(newResourceId, resource, new ResourcesCTO(), ResourceCrudAction.Create, false, null, false, true);
                                     _logger.LogInformation("BackgroundService: Validation Complete for: {srcId} having status {stat}", srcId, failed.ToString());
 
-                                    //Update pidUri in stateItem
-                                    if (failed == false && resource.StateItems[0].ContainsKey("pid_uri"))
-                                    {
-                                        resource.StateItems[0]["pid_uri"] = validationFacade.RequestResource.PidUri.ToString();
-                                    }
+                                    //Update pidUri in stateItem                            
+                                    UpdateStateItemsWithPidUri(resource, validationFacade.RequestResource.PidUri.ToString());
 
                                     //Create result data
                                     BulkUploadResult result = new BulkUploadResult
@@ -268,7 +275,7 @@ namespace COLID.RegistrationService.Services.Implementation
                                         Triples = validationResult.Triples.Replace(ColidEntryLifecycleStatus.Draft, ColidEntryLifecycleStatus.Published),
                                         InstanceGraph = resInstanceGraph.ToString(),
                                         TimeTaken = stpWatch.ElapsedMilliseconds.ToString(),
-                                        pidUri = validationFacade.RequestResource.PidUri.ToString(),
+                                        pidUri = validationFacade.RequestResource.PidUri == null ? "" : validationFacade.RequestResource.PidUri.ToString(),
                                         ResourceId = newResourceId,
                                         SourceId = srcId,
                                         ResourceLabel = resource.Properties.GetValueOrNull(Graph.Metadata.Constants.Resource.HasLabel, true),
@@ -334,8 +341,11 @@ namespace COLID.RegistrationService.Services.Implementation
 
                                     _logger.LogInformation("BackgroundService: About to Validate Existing resource: {msg}", msg.Body);
                                     var (validationResult, failed, validationFacade) =
-                                        await _resourcePreprocessService.ValidateAndPreProcessResource(id, resource, resourcesCTO, ResourceCrudAction.Publish, false, null);
+                                        await _resourcePreprocessService.ValidateAndPreProcessResource(id, resource, resourcesCTO, ResourceCrudAction.Publish, false, null, false, true);
                                     _logger.LogInformation("BackgroundService: Validation Complete for: {srcId} having status {stat}", srcId, failed.ToString());
+
+                                    //Update pidUri in stateItem                            
+                                    UpdateStateItemsWithPidUri(resource, validationFacade.RequestResource.PidUri.ToString());
 
                                     // The validation failed, if the results are cricital errors.
                                     if (failed)
@@ -406,6 +416,21 @@ namespace COLID.RegistrationService.Services.Implementation
                                             var existingRevisions = resourcesCTO.Published.Properties.TryGetValue(COLID.Graph.Metadata.Constants.Resource.HasRevision, out List<dynamic> revisionValues) ? revisionValues : null;
                                             if (existingRevisions != null)
                                                 resourcetoCreate.Properties.Add(COLID.Graph.Metadata.Constants.Resource.HasRevision, existingRevisions);
+                                            
+                                            // Check if Link already exists
+                                            IList<MetadataProperty> metadataEntityType = _metadataService.GetMetadataForEntityType(resource.Properties.GetValueOrNull(COLID.Graph.Metadata.Constants.RDF.Type, true));
+                                            var linkMetadata = metadataEntityType.Where(x => (x.Properties.GetValueOrNull(COLID.Graph.Metadata.Constants.Shacl.Group, true)).GetValue("key") == COLID.Graph.Metadata.Constants.Resource.Groups.LinkTypes).ToList().Select(y => y.Key).ToHashSet();
+
+                                            //Add previous links to Properties.
+                                            var outboundlinks = _resourceRepository.GetOutboundLinksOfPublishedResource(validationFacade.RequestResource.PidUri, resInstanceGraph, linkMetadata);
+                                            resourcetoCreate.Links = outboundlinks;
+
+                                            foreach (var lnk in outboundlinks)
+                                            {
+                                                var temp = new List<dynamic>();
+                                                temp.AddRange(lnk.Value.Select(s => s.PidUri).ToList());
+                                                resourcetoCreate.Properties.Add(lnk.Key, temp);
+                                            }
                                         }
 
                                         //Add Published
@@ -458,6 +483,9 @@ namespace COLID.RegistrationService.Services.Implementation
 
                                     //Update Nginx Proxy info for the resource DynamoDB
                                     _proxyConfigService.AddUpdateNginxConfigRepository(resource);
+
+                                    _logger.LogInformation("BackgroundService: Sending update notification for sourceId {sourceId} ", srcId);
+                                    await _remoteAppDataService.NotifyResourcePublished(validationFacade.RequestResource);
                                 }
                                 catch (System.Exception ex)
                                 {
@@ -508,7 +536,7 @@ namespace COLID.RegistrationService.Services.Implementation
             }
             catch (System.Exception ex)
             {
-                _logger.LogError("BackgroundService: " + ex.InnerException == null ? ex.Message : ex.InnerException.Message);
+                _logger.LogError("BackgroundService: " + (ex.InnerException == null ? ex.Message : ex.InnerException.Message));
             }
 
             stpWatch.Stop();
@@ -607,6 +635,51 @@ namespace COLID.RegistrationService.Services.Implementation
             {
                 return false;
             }
+        }
+
+        private void UpdateStateItemsWithPidUri(ResourceRequestDTO resource, string assetPidUri)
+        {
+            foreach (var stateItem in resource.StateItems)
+            {
+                if (stateItem["entry_type"] == "asset")
+                {
+                    stateItem["pid_uri"] = assetPidUri;
+                }
+                else
+                {
+                    //Get PidUri from Distribution List
+                    if (resource.Properties.ContainsKey(Graph.Metadata.Constants.Resource.Distribution))
+                    {
+                        List<dynamic> distList = resource.Properties[Graph.Metadata.Constants.Resource.Distribution];
+                        foreach (dynamic dist in distList)
+                        {
+                            string EndPointPidUri = ((COLID.Graph.TripleStore.DataModels.Base.EntityBase)dist).Properties[Graph.Metadata.Constants.Resource.hasPID][0].Id;
+                            string EndPointUrl = ((COLID.Graph.TripleStore.DataModels.Base.EntityBase)dist).Properties.GetValueOrNull(Graph.Metadata.Constants.Resource.DistributionEndpoints.HasNetworkAddress, true);
+
+                            if (stateItem["key_value"] == EndPointUrl)
+                            {
+                                stateItem["pid_uri"] = EndPointPidUri;
+                                break;
+                            }
+                        }
+
+                    }
+
+                }
+            }
+        }
+
+        private async Task ImportExcel()
+        {
+            try
+            {
+                await _importService.ImportExcel();
+            }
+            catch(System.Exception ex)
+            {
+                _logger.LogError("BackgroundService: " + (ex.InnerException == null ? ex.Message : ex.InnerException.Message));
+            }
+            
         }
     }
 }

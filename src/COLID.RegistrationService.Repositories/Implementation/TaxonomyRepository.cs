@@ -129,6 +129,83 @@ namespace COLID.RegistrationService.Repositories.Implementation
             return taxonomies;
         }
 
+        public IList<Taxonomy> BuildTaxonomy(string type, ISet<Uri> metadataNamedGraphs)
+        {
+            var parameterizedString = new SparqlParameterizedString();
+            parameterizedString.CommandText =
+            @"CONSTRUCT{
+              ?subject @broader ?parent.
+              ?subject @prefLabel ?subjectLabel.
+              ?subject rdf:type @type.
+              ?topConcept rdf:type @type.
+              ?topConcept @prefLabel ?label.
+                }
+              @fromMetadataNamedGraph
+              WHERE {
+               {
+                OPTIONAL {?s @topConcept ?topConcept}.
+  				?topConcept @prefLabel ?label.
+                ?subject @broader+ ?topConcept ;
+                 @broader ?parent;
+                 @prefLabel ?subjectLabel.
+                ?parent  @prefLabel ?parentLabel.
+                 FILTER (lang(?label) IN (@language , """"))  
+                 FILTER (lang(?subjectLabel) IN (@language , """"))  
+                }}ORDER BY ?parent ?subjectLabel";
+
+            parameterizedString.SetPlainLiteral("fromMetadataNamedGraph", metadataNamedGraphs.JoinAsFromNamedGraphs());
+
+            parameterizedString.SetUri("broader", new Uri(Graph.Metadata.Constants.SKOS.Broader));
+            
+            parameterizedString.SetUri("prefLabel", new Uri(Graph.Metadata.Constants.SKOS.PrefLabel));
+
+            parameterizedString.SetUri("type", new Uri(type));
+
+            parameterizedString.SetUri("topConcept", new Uri(Graph.Metadata.Constants.SKOS.TopConcept));
+
+            parameterizedString.SetLiteral("language", COLID.Graph.Metadata.Constants.I18n.DefaultLanguage);
+
+            var results = _tripleStoreRepository.QueryTripleStoreGraphResult(parameterizedString);
+            if (results.IsEmpty)
+            {
+                return new List<Taxonomy>();
+            }
+            var subjects = results.Triples.SubjectNodes;
+            
+            var taxonomies = new List<Taxonomy>();
+
+            foreach (var item in subjects)
+            {
+                var groupSubjects = results.GetTriplesWithSubject(item);
+
+                var subGroupedResults = groupSubjects.GroupBy(
+                                p => p.Predicate,p=>p.Object)
+                                .ToDictionary(g => g.Key, g => g.ToList());
+
+                Taxonomy newEntity = new Taxonomy
+                {
+                    Id = item.ToString(),
+                    Properties = subGroupedResults.ToDictionary(x => x.Key.ToString(),
+                                x =>
+                                {
+                                    if (x.Key.ToString() == Graph.Metadata.Constants.SKOS.PrefLabel)
+                                    {
+                                        return x.Value.Select(x => ((VDS.RDF.BaseLiteralNode)x).Value).ToList<dynamic>();
+
+                                    }
+                                    else
+                                    {
+                                        return x.Value.Select(y=>((VDS.RDF.BaseUriNode)y).Uri.AbsoluteUri).ToList<dynamic>();
+                                    }
+                                }
+                                )
+                };
+                taxonomies.Add(newEntity);
+            }
+
+            return taxonomies;
+        }
+
         public override IList<Taxonomy> GetEntities(EntitySearch entitySearch, IList<string> types, ISet<Uri> namedGraphs)
         {
             throw new NotImplementedException();
@@ -157,6 +234,41 @@ namespace COLID.RegistrationService.Repositories.Implementation
         public override ITripleStoreTransaction CreateTransaction()
         {
             throw new NotImplementedException();
+        }
+
+        /// <summary>
+        /// Get all taxonomy labels for excel export
+        /// </summary>
+        /// <param name="metadataNamedGraphs"></param>
+        /// <returns></returns>
+        public IList<TaxonomyLabel> GetTaxonomyLabels(ISet<Uri> metadataNamedGraphs)
+        {
+            var parameterizedString = new SparqlParameterizedString();
+            parameterizedString.CommandText =
+                @"SELECT ?subject ?label
+                  @fromMetadataNamedGraph
+                  WHERE {
+                        ?subject rdfs:label | @prefLabel ?label.
+                  }";
+
+            parameterizedString.SetPlainLiteral("fromMetadataNamedGraph", metadataNamedGraphs.JoinAsFromNamedGraphs());
+            parameterizedString.SetUri("prefLabel", new Uri(COLID.Graph.Metadata.Constants.SKOS.PrefLabel));
+
+            var results = _tripleStoreRepository.QueryTripleStoreResultSet(parameterizedString);
+            var taxonomyLabels = new List<TaxonomyLabel>();
+            if (!results.IsEmpty)
+            {
+                taxonomyLabels = results.Select(rslt =>
+                {
+                    return new TaxonomyLabel
+                    {
+                        Id = rslt.GetNodeValuesFromSparqlResult("subject").Value,
+                        Label = rslt.GetNodeValuesFromSparqlResult("label").Value
+                    };
+                }).ToList();
+            }
+
+            return taxonomyLabels;
         }
     }
 }

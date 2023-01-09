@@ -14,8 +14,8 @@ using COLID.RegistrationService.Common.DataModel.Search;
 using Microsoft.AspNetCore.Http;
 using Swashbuckle.AspNetCore.Annotations;
 using Swashbuckle.AspNetCore.Filters;
-using Newtonsoft.Json.Linq;
-
+using Newtonsoft.Json.Linq;
+
 namespace COLID.RegistrationService.WebApi.Controllers.V3
 {
     /// <summary>
@@ -28,20 +28,18 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
     public class ExportController : Controller
     {
         private readonly IExportService _exportService;
-
+        
         /// <summary>
         /// API endpoint for exports.
         /// </summary>
         /// <param name="exportService">The service for exports</param>
-        public ExportController(
-            IExportService exportService
-            )
+        public ExportController(IExportService exportService)
         {
-            _exportService = exportService;
+            _exportService = exportService;            
         }
 
         /// <summary>
-        /// Export result of search request
+        /// Export result against search parameter
         /// </summary>
         /// <param name="exportRequest"></param>
         /// <returns>A status code. </returns>
@@ -57,6 +55,20 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
             background.Start();
 
             return NoContent();
-        }        
+        }
+        ///// <summary>
+        ///// Export Excel
+        ///// </summary>
+        ///// <param name="exportRequest"></param>
+        ///// <returns></returns>
+        //[HttpPost]
+        //[SwaggerResponse((int)HttpStatusCode.NoContent)]
+        //[SwaggerResponse((int)HttpStatusCode.InternalServerError)]
+        //[Route("exportExcel")]
+        //public IActionResult ExportExcel([FromBody] List<Uri> pidUris)
+        //{
+        //    var memStrm = _exportService.Export(pidUris);
+        //    return File(fileContents: memStrm.ToArray(), contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "ExcelFile.xlsx");
+        //}
     }
 }

@@ -131,6 +131,6 @@ namespace COLID.RegistrationService.Services.Implementation
                 //TODO: Log error
                 Console.WriteLine($"Something went wrong while publishing resource {resourceIndexingDto.PidUri} by message queue. Exception: {ex}");
             }
-        }
+        }        
     }
 }

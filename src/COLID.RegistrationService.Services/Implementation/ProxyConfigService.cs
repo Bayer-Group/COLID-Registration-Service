@@ -428,9 +428,21 @@ namespace COLID.RegistrationService.Services.Implementation
                         var hasBaseUriReplacement = extendedUri.Properties.GetValueOrNull(COLID.Graph.Metadata.Constants.ExtendedUriTemplate.HasReplacementString, true);
                         if (!string.IsNullOrWhiteSpace(resourceProxy.BaseUrl) && resourceProxy.PidUrl == resourceProxy.BaseUrl & hasBaseUriReplacement.Contains("{base64BaseUri}"))
                         {
+                            var baseUrIBuilder = new UriBuilder(resourceProxy.BaseUrl)
+                            {
+                                Port = -1,
+                                Host = new Uri(Graph.Metadata.Constants.Resource.PidUrlPrefix).Host
+                            };
+                            string httpScheme = extendedUri.Properties.GetValueOrNull(COLID.Graph.Metadata.Constants.ExtendedUriTemplate.UseHttpScheme, true);
+
+                            if (!string.IsNullOrWhiteSpace(httpScheme) && httpScheme == Graph.Metadata.Constants.Boolean.True)
+                            {
+                                baseUrIBuilder.Scheme = Uri.UriSchemeHttp;
+                            }
+                            string baseUrl = baseUrIBuilder.Uri.ToString();
                             var base64Attributes = new List<NginxAttribute>
                                 {
-                                    new NginxAttribute("set $extendeduri", $"{resourceProxy.BaseUrl}$1"),
+                                    new NginxAttribute("set $extendeduri", $"{baseUrl}$1"),
                                     new NginxAttribute("set_encode_base64", "$accurid $extendeduri" ),
 
                                 };

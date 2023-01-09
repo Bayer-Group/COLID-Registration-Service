@@ -328,6 +328,32 @@ namespace COLID.Graph.Metadata.Repositories
             return entities;
         }
 
+        public Dictionary<string, string> GetDistributionEndpointTypes()
+        {
+            SparqlParameterizedString queryString = new SparqlParameterizedString
+            {
+                CommandText =
+                @"SELECT *    
+                  @fromMetadataNamedGraph
+                  WHERE {
+                  ?subject rdfs:subClassOf <" + COLID.Graph.Metadata.Constants.EnterpriseCore.NetworkedResource + @">.
+                  ?subject rdfs:label ?object 
+                }"
+            };
+            queryString.SetPlainLiteral("fromMetadataNamedGraph", _metadataGraphConfigurationRepository.GetGraphs(Constants.MetadataGraphConfiguration.HasMetadataGraph).JoinAsFromNamedGraphs());
+
+            SparqlResultSet results = _tripleStoreRepository.QueryTripleStoreResultSet(queryString);
+
+            Dictionary<string, string> DistributionEndpoints = new Dictionary<string, string>();
+
+            foreach (var result in results)
+            {
+                DistributionEndpoints.Add(result.GetNodeValuesFromSparqlResult("subject").Value, result.GetNodeValuesFromSparqlResult("object").Value);
+            }
+
+            return DistributionEndpoints;
+        }
+
         private MetadataProperty CreateMetadataPropertyFromList(string pidUri, List<SparqlResult> sparqlResults, string configIdentifier)
         {
             var metadataProperty = new MetadataProperty();
@@ -629,5 +655,34 @@ namespace COLID.Graph.Metadata.Repositories
             _tripleStoreRepository.UpdateTripleStore(deleteQuery);
 
         }
+
+        public Dictionary<string, string> GetLinkTypes()
+        {
+            var parameterizedString = new SparqlParameterizedString();
+            parameterizedString.CommandText =
+              @"SELECT ?linkProperty ?linkName
+                  @fromMetadataNamedGraph
+                    WHERE {
+                      ?s rdf:type @shaclProperty ;
+                                    @shaclGroup  @linkTypes ;
+                                    @shaclPath  ?linkProperty ;
+                                    @shaclName ?linkName .
+                  }";
+
+            parameterizedString.SetPlainLiteral("fromMetadataNamedGraph", _metadataGraphConfigurationRepository.GetGraphs(Constants.MetadataGraphConfiguration.HasMetadataGraph).JoinAsFromNamedGraphs());
+            parameterizedString.SetUri("shaclProperty", new Uri(COLID.Graph.Metadata.Constants.Shacl.PropertyShape));
+            parameterizedString.SetUri("shaclGroup", new Uri(COLID.Graph.Metadata.Constants.Shacl.Group));
+            parameterizedString.SetUri("shaclName", new Uri(COLID.Graph.Metadata.Constants.Shacl.Name));
+            parameterizedString.SetUri("shaclPath", new Uri(COLID.Graph.Metadata.Constants.Shacl.Path));
+            parameterizedString.SetUri("linkTypes", new Uri(Constants.Resource.Groups.LinkTypes));
+            
+
+            var results = _tripleStoreRepository.QueryTripleStoreResultSet(parameterizedString);
+
+            var linkTypes = results.ToDictionary(x => x.GetNodeValuesFromSparqlResult("linkProperty").Value, x => x.GetNodeValuesFromSparqlResult("linkName").Value);
+
+            return linkTypes;
+        }
+
     }
 }

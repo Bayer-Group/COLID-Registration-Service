@@ -27,6 +27,11 @@ namespace COLID.AWS.DataModels
         public string S3AccessIamRoleArn { get; set; }
 
         /// <summary>
+        /// Bucket to store Excel Template to import them to AWS Neptune.
+        /// </summary>
+        public string S3BucketForImportExcelInput { get; set; }        
+        
+        /// <summary>
         /// Use MinIO as a local alternative as S3.
         /// </summary>
         public bool S3UseMinIo { get; set; }

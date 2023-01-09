@@ -48,17 +48,62 @@ namespace COLID.RegistrationService.Services.Validation
         /// <param name="entity"></param>
         /// <param name="metadataProperties"></param>
         /// <returns></returns>
-        public async Task<ValidationResult> ValidateEntity(Entity entity, IList<MetadataProperty> metadataProperties)
+        public async Task<ValidationResult> ValidateEntity(Entity entity, IList<MetadataProperty> metadataProperties, bool ignoreInvalidProperties = false)
         {
             var resourceGraph = GetResourceGraph(entity, metadataProperties);
             var shapesGraph = GetShapesGraph();
 
             var processor = new ShapesGraph(shapesGraph);
             var report = processor.Validate(resourceGraph);
-
             var validationResult = CreateValidationResult(report);
-            NTriplesWriter rdfNTriplesWriter = new NTriplesWriter();
+            
+            //Remove NonMandatory properties if they have validtion error 
+            if (ignoreInvalidProperties)
+            {
+                var validationresults = validationResult.Results.ToList();
+                foreach (var errResult in validationresults)
+                {
+                    if (!CheckPropertyIsMandatory(errResult.Path, metadataProperties))
+                    {
+                        
+                        if (entity.Properties.TryGetValue(errResult.Path, out var curProperty ))
+                        {
+                            if (curProperty.Count > 1)
+                            {
+                                //Remove From RequestResource
+                                int curIndex = curProperty.IndexOf(errResult.ResultValue.Split("^^")[0]);
+                                if (curIndex > -1)
+                                {
+                                    curProperty.RemoveAt(curIndex);
+                                    
+                                    //Remove triple from graph
+                                    var curNode = resourceGraph.GetUriNode(new Uri(errResult.Path));
+                                    var curTRiple = resourceGraph.GetTriplesWithPredicate(curNode).Where(s => s.Object.ToString() == errResult.ResultValue).FirstOrDefault();
+                                    resourceGraph.Retract(curTRiple);
 
+                                    //Remove from Validation error
+                                    validationResult.Results.Remove(errResult);
+                                }
+                            }
+                            else
+                            {
+                                //Remove From RequestResource
+                                entity.Properties.Remove(errResult.Path);
+
+                                //Remove triple from graph
+                                var curNode = resourceGraph.GetUriNode(new Uri(errResult.Path));
+                                var curTRiple = resourceGraph.GetTriplesWithPredicate(curNode).FirstOrDefault();
+                                resourceGraph.Retract(curTRiple);
+
+                                //Remove from Validation error
+                                validationResult.Results.Remove(errResult);
+                            }
+                        }                                                                                              
+                    }
+                }
+            }
+            
+            NTriplesWriter rdfNTriplesWriter = new NTriplesWriter();
             validationResult.Triples = VDS.RDF.Writing.StringWriter.Write(resourceGraph, rdfNTriplesWriter);
             return await Task.FromResult(validationResult);
         }
@@ -261,6 +306,20 @@ namespace COLID.RegistrationService.Services.Validation
 
             return validationResults;
         }
+
+        public bool CheckPropertyIsMandatory(string Property, IList<Graph.Metadata.DataModels.Metadata.MetadataProperty> metadata)
+        {
+            var curMetadata = metadata.Where(cond => cond.Key == Property).FirstOrDefault();
+            if (curMetadata != null)
+            {
+                if (curMetadata.Properties.ContainsKey(COLID.Graph.Metadata.Constants.Shacl.MinCount) && int.Parse(curMetadata.Properties[COLID.Graph.Metadata.Constants.Shacl.MinCount]) > 0)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         #endregion
     }
 }
