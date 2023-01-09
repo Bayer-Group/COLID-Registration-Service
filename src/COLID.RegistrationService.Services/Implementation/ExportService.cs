@@ -31,6 +31,8 @@ using Entity = COLID.Graph.TripleStore.DataModels.Base.Entity;
 using COLID.Graph.TripleStore.Extensions;
 using COLID.Graph.Metadata.DataModels.Metadata;
 using Microsoft.AspNetCore.Hosting;
+using System.Net;
+using COLID.Graph.Metadata.Extensions;
 
 namespace COLID.RegistrationService.Services.Implementation
 {
@@ -40,7 +42,7 @@ namespace COLID.RegistrationService.Services.Implementation
         private readonly IResourceService _resourceService;
         private readonly IUserInfoService _userInfoService;
         private readonly IAmazonS3Service _awsS3Service;
-        private readonly IAmazonDynamoDB _awsDynamoDbService;
+        //private readonly IAmazonDynamoDB _awsDynamoDbService;
         private readonly IMetadataService _metaDataService;
         private readonly ITaxonomyService _taxonomyService;
         private readonly AmazonWebServicesOptions _awsConfig;
@@ -72,7 +74,7 @@ namespace COLID.RegistrationService.Services.Implementation
             IResourceService resourceService,
             IUserInfoService userInfoService,
             IAmazonS3Service amazonS3Service,
-            IAmazonDynamoDB amazonDynamoDbService,
+            //IAmazonDynamoDB amazonDynamoDbService,
             IMetadataService metadataService,
             ITaxonomyService taxonomyService,
             ILogger<ExportService> logger,
@@ -84,7 +86,7 @@ namespace COLID.RegistrationService.Services.Implementation
             _resourceService = resourceService;
             _userInfoService = userInfoService;
             _awsS3Service = amazonS3Service;
-            _awsDynamoDbService = amazonDynamoDbService;
+           // _awsDynamoDbService = amazonDynamoDbService;
             _awsConfig = awsOptionsMonitor.CurrentValue;
             _logger = logger;
             _searchServiceEndpoint = _configuration.GetConnectionString("searchServiceConnectionUrl");
@@ -98,51 +100,134 @@ namespace COLID.RegistrationService.Services.Implementation
         }
 
         /// <summary>
-        /// Main function to export the resource meta data.
+        /// Main function to export the resource meta data as per search parameter .
         /// </summary>
         /// <param name="exportRequest">Search request and additional export parameters</param>
         public async void Export(ExportRequestDto exportRequest)
         {
-            // Loop over search results to export
-            var original_size = exportRequest.searchRequest.Size;
-            var original_from = exportRequest.searchRequest.From;
+            try
+            {               
+                var resources = new List<Dictionary<string, List<dynamic>>>();
+                //Check Whether to query by search criteria else look for resource for given list of pidUris
+                if (exportRequest.pidUris.Count == 0)
+                {
+                    _logger.LogInformation("ExcelExport: Excel Export Started..");
+                    // Loop over search results to export
+                    var original_size = exportRequest.searchRequest.Size;
+                    var original_from = exportRequest.searchRequest.From;
 
-            int size = _searchSizePerLoop;
-            int from = original_from;
+                    int size = _searchSizePerLoop;
+                    int from = original_from;
 
-            var resources = new List<Dictionary<string, List<dynamic>>>();
-            List<Dictionary<string, List<dynamic>>> current_resources;
-            do
-            {
-                // Send search request to SearchService
-                exportRequest.searchRequest.Size = size;
-                exportRequest.searchRequest.From = from;
-                var response = await this.Search(exportRequest.searchRequest);
+                    
+                    var resourcesWithLink = new List<Graph.Metadata.DataModels.Resources.Resource>();
+                    List<Dictionary<string, List<dynamic>>> current_resources;
+                    do
+                    {
+                        // Send search request to SearchService
+                        exportRequest.searchRequest.Size = size;
+                        exportRequest.searchRequest.From = from;
+                        var response =  this.Search(exportRequest.searchRequest).Result;
 
-                // Get metadata for resulting resources
-                current_resources = this.GetDetails(
-                    response,
-                    exportRequest.exportSettings.exportContent,
-                    exportRequest.exportSettings.exportFormat);
-                resources.AddRange(current_resources);
+                        // Get metadata for resulting resources
+                        (List<Dictionary<string, List<dynamic>>> filteredList, List<Graph.Metadata.DataModels.Resources.Resource> resourceList) = this.GetDetails(
+                            response,
+                            exportRequest.exportSettings.exportContent,
+                            exportRequest.exportSettings.exportFormat);
 
-                from += current_resources.Count;
-            } while (current_resources.Any());
+                        resources.AddRange(filteredList);
+                        resourcesWithLink.AddRange(resourceList);
+                        current_resources = filteredList;
 
-            exportRequest.searchRequest.Size = original_size;
-            exportRequest.searchRequest.From = original_from;
+                        from += filteredList.Count;
+                    } while (current_resources.Any());
 
-            // Generate Excel file from resource metadata
-            var stream = this.exportToExcel(resources, exportRequest);
+                    exportRequest.searchRequest.Size = original_size;
+                    exportRequest.searchRequest.From = original_from;
 
-            //Upload generated Excel file to S3-Server
-            if (stream.Length > 0)
-            {
-                var uploadInfoDto = await this.uploadToS3(stream);
-                //Send message to user with URL to Excel file
-                this.SendNotification(uploadInfoDto);
+
+                    //return this.generateExcelTemplate(resources, resourcesWithLink);
+                    // Generate Excel file from resource metadata
+                    var stream = this.exportToExcel(resources, exportRequest, resourcesWithLink);
+                    //return stream;
+                    //Upload generated Excel file to S3-Server
+                    if (stream.Length > 0)
+                    {
+                        var uploadInfoDto = await this.uploadToS3(stream);
+                        //Send message to user with URL to Excel file
+                        this.SendNotification(uploadInfoDto);
+                    }
+                }
+                else
+                {
+                    _logger.LogInformation("ExcelExport: Excel Export Started for list of piduri..");
+                    // Construct a list of resources that were found
+                    List<Graph.Metadata.DataModels.Resources.Resource> hits = new List<Graph.Metadata.DataModels.Resources.Resource>();
+                    //exchange URIs with resource data
+                    if (exportRequest.pidUris.Count > 0)
+                    {
+                        // Get Metadata of the resource from the ResourceService
+                        hits.AddRange(_resourceService.GetByPidUris(exportRequest.pidUris));
+                    }
+
+                    //var to_return = new List<Dictionary<string, List<dynamic>>>();
+
+                    foreach (var hit in hits)
+                    {
+                        var current = new Dictionary<string, List<dynamic>>()
+                        {
+                            ["Id"] = new List<dynamic>() { hit.Id }
+                        };
+                        foreach (var prop in hit.Properties)
+                        {
+                            current.Add(prop.Key, prop.Value);
+                        }
+                        resources.Add(current);
+                    }
+
+
+                    //combining resource Types and fetch their information
+                    var resourceTypes = _metaDataService.GetInstantiableEntityTypes(Resource.Type.FirstResouceType).ToList();
+                    List<MetadataProperty> metaDataEntityTypes = new List<MetadataProperty>();
+                    resourceTypes.ForEach(x =>
+                    {
+                        metaDataEntityTypes.AddRange(
+                            _metaDataService.GetMetadataForEntityType(x)
+                                .Where(y => y.Properties.GetValueOrNull(COLID.Graph.Metadata.Constants.Shacl.Group, true)
+                                .GetValue("key") == COLID.Graph.Metadata.Constants.Resource.Groups.LinkTypes)
+                                );
+                    });
+
+                    ////get link information from database
+                    //resourceTypes.ForEach(x =>
+                    //{
+                    //    metaDataEntityTypes.AddRange(
+                    //        _metaDataService.GetMetadataForEntityType(x)
+                    //            .Where(y => y.Properties.GetValueOrNull(COLID.Graph.Metadata.Constants.Shacl.Group, true)
+                    //            .GetValue("key") == COLID.Graph.Metadata.Constants.Resource.Groups.LinkTypes)
+                    //            );
+                    //});
+
+                    Uri publishedGraph = _metaDataService.GetInstanceGraph(PIDO.PidConcept);
+                    _resourceService.GetLinksOfPublishedResources(hits, exportRequest.pidUris, publishedGraph, metaDataEntityTypes.Select(x => x.Key).ToHashSet());
+                    //return this.generateExcelTemplate(to_return, hits);
+                    //var stream = this.generateExcelTemplate(resources, hits);
+                    var stream = this.exportToExcel(resources, exportRequest, hits);
+                    //return stream;
+                    //Upload generated Excel file to S3-Server
+                    if (stream.Length > 0)
+                    {
+                        var uploadInfoDto = await this.uploadToS3(stream);
+                        //Send message to user with URL to Excel file
+                        this.SendNotification(uploadInfoDto);
+                    }
+                }
             }
-        }
+            catch (System.Exception ex)
+            {
+                _logger.LogError("ExcelExport:- " + (ex.InnerException == null ? ex.Message : ex.InnerException.Message));                
+            }
+        }        
 
         /// <summary>
         /// Send search request to SearchService API, return the HTTP Response
@@ -151,6 +236,8 @@ namespace COLID.RegistrationService.Services.Implementation
         /// <returns></returns>
         private async Task<HttpResponseMessage> Search(SearchRequestDto searchRequest)
         {
+            //var handler = new HttpClientHandler();
+            //handler.DefaultProxyCredentials = CredentialCache.DefaultCredentials;
             HttpClient client = new HttpClient();
             try
             {
@@ -160,7 +247,7 @@ namespace COLID.RegistrationService.Services.Implementation
                 StringContent content = new StringContent(jsonobject, Encoding.UTF8, "application/json");
 
                 //Fetch token for search service
-                var accessToken = await _searchTokenService.GetAccessTokenForWebApiAsync();
+                var accessToken = await _searchTokenService.GetAccessTokenForWebApiAsync();                  
                 client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
 
                 // Post the JSON object to the SearchService endpoint
@@ -168,14 +255,14 @@ namespace COLID.RegistrationService.Services.Implementation
                 response.EnsureSuccessStatusCode();
                 return response;
             }
-            catch (HttpRequestException ex)
+            catch (System.Exception ex)
             {
-                _logger.LogError("An error occurred while passing the search request to the search service.", ex);
+                _logger.LogError("ExcelExport: An error occurred while passing the search request to the search service.", ex.Message);
                 throw ex;
             }
         }
 
-        private List<Dictionary<string, List<dynamic>>> GetDetails(
+        private (List<Dictionary<string, List<dynamic>>> filteredList, List<Graph.Metadata.DataModels.Resources.Resource> resourceList) GetDetails(
             HttpResponseMessage httpResponseMessage,
             string exportContent,
             string exportFormat)
@@ -197,7 +284,7 @@ namespace COLID.RegistrationService.Services.Implementation
             //exchange URIs with resource data
             if (s.Hits.Hits.Count > 0 && (exportContent == _uriAndMeta || exportFormat == _excelTemplate))
             {
-                // Get Metadata of the resource from the ResourceService
+                // Get resource from the piduris
                 hits.AddRange(_resourceService.GetByPidUris(uris));
             }
 
@@ -236,7 +323,32 @@ namespace COLID.RegistrationService.Services.Implementation
                 throw new ArgumentException(string.Format("Unexpected value for exportContent. Accepted values: uriAndMeta, onlyUri. Given value: {0}.", exportContent));
             }
 
-            return to_return;
+            //combining resource Types and fetch their information
+            var resourceTypes = _metaDataService.GetInstantiableEntityTypes(Resource.Type.FirstResouceType).ToList();
+            List<MetadataProperty> metaDataEntityTypes = new List<MetadataProperty>();
+            resourceTypes.ForEach(x =>
+            {
+                metaDataEntityTypes.AddRange(
+                    _metaDataService.GetMetadataForEntityType(x)
+                        .Where(y => y.Properties.GetValueOrNull(COLID.Graph.Metadata.Constants.Shacl.Group, true)
+                        .GetValue("key") == COLID.Graph.Metadata.Constants.Resource.Groups.LinkTypes)
+                        );
+            });
+
+            ////get link information from database
+            //resourceTypes.ForEach(x =>
+            //{
+            //    metaDataEntityTypes.AddRange(
+            //        _metaDataService.GetMetadataForEntityType(x)
+            //            .Where(y => y.Properties.GetValueOrNull(COLID.Graph.Metadata.Constants.Shacl.Group, true)
+            //            .GetValue("key") == COLID.Graph.Metadata.Constants.Resource.Groups.LinkTypes)
+            //            );
+            //});
+
+            Uri publishedGraph = _metaDataService.GetInstanceGraph(PIDO.PidConcept);
+            _resourceService.GetLinksOfPublishedResources(hits, uris, publishedGraph, metaDataEntityTypes.Select(x => x.Key).ToHashSet());
+
+            return (filteredList: to_return, resourceList: hits) ;
         }
 
         /// <summary>
@@ -245,7 +357,7 @@ namespace COLID.RegistrationService.Services.Implementation
         /// <param name="resources">List of resource</param>
         /// <param name="exportRequestDto"></param>
         /// <returns></returns>
-        private MemoryStream exportToExcel(List<Dictionary<string, List<dynamic>>> resources, ExportRequestDto exportRequestDto)
+        private MemoryStream exportToExcel(List<Dictionary<string, List<dynamic>>> resources, ExportRequestDto exportRequestDto, List<Graph.Metadata.DataModels.Resources.Resource> resourcesWithLink)
         {
             // Generation depends on exportFormat
             if (exportRequestDto.exportSettings.exportFormat == _readableExcel)
@@ -258,7 +370,7 @@ namespace COLID.RegistrationService.Services.Implementation
             }
             else if (exportRequestDto.exportSettings.exportFormat == _excelTemplate)
             {
-                return this.generateExcelTemplate(resources);
+                return this.generateExcelTemplate(resources, resourcesWithLink);
             }
             else
             {
@@ -296,59 +408,79 @@ namespace COLID.RegistrationService.Services.Implementation
 
             // Add SearchRequest parameters to header
             top_row.Append(new Cell() { CellValue = new CellValue("Search term"), DataType = CellValues.String });
-            bottom_row.Append(new Cell() { CellValue = new CellValue(searchRequestDto.SearchTerm), DataType = CellValues.String });
+            bottom_row.Append(new Cell() { CellValue = new CellValue((searchRequestDto == null ? "Selected resources" : searchRequestDto.SearchTerm)), DataType = CellValues.String });
 
             top_row.Append(new Cell() { CellValue = new CellValue("From"), DataType = CellValues.String });
-            bottom_row.Append(new Cell() { CellValue = new CellValue(searchRequestDto.From), DataType = CellValues.Number });
+            bottom_row.Append(new Cell() { CellValue = new CellValue((searchRequestDto == null ? 0 : searchRequestDto.From)), DataType = CellValues.Number });
 
             top_row.Append(new Cell() { CellValue = new CellValue("Size"), DataType = CellValues.String });
-            bottom_row.Append(new Cell() { CellValue = new CellValue(searchRequestDto.Size), DataType = CellValues.Number });
+            bottom_row.Append(new Cell() { CellValue = new CellValue((searchRequestDto == null ? 0 : searchRequestDto.Size)), DataType = CellValues.Number });
 
-            var aggregation_filters = string.Join(", ",
-                searchRequestDto.AggregationFilters.Select(x =>
-                    string.Format("{0}: [", x.Key)
-                    + string.Join(", ", x.Value)
-                    + "]"));
+            var aggregation_filters = "";
+            if (searchRequestDto != null)
+            {
+                aggregation_filters = string.Join(", ",
+                    searchRequestDto.AggregationFilters.Select(x =>
+                        string.Format("{0}: [", x.Key)
+                        + string.Join(", ", x.Value)
+                        + "]"));
+            }
             top_row.Append(new Cell() { CellValue = new CellValue("Aggregation Filters"), DataType = CellValues.String });
             bottom_row.Append(new Cell() { CellValue = new CellValue(aggregation_filters), DataType = CellValues.String });
 
-            var range_filters = string.Join(", ",
+            var range_filters = "";
+            if (searchRequestDto != null)
+            {
+                range_filters = string.Join(", ",
                 searchRequestDto.RangeFilters.Select(x =>
                     string.Format("{0}: ", x.Key)
                     + "{"
                     + string.Join(", ", x.Value.Select(y =>
                         string.Format("{0}: {1}", y.Key, y.Value)))
                     + "}"));
+            }
             top_row.Append(new Cell() { CellValue = new CellValue("Range Filters"), DataType = CellValues.String });
             bottom_row.Append(new Cell() { CellValue = new CellValue(range_filters), DataType = CellValues.String });
 
             top_row.Append(new Cell() { CellValue = new CellValue("No Auto Correct"), DataType = CellValues.String });
-            bottom_row.Append(new Cell() { CellValue = new CellValue(searchRequestDto.NoAutoCorrect.ToString()), DataType = CellValues.String });
+            bottom_row.Append(new Cell() { CellValue = new CellValue((searchRequestDto == null ? "" :searchRequestDto.NoAutoCorrect.ToString())), DataType = CellValues.String });
 
             top_row.Append(new Cell() { CellValue = new CellValue("Enable Highlighting"), DataType = CellValues.String });
-            bottom_row.Append(new Cell() { CellValue = new CellValue(searchRequestDto.EnableHighlighting.ToString()), DataType = CellValues.String });
+            bottom_row.Append(new Cell() { CellValue = new CellValue((searchRequestDto == null ? "" : searchRequestDto.EnableHighlighting.ToString())), DataType = CellValues.String });
 
             top_row.Append(new Cell() { CellValue = new CellValue("Api call time"), DataType = CellValues.String });
-            bottom_row.Append(new Cell() { CellValue = new CellValue(searchRequestDto.ApiCallTime), DataType = CellValues.String });
+            bottom_row.Append(new Cell() { CellValue = new CellValue((searchRequestDto == null ? "" : searchRequestDto.ApiCallTime)), DataType = CellValues.String });
 
-            string searchIndex = typeof(SearchIndex).GetMember(searchRequestDto.SearchIndex.ToString())[0].GetCustomAttributes(false).OfType<EnumMemberAttribute>().FirstOrDefault()?.Value;
+            string searchIndex = "";
+            if (searchRequestDto != null)
+            {
+                searchIndex = typeof(SearchIndex).GetMember(searchRequestDto.SearchIndex.ToString())[0].GetCustomAttributes(false).OfType<EnumMemberAttribute>().FirstOrDefault()?.Value;
+            }
             top_row.Append(new Cell() { CellValue = new CellValue("Search Index"), DataType = CellValues.String });
             bottom_row.Append(new Cell() { CellValue = new CellValue(searchIndex), DataType = CellValues.String });
 
             top_row.Append(new Cell() { CellValue = new CellValue("Enable Aggregation"), DataType = CellValues.String });
-            bottom_row.Append(new Cell() { CellValue = new CellValue(searchRequestDto.EnableAggregation.ToString()), DataType = CellValues.String });
+            bottom_row.Append(new Cell() { CellValue = new CellValue((searchRequestDto == null ? "" : searchRequestDto.EnableAggregation.ToString())), DataType = CellValues.String });
 
             top_row.Append(new Cell() { CellValue = new CellValue("Enable Suggest"), DataType = CellValues.String });
-            bottom_row.Append(new Cell() { CellValue = new CellValue(searchRequestDto.EnableSuggest.ToString()), DataType = CellValues.String });
+            bottom_row.Append(new Cell() { CellValue = new CellValue((searchRequestDto == null ? "" : searchRequestDto.EnableSuggest.ToString())), DataType = CellValues.String });
 
-            string searchOrder = typeof(SearchOrder).GetMember(searchRequestDto.Order.ToString())[0].GetCustomAttributes(false).OfType<EnumMemberAttribute>().FirstOrDefault()?.Value;
+            string searchOrder = "";
+            if (searchRequestDto != null)
+            {
+                searchOrder = typeof(SearchOrder).GetMember(searchRequestDto.Order.ToString())[0].GetCustomAttributes(false).OfType<EnumMemberAttribute>().FirstOrDefault()?.Value;
+            }
             top_row.Append(new Cell() { CellValue = new CellValue("Search Order"), DataType = CellValues.String });
             bottom_row.Append(new Cell() { CellValue = new CellValue(searchOrder), DataType = CellValues.String });
 
             top_row.Append(new Cell() { CellValue = new CellValue("Order Field"), DataType = CellValues.String });
-            bottom_row.Append(new Cell() { CellValue = new CellValue(searchRequestDto.OrderField), DataType = CellValues.String });
+            bottom_row.Append(new Cell() { CellValue = new CellValue((searchRequestDto == null ? "" : searchRequestDto.OrderField)), DataType = CellValues.String });
 
-            string fieldsToReturn = searchRequestDto.FieldsToReturn == null ? null : string.Join(", ", searchRequestDto.FieldsToReturn);
+            string fieldsToReturn = "";
+            if (searchRequestDto != null)
+            {
+                fieldsToReturn = searchRequestDto.FieldsToReturn == null ? null : string.Join(", ", searchRequestDto.FieldsToReturn);
+            }
             top_row.Append(new Cell() { CellValue = new CellValue("Fields to return"), DataType = CellValues.String });
             bottom_row.Append(new Cell() { CellValue = new CellValue(fieldsToReturn), DataType = CellValues.String });
 
@@ -421,13 +553,13 @@ namespace COLID.RegistrationService.Services.Implementation
             List<string> _resourceTypes = new List<string>();
 
             // Taxonomiesto resolve URI's in data
-            var taxonomies = _taxonomyService.GetAllTaxonomies()
-                .Where(x => x.Properties.ContainsKey(COLID.Graph.Metadata.Constants.RDFS.Label))
-                .Select(x =>
-                (
-                    x.Id,
-                    (string)x.Properties.GetValueOrNull(COLID.Graph.Metadata.Constants.RDFS.Label, true)
-                ));
+            var taxonomies = _taxonomyService.GetTaxonomyLabels();
+                //.Where(x => x.Properties.ContainsKey(COLID.Graph.Metadata.Constants.RDFS.Label))
+                //.Select(x =>
+                //(
+                //    x.Id,
+                //    (string)x.Properties.GetValueOrNull(COLID.Graph.Metadata.Constants.RDFS.Label, true)
+                //));
 
             Func<string, bool> validateUriFormat = (uri) => uri.StartsWith("http");
 
@@ -472,7 +604,7 @@ namespace COLID.RegistrationService.Services.Implementation
                  .Select(values =>
                     (
                         values,
-                        string.Join(",", values.Split(",").Select(value => taxonomies.FirstOrDefault(taxonomy => taxonomy.Id.Equals(value)).Item2 ?? value))
+                        string.Join(",", values.Split(",").Select(value => taxonomies.FirstOrDefault(taxonomy => taxonomy.Id.Equals(value)) == null? value : taxonomies.FirstOrDefault(taxonomy => taxonomy.Id.Equals(value)).Label))
                     )));
 
             _labelList.AddRange(
@@ -482,7 +614,7 @@ namespace COLID.RegistrationService.Services.Implementation
                 .Select(key =>
                 (
                         key,
-                        taxonomies.FirstOrDefault(taxonomy => taxonomy.Id.Equals(key)).Item2 ?? key
+                        taxonomies.FirstOrDefault(taxonomy => taxonomy.Id.Equals(key)) == null? key : taxonomies.FirstOrDefault(taxonomy => taxonomy.Id.Equals(key)).Label
                 )));
 
             return _labelList;
@@ -735,7 +867,7 @@ namespace COLID.RegistrationService.Services.Implementation
         /// </summary>
         /// <param name="resources"></param>
         /// <returns></returns>
-        public MemoryStream generateExcelTemplate(List<Dictionary<string, List<dynamic>>> resources)
+        private MemoryStream generateExcelTemplate(List<Dictionary<string, List<dynamic>>> resources, List<Graph.Metadata.DataModels.Resources.Resource> resourcelinks = null)
         {
             //Prepare to load the excel template from file
             var currentFolder = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
@@ -743,42 +875,237 @@ namespace COLID.RegistrationService.Services.Implementation
 
             if (!File.Exists(excelFilePath))
             {
-                _logger.LogError("Excel template could not be loaded" + excelFilePath);
+                _logger.LogError("ExcelExport: Template could not be loaded" + excelFilePath);
                 return new MemoryStream();
+            }
+            
+            //Get list of Properties
+            var allProperties = new List<MetadataProperty>();
+            Dictionary<string, List<MetadataProperty>> typeListWithProperties = new Dictionary<string, List<MetadataProperty>>();
+            
+            var resourceTypes = _metaDataService.GetInstantiableEntity(Resource.Type.FirstResouceType);
+            var distributionEndpointTypes = _metaDataService.GetDistributionEndpointTypes();
+
+            foreach (var resType in resourceTypes)
+            {
+                var resMetadataProp = _metaDataService.GetMetadataForEntityType(resType.Id);
+                typeListWithProperties.Add(resType.Id, resMetadataProp.ToList());
+                
+                foreach (var prop in resMetadataProp)
+                {
+                    if (prop.Properties.ContainsKey(Shacl.Order) && prop.Properties[Shacl.Order] != null)
+                    {
+                        if (allProperties.Find(x => x.Key == prop.Properties[Shacl.Path]) == null)
+                        {
+                            allProperties.Add(prop);
+                        }
+                    }
+                }
+            }
+            
+            //Filter out Properties used for Links and NonLinks
+            var propertiesWithoutLinks = new List<MetadataProperty>();
+            var propertiesForLinks = new List<MetadataProperty>();
+            
+            foreach (var prop in allProperties)
+            {               
+                if (prop.Properties.ContainsKey(Shacl.Group))
+                {                                        
+                    MetadataPropertyGroup propGrp = prop.GetMetadataPropertyGroup();                    
+                    if (propGrp.Key == Resource.Groups.LinkTypes)
+                    {
+                        propertiesForLinks.Add(prop);
+                    }
+                    else
+                    {
+                        propertiesWithoutLinks.Add(prop);
+                    }
+                }
+                else
+                {
+                    propertiesWithoutLinks.Add(prop);
+                }
             }
 
             // Stream that will be returned
             MemoryStream memoryStream = new MemoryStream();
-
             using (SpreadsheetDocument doc = (SpreadsheetDocument)SpreadsheetDocument.Open(excelFilePath, true).Clone(memoryStream))
             {
                 //extract the important inner parts of the worksheet
                 WorkbookPart workbookPart = doc.WorkbookPart;
                 Sheets sheets = workbookPart.Workbook.GetFirstChild<Sheets>();
                 Sheet dataSheet = sheets.Elements<Sheet>().Where(s => s.Name == "Data").FirstOrDefault(); //Get data sheet
+                Sheet linkDataSheet = sheets.Elements<Sheet>().Where(s => s.Name == "Links").FirstOrDefault();
+                Sheet linkTypesDataSheet = sheets.Elements<Sheet>().Where(s => s.Name == "LinkTypes").FirstOrDefault();
+                Sheet resTypesDataSheet = sheets.Elements<Sheet>().Where(s => s.Name == "ResourceTypes").FirstOrDefault();
+                Sheet resTypePropertiesDataSheet = sheets.Elements<Sheet>().Where(s => s.Name == "ResourceTypeWithProperties").FirstOrDefault();
+                Sheet distributionEndpointTypesDataSheet = sheets.Elements<Sheet>().Where(s => s.Name == "DistributionEndpointTypes").FirstOrDefault();
+                Sheet techinicalInfoDataSheet = sheets.Elements<Sheet>().Where(s => s.Name == "TechnicalInfo").FirstOrDefault(); 
 
-                //Get worksheet of "Data" sheet
+                //Get worksheet of "Data" 
                 Worksheet worksheet = ((WorksheetPart)workbookPart.GetPartById(dataSheet.Id)).Worksheet;
                 SheetData rowContainer = (SheetData)worksheet.GetFirstChild<SheetData>();
 
+                //Get worksheet of "Link" 
+                Worksheet linkWorksheet = ((WorksheetPart)workbookPart.GetPartById(linkDataSheet.Id)).Worksheet;
+                SheetData linkRowContainer = (SheetData)linkWorksheet.GetFirstChild<SheetData>();
+
+                //Get worksheet of "LinkTypes" 
+                Worksheet linkTypesWorksheet = ((WorksheetPart)workbookPart.GetPartById(linkTypesDataSheet.Id)).Worksheet;
+                SheetData linkTypesRowContainer = (SheetData)linkTypesWorksheet.GetFirstChild<SheetData>();
+
+                //Get worksheet of "ResourceTypes" 
+                Worksheet resTypesWorksheet = ((WorksheetPart)workbookPart.GetPartById(resTypesDataSheet.Id)).Worksheet;
+                SheetData resTypesRowContainer = (SheetData)resTypesWorksheet.GetFirstChild<SheetData>();
+
+                //Get worksheet of "ResourceTypeProperties" 
+                Worksheet resTypePropertiesWorksheet = ((WorksheetPart)workbookPart.GetPartById(resTypePropertiesDataSheet.Id)).Worksheet;
+                SheetData resTypePropertiesRowContainer = (SheetData)resTypePropertiesWorksheet.GetFirstChild<SheetData>();
+
+                //Get worksheet of "DistributionEndpointTypes" 
+                Worksheet distributionEndpointTypesWorksheet = ((WorksheetPart)workbookPart.GetPartById(distributionEndpointTypesDataSheet.Id)).Worksheet;
+                SheetData distributionEndpointTypesRowContainer = (SheetData)distributionEndpointTypesWorksheet.GetFirstChild<SheetData>();
+
+                //Get worksheet of "TechnicalInfo" 
+                Worksheet technicalInfoWorksheet = ((WorksheetPart)workbookPart.GetPartById(techinicalInfoDataSheet.Id)).Worksheet;
+                SheetData technicalInfoRowContainer = (SheetData)technicalInfoWorksheet.GetFirstChild<SheetData>();
+                //Update donloaded by user
+                Row docDownloaddByUser = technicalInfoRowContainer.Elements<Row>().ElementAt(0);
+                Cell docDownloadByUserCell = docDownloaddByUser.Elements<Cell>().Where(c => string.Compare
+               (c.CellReference.Value, "B" + docDownloaddByUser.RowIndex.Value, true) == 0).First();
+
+                docDownloadByUserCell.CellValue = new CellValue(_userInfoService.GetEmail());
+                docDownloadByUserCell.DataType = CellValues.String;
+                //Update Download date
+                Row docDownloaddDate = technicalInfoRowContainer.Elements<Row>().ElementAt(1);
+                Cell docDownloadDateCell = docDownloaddDate.Elements<Cell>().Where(c => string.Compare
+               (c.CellReference.Value, "B" + docDownloaddDate.RowIndex.Value, true) == 0).First();
+
+                docDownloadDateCell.CellValue = new CellValue(DateTime.UtcNow.ToString());
+                docDownloadDateCell.DataType = CellValues.String;
+
+                //Populate Resource Types
+                var resTypesStartingIndex = 1;
+                foreach (var resTyp in resourceTypes)
+                {
+                    Row resTypeRow = new Row();
+                    //Add LinkType information columns                        
+                    resTypeRow.Append(new Cell { DataType = CellValues.String, CellValue = new CellValue(resTyp.Label) });
+                    resTypeRow.Append(new Cell { DataType = CellValues.String, CellValue = new CellValue(resTyp.Id) });
+
+                    resTypesRowContainer.InsertAt<Row>(resTypeRow, resTypesStartingIndex);
+                    resTypesStartingIndex++;
+                }
+
+                //Populate Resource Type Properties
+                var resTypePropertiesStartingIndex = 1;
+                foreach (var resTyp in typeListWithProperties)
+                {
+                    foreach (var prop in resTyp.Value)
+                    {
+                        Row resTypePropertiesRow = new Row();
+                        //Add columns
+                        resTypePropertiesRow.Append(new Cell { DataType = CellValues.String, CellValue = new CellValue(resTyp.Key) });
+                        resTypePropertiesRow.Append(new Cell { DataType = CellValues.String, CellValue = new CellValue(prop.Properties[Shacl.Path]) });
+                        resTypePropertiesRow.Append(new Cell { DataType = CellValues.String, CellValue = new CellValue(prop.Properties[Shacl.Name]) });
+                       
+                        int chkMaxCount = 0;
+                        int chkMinCount = 0;                        
+                        if (prop.Properties.ContainsKey(Shacl.MinCount))
+                            chkMinCount = int.Parse(prop.Properties[Shacl.MinCount]);
+                        if (prop.Properties.ContainsKey(Shacl.MaxCount))
+                            chkMaxCount = int.Parse(prop.Properties[Shacl.MaxCount]);
+                        
+                        resTypePropertiesRow.Append(new Cell { DataType = CellValues.String, CellValue = new CellValue(chkMaxCount > 1 ? bool.TrueString : bool.FalseString) });
+                        resTypePropertiesRow.Append(new Cell { DataType = CellValues.String, CellValue = new CellValue(chkMinCount >= 1 ? bool.TrueString : bool.FalseString) });
+
+                        resTypePropertiesRowContainer.InsertAt<Row>(resTypePropertiesRow, resTypePropertiesStartingIndex);
+                        resTypePropertiesStartingIndex++;
+                    }
+                }                
+
+                //Populate LinkTypes
+                var linkTypesStartingIndex = 1;
+                foreach (var linkType in propertiesForLinks)
+                {
+                    Row linkTypeRow = new Row();
+                    //Add LinkType information columns                        
+                    linkTypeRow.Append(new Cell { DataType = CellValues.String, CellValue = new CellValue(linkType.Properties[Shacl.Name]) });
+                    linkTypeRow.Append(new Cell { DataType = CellValues.String, CellValue = new CellValue(linkType.Key) });
+
+                    linkTypesRowContainer.InsertAt<Row>(linkTypeRow, linkTypesStartingIndex);
+                    linkTypesStartingIndex++;
+                }
+
+                //Populate distribution Endpoint Types
+                var distEndPointTypesStartingIndex = 1;
+                foreach (var distType in distributionEndpointTypes)
+                {
+                    Row distTypeRow = new Row();
+                    //Add LinkType information columns                        
+                    distTypeRow.Append(new Cell { DataType = CellValues.String, CellValue = new CellValue(distType.Value) });
+                    distTypeRow.Append(new Cell { DataType = CellValues.String, CellValue = new CellValue(distType.Key) });
+
+                    distributionEndpointTypesRowContainer.InsertAt<Row>(distTypeRow, distEndPointTypesStartingIndex);
+                    distEndPointTypesStartingIndex++;
+                }
+                
                 //get the third row of the template (which should include the PID URIs)
                 //and transform them into a list for later usage
                 Row pidUriRow = rowContainer.Elements<Row>().ElementAt(3);
+                Row pidUriTypeRow = rowContainer.Elements<Row>().ElementAt(2);
                 Row uriHeaderRow = rowContainer.Elements<Row>().ElementAt(1);
 
                 List<string> pidUris = this.getRowValues(pidUriRow, doc);
+                List<string> pidUriTypes = this.getRowValues(pidUriTypeRow, doc);
                 List<string> uriHeader = this.getRowValues(uriHeaderRow, doc);
                 uriHeader.RemoveRange(0, Math.Min(3, uriHeader.Count)); //remove first three items in this list, because they have no PID URI. This way, the indizes from the two lists here match
 
+                //Check Whether all Metadata Properties are there in the Excel Template if not Add
+                foreach(var prop in propertiesWithoutLinks)
+                {
+                    if (pidUris.Contains(prop.Key) == false)
+                    {
+                        //Add Header Label
+                        uriHeader.Add(prop.Properties[Shacl.Name]);
+                        Cell labelCell = new Cell() { DataType = CellValues.String };
+                        labelCell.CellValue = new CellValue(prop.Properties[Shacl.Name]);
+                        uriHeaderRow.Append(labelCell);
+                        
+                        //Add Header Key
+                        pidUris.Add(prop.Properties[Shacl.Path]);
+                        Cell valueCell = new Cell() { DataType = CellValues.String };
+                        valueCell.CellValue = new CellValue(prop.Properties[Shacl.Path]);
+                        pidUriRow.Append(valueCell);
+
+                        //Add field Type
+                        string fieldType = "";
+                        int maxCount = 0;
+                        if (prop.Properties.ContainsKey(COLID.Graph.Metadata.Constants.RDF.Type))
+                        {
+                            fieldType = prop.Properties[COLID.Graph.Metadata.Constants.RDF.Type];
+                            fieldType = fieldType.Split("#")[1];
+                        }
+                            
+                        if (prop.Properties.ContainsKey(Shacl.MaxCount))
+                            maxCount = int.Parse(prop.Properties[Shacl.MaxCount]);
+
+                        pidUriTypes.Add(maxCount > 1 ? "comma separated " + fieldType : fieldType);
+                        pidUriTypeRow.Append(new Cell { DataType = CellValues.String, CellValue = new CellValue(maxCount > 1 ? "comma separated " + fieldType : fieldType) });
+                    }
+                       
+                }
+                
                 //Loop through the resources and create rows
                 List<Row> rows = new List<Row>();
-
+                List<Row> linkRows = new List<Row>();
                 List<string> displayedColumns = new List<string>();
 
                 int _index = 1; //row index
 
                 foreach (var resource in resources)
                 {
+                    // Convert Distribution Endpoint piduris to indices
                     if (resource.TryGetValue(Graph.Metadata.Constants.Resource.Distribution, out List<dynamic> distributionEndpoints))
                     {
                         int dEIndex = _index + 1;
@@ -793,6 +1120,21 @@ namespace COLID.RegistrationService.Services.Implementation
                         resource.Add(Graph.Metadata.Constants.Resource.Distribution, distributionEndpointsIndices);
                     }
 
+                    // Convert MainDistribution Endpoint piduris to indices
+                    if (resource.TryGetValue(Graph.Metadata.Constants.Resource.MainDistribution, out List<dynamic> mainDistributionEndpoints))
+                    {
+                        int mdEIndex = _index + 1 + (distributionEndpoints == null? 0: distributionEndpoints.Count);
+                        var mainDistributionEndpointsIndices = new List<dynamic>();
+                        foreach (var item in mainDistributionEndpoints)
+                        {
+                            mainDistributionEndpointsIndices.Add(mdEIndex++.ToString());
+                        }
+
+                        //replace main distribution endpoints (json string) with distribution endpoint ids for human readability
+                        resource.Remove(Graph.Metadata.Constants.Resource.MainDistribution);
+                        resource.Add(Graph.Metadata.Constants.Resource.MainDistribution, mainDistributionEndpointsIndices);
+                    }
+
                     // add resouce details in a excel row
                     rows.Add(generateRow(_index, resource, pidUris, uriHeader, displayedColumns));
                     _index++;
@@ -803,11 +1145,47 @@ namespace COLID.RegistrationService.Services.Implementation
                         foreach (var item in distributionEndpoints)
                         {
                             var distributionEndpointProperties = ((COLID.Graph.TripleStore.DataModels.Base.Entity)item).Properties;
+                            distributionEndpointProperties.Add("Id", new List<dynamic> { ((COLID.Graph.TripleStore.DataModels.Base.Entity)item).Id });
                             //Type "DE" is explicitely defined for distribution endpoint, for resource its default "RE" provided
                             rows.Add(generateRow(_index, distributionEndpointProperties, pidUris, uriHeader, displayedColumns, "DE"));
                             _index++;
                         }
                     }
+                    ////find out whether resource contains main distribution endpoint and add them in a seperate row of excel
+                    if (mainDistributionEndpoints != null)
+                    {
+                        foreach (var item in mainDistributionEndpoints)
+                        {
+                            var mainDistributionEndpointProperties = ((COLID.Graph.TripleStore.DataModels.Base.Entity)item).Properties;
+                            mainDistributionEndpointProperties.Add("Id", new List<dynamic> { ((COLID.Graph.TripleStore.DataModels.Base.Entity)item).Id });
+                            //Type "DE" is explicitely defined for distribution endpoint, for resource its default "RE" provided
+                            rows.Add(generateRow(_index, mainDistributionEndpointProperties, pidUris, uriHeader, displayedColumns, "DE"));
+                            _index++;
+                        }
+                    }
+
+                    //Populate Links
+                    if (resourcelinks != null)
+                    {                        
+                        var curReslink = resourcelinks.Where(s => s.Id == resource.GetValueOrNull("Id", true)).FirstOrDefault();
+                        if (curReslink != null && curReslink.Links.Count > 0)
+                        {
+                            foreach (var link in curReslink.Links)
+                            {
+                                foreach(var linkItem in link.Value)
+                                {
+                                    if (linkItem.LinkType == Common.DataModel.Resources.LinkType.inbound)
+                                    {
+                                        linkRows.Add(generateLinkRow(linkItem.PidUri, resource.GetValueOrNull(Graph.Metadata.Constants.Resource.hasPID, true).Id, link.Key));
+                                    }
+                                    else
+                                    {
+                                        linkRows.Add(generateLinkRow(resource.GetValueOrNull(Graph.Metadata.Constants.Resource.hasPID, true).Id, linkItem.PidUri, link.Key));                                        
+                                    }
+                                }
+                            }
+                        }
+                    }                    
                 }
 
                 //insert rows into sheet data
@@ -818,6 +1196,14 @@ namespace COLID.RegistrationService.Services.Implementation
                     startingIndex++;
                 });
 
+                //insert rows into sheet link
+                var linkStartingIndex = 2;
+                linkRows.ForEach(r =>
+                {
+                    linkRowContainer.InsertAt<Row>(r, linkStartingIndex);
+                    linkStartingIndex++;
+                });
+                
                 //remove empty columns from sheet
                 //List<string> empty_columns = uriHeader.Except(displayedColumns).ToList();
                 //foreach (var empty_column in empty_columns)
@@ -854,8 +1240,7 @@ namespace COLID.RegistrationService.Services.Implementation
                 }
                 else
                 {
-                    pidUris.Add(cell.CellValue.Text);
-
+                    pidUris.Add(cell.CellValue == null? cell.InnerText : cell.CellValue.Text);
                 }
             }
             return pidUris;
@@ -868,32 +1253,36 @@ namespace COLID.RegistrationService.Services.Implementation
             var resource = pResource;
 
             Row currentResource = new Row();
-            Cell resourceType = new Cell()
-            {
-                DataType = CellValues.String,
-                CellValue = new CellValue(type)
-            };
-            Cell resourceId = new Cell()
-            {
-                DataType = CellValues.Number,
-                CellValue = new CellValue(index)
-            };
-            Cell resourceStatus = new Cell()
-            {
-                DataType = CellValues.String,
-                CellValue = new CellValue("published")
-            };
+            //Add First 5 blank Columns 1st col for Action Response 2nd,3rd 4th, 5th for marking Action with "x" (Create/Update/Delete/Type Change)
+            currentResource.Append(new Cell { DataType = CellValues.String, CellValue = new CellValue("") });
+            currentResource.Append(new Cell { DataType = CellValues.String, CellValue = new CellValue("") });
+            currentResource.Append(new Cell { DataType = CellValues.String, CellValue = new CellValue("") });
+            currentResource.Append(new Cell { DataType = CellValues.String, CellValue = new CellValue("") });
+            currentResource.Append(new Cell { DataType = CellValues.String, CellValue = new CellValue("") });
 
-            currentResource.Append(resourceType);
-            currentResource.Append(resourceId);
-            currentResource.Append(resourceStatus);
+            //Add Type, Index, Published Draft and Internal ID columns
+            currentResource.Append(new Cell { DataType = CellValues.String, CellValue = new CellValue("published") });
+            currentResource.Append(new Cell { DataType = CellValues.String, CellValue = new CellValue(type) });
+            currentResource.Append(new Cell { DataType = CellValues.Number, CellValue = new CellValue(index) });
+            
+            //if (resource.TryGetValue("Id", out List<dynamic> idValue))
+            //{
+            //    currentResource.Append(new Cell { DataType = CellValues.String, CellValue = new CellValue(idValue[0]) });
+            //}
+            
+            //else
+            //{
+            //    currentResource.Append(new Cell { DataType = CellValues.String, CellValue = new CellValue("") });
+            //}
+            
 
             for (int i = 0; i < templateProperties.Count; i++)
             {
                 var templateProperty = templateProperties[i];
-                var templatePropertyLabel = templatePropertyLabels[i];
+                var templatePropertyLabel = templatePropertyLabels[i + 5];
 
                 Cell valueCell = new Cell() { DataType = CellValues.String };
+                
                 string cellValue = "";
                 string actualProperty = templateProperty;
                 if (templateProperty == Identifier.HasUriTemplate)
@@ -907,9 +1296,15 @@ namespace COLID.RegistrationService.Services.Implementation
                         //The URI is a pid uri, now we need to extract it
                         cellValue = ((COLID.Graph.TripleStore.DataModels.Base.Entity)propertyValue[0]).Id;
                     }
+                    else if (templateProperty == Graph.Metadata.Constants.Resource.BaseUri)
+                    {
+                        //The URI is a base uri, now we need to extract it
+                        cellValue = ((COLID.Graph.TripleStore.DataModels.Base.Entity)propertyValue[0]).Id;
+                    }
                     else if (templateProperty == Identifier.HasUriTemplate)
                     {
-                        //it is an uri template, now we have to check if it is from BaseUri or PidUri
+                        
+                        ////it is an uri template, now we have to check if it is from BaseUri or PidUri
                         switch (templatePropertyLabel.ToLower())
                         {
                             case "pid uri template":
@@ -919,7 +1314,18 @@ namespace COLID.RegistrationService.Services.Implementation
                                     var properties = ((COLID.Graph.TripleStore.DataModels.Base.Entity)pidUriValue[0]).Properties;
                                     if (properties.TryGetValue(Identifier.HasUriTemplate, out List<dynamic> hasUriTemplate))
                                     {
-                                        cellValue = string.Join(", ", hasUriTemplate);
+                                        cellValue = hasUriTemplate[0];
+                                    }
+                                }
+                                break;
+                            case "base uri template":
+                                //now fetch the pid uri from the hasPid properties
+                                if (resource.TryGetValue(Graph.Metadata.Constants.Resource.BaseUri, out List<dynamic> baseUriValue))
+                                {
+                                    var properties = ((COLID.Graph.TripleStore.DataModels.Base.Entity)baseUriValue[0]).Properties;
+                                    if (properties.TryGetValue(Identifier.HasUriTemplate, out List<dynamic> hasUriTemplate))
+                                    {
+                                        cellValue = hasUriTemplate[0];
                                     }
                                 }
                                 break;
@@ -955,6 +1361,22 @@ namespace COLID.RegistrationService.Services.Implementation
 
             return currentResource;
         }
+        private Row generateLinkRow (string sourcePidUri, string targetPidUri, string linkType)
+        {
+            Row linkRow = new Row();
+            //Add First 3 blank Columns for technical response & marking Action with "x" (Create/Delete)
+            linkRow.Append(new Cell { DataType = CellValues.String, CellValue = new CellValue("") });
+            linkRow.Append(new Cell { DataType = CellValues.String, CellValue = new CellValue("") });
+            linkRow.Append(new Cell { DataType = CellValues.String, CellValue = new CellValue("") });            
+
+            //Add Link information columns            
+            linkRow.Append(new Cell { DataType = CellValues.String, CellValue = new CellValue(sourcePidUri) });
+            linkRow.Append(new Cell { DataType = CellValues.String, CellValue = new CellValue(targetPidUri) });
+            linkRow.Append(new Cell { DataType = CellValues.String, CellValue = new CellValue(linkType) });
+
+            return linkRow;
+        }
+
         public List<dynamic> CheckJson(List<dynamic> props)
         {
             List<dynamic> output = new List<dynamic>();
@@ -1003,6 +1425,7 @@ namespace COLID.RegistrationService.Services.Implementation
                 }
             }
         }
+        
         /// <summary>
         /// Upload a given stream as a file to the S3-Server
         /// </summary>
@@ -1064,7 +1487,7 @@ namespace COLID.RegistrationService.Services.Implementation
             }
             catch (HttpRequestException ex)
             {
-                _logger.LogError("An error occurred while passing the notification to the AppData service.", ex);
+                _logger.LogError("ExcelExport: An error occurred while passing the notification to the AppData service.", ex.Message);
                 throw ex;
             }
         }
@@ -1121,6 +1544,8 @@ namespace COLID.RegistrationService.Services.Implementation
             }
             return _formattedDate;
         }
+
+
     }
 
 }

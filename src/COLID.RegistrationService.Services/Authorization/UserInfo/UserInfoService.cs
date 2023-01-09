@@ -20,7 +20,7 @@ namespace COLID.RegistrationService.Services.Authorization.UserInfo
             if (httpContextAccessor == null || httpContextAccessor.HttpContext == null)
             {
                 _roles = new List<string> { AuthorizationRoles.SuperAdmin };
-                _email = "colid@bayer.com";
+                _email = Users.BackgroundProcessUser;
             }
             else
             {

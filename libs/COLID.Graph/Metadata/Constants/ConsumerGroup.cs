@@ -9,6 +9,7 @@
         public const string HasDefaultPidUriTemplate = "https://pid.bayer.com/kos/19050/hasDefaultPidUriTemplate";
         public const string HasLifecycleStatus = "https://pid.bayer.com/kos/19050/hasConsumerGroupLifecycleStatus";
         public const string HasContactPerson = "https://pid.bayer.com/kos/19050/hasConsumerGroupContactPerson";
+        public const string DefaultDeprecationTime = "https://pid.bayer.com/kos/19050/hasDefaultDeprecationTime";
 
         public static class LifecycleStatus
         {

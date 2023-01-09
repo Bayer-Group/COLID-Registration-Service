@@ -29,6 +29,6 @@ namespace COLID.RegistrationService.Services.Interface
         ///3. the facade with all transformed data.
         ///
         /// </returns>
-        Task<Tuple<ValidationResult, bool, EntityValidationFacade>> ValidateAndPreProcessResource(string resourceId, ResourceRequestDTO resourceRequestDTO, ResourcesCTO resourcesCTO, ResourceCrudAction resourceCrudAction, bool nestedValidation = false, string consumerGroup = null, bool changeResourceType = false);
+        Task<Tuple<ValidationResult, bool, EntityValidationFacade>> ValidateAndPreProcessResource(string resourceId, ResourceRequestDTO resourceRequestDTO, ResourcesCTO resourcesCTO, ResourceCrudAction resourceCrudAction, bool nestedValidation = false, string consumerGroup = null, bool changeResourceType = false, bool ignoreInvalidProperties = false);
     }
 }

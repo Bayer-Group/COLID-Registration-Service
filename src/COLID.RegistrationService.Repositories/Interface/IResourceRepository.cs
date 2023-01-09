@@ -134,6 +134,14 @@ namespace COLID.RegistrationService.Repositories.Interface
         void GetLinksOfPublishedResources(List<Resource> resources, IList<Uri> pidUris, Uri namedGraph, ISet<string> LinkTypeList);
 
         /// <summary> 
+        /// Retrieves all resources of a specified consumer group from today to the specified end date for review 
+        /// </summary> 
+        /// <param name="consumerGroup"></param> 
+        /// <param name="endDate"></param> 
+        /// <returns>Retrieves all resources of a specified consumer group from today to the specified end date for review</returns> 
+        IList<Resource> GetDueResources(Uri consumerGroup, DateTime endDate, Uri namedGraph, IList<string> resourceTypes);
+
+        /// <summary> 
         /// Gets the Active Directory (AD) role for the distribution endpoint pid uri. 
         /// An endpoint belongs to a resource. Each resource has a consumer group referenced, which is allowed to edit this resource. 
         /// Each consumer group has one AD role attached. 
@@ -263,6 +271,8 @@ namespace COLID.RegistrationService.Repositories.Interface
         /// <param name="linkHistoryGraph">Named of the link history graph</param>
 
         Uri GetLinkHistoryRecord(Uri linkStart, Uri linkType, Uri linkEnd, Uri linkHistoryGraph, Uri resourceGraph);
+        List<LinkHistoryCreateDto> GetLinkHistoryRecords(Uri linkHistoryGraph);
+
 
         /// <summary> 
         /// Validate the existence of a resource by a given pidUri. 

@@ -11,6 +11,7 @@ namespace COLID.Cache.Services
         bool Set<T>(string key, T value);
         bool Set<T>(string key, T value, TimeSpan expirationTime);
         bool Exists(string key);
+        bool Exists<T>(string key, Func<T> function);
         void Clear();
 
         #region GetOrAdd
@@ -38,5 +39,27 @@ namespace COLID.Cache.Services
         void Delete(object o, Action method);
         #endregion
 
+        #region BuildCacheKey
+
+        /// <summary>
+        /// Create the correct name for a cache key, based on the ApplicationName and EnvironmentName variables.
+        /// </summary>
+        /// <param name="suffix">the key suffix, appended to prefix</param>
+        string BuildCacheEntryKey(string suffix);
+
+        /// <summary>
+        /// Create the correct name for a cache key, based on the ApplicationName and EnvironmentName variables.
+        /// </summary>
+        /// <param name="suffix">the key suffix, appended to prefix</param>
+        /// <param name="method">the method for which the key is generated</param>
+        string BuildCacheEntryKey(string suffix, Action method);
+
+        /// <summary>
+        /// Create the correct name for a cache key, based on the ApplicationName and EnvironmentName variables.
+        /// </summary>
+        /// <param name="suffix">the key suffix, appended to prefix</param>
+        /// <param name="function">the function for which the key is generated</param>
+        string BuildCacheEntryKey<T>(string suffix, Func<T> function);
+        #endregion
     }
 }

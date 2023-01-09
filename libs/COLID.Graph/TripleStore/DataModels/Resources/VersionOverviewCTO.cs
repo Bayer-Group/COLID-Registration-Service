@@ -8,5 +8,6 @@
         public string BaseUri { get; set; }
         public string LifecycleStatus { get; set; }
         public string PublishedVersion { get; set; }
+        public string LaterVersion { get; set; }
     }
 }

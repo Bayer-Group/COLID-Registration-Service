@@ -26,6 +26,6 @@ namespace COLID.RegistrationService.Services.Interface
         /// Get all taxonomies to resolve labels in excel export
         /// </summary>
         /// <returns></returns>
-        IList<Taxonomy> GetAllTaxonomies();
+        IList<TaxonomyLabel> GetTaxonomyLabels();
     }
 }

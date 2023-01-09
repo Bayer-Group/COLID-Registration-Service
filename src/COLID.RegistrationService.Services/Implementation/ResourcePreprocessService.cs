@@ -18,6 +18,7 @@ using Microsoft.Extensions.Logging;
 using COLID.Graph.Metadata.DataModels.Resources;
 using COLID.Graph.TripleStore.DataModels.Resources;
 
+
 namespace COLID.RegistrationService.Services.Implementation
 {
     internal class ResourcePreprocessService : IResourcePreprocessService
@@ -52,13 +53,25 @@ namespace COLID.RegistrationService.Services.Implementation
         }
 
         public async Task<Tuple<ValidationResult, bool, EntityValidationFacade>> ValidateAndPreProcessResource(string resourceId, ResourceRequestDTO resourceRequestDTO, 
-            ResourcesCTO resourcesCTO, ResourceCrudAction resourceCrudAction, bool nestedValidation = false, string consumerGroup = null, bool changeResourceType = false)
+            ResourcesCTO resourcesCTO, ResourceCrudAction resourceCrudAction, bool nestedValidation = false, string consumerGroup = null, bool changeResourceType = false, bool ignoreInvalidProperties = false)
         {
             var requestResource = _mapper.Map<Resource>(resourceRequestDTO);
             requestResource.Id = string.IsNullOrWhiteSpace(resourceId) ? CreateNewResourceId() : resourceId;
 
             string entityType = requestResource.Properties.GetValueOrNull(Graph.Metadata.Constants.RDF.Type, true).ToString();
             var metadata = _metadataService.GetMetadataForEntityType(entityType);
+            
+            //Remove invalid properties as per the resource Type 
+            if (ignoreInvalidProperties)
+            {
+                List<string> metadataKeyList = metadata.Select(s => s.Key).ToList();
+                List<string> resourcekeys = requestResource.Properties.Keys.ToList();
+                foreach (string key in resourcekeys)
+                {
+                    if (!metadataKeyList.Contains(key))
+                        requestResource.Properties.Remove(key);
+                }
+            }
 
             // If it is a nested validation (example distribution endpoint), the consumer group of the parent must be included in the process.
             var actualConsumerGroup = nestedValidation ? consumerGroup : requestResource.Properties.GetValueOrNull(Graph.Metadata.Constants.Resource.HasConsumerGroup, true);
@@ -98,9 +111,48 @@ namespace COLID.RegistrationService.Services.Implementation
                     continue;
                 _entityPropertyValidator.Validate(key, validationFacade);
 
-                await ValidateEndpoint(property, validationFacade);
+                await ValidateEndpoint(property, validationFacade, ignoreInvalidProperties);
             }
 
+            //Remove NonMandatory properties if they have validtion error 
+            List<string> ignorePoroperties = new List<string> { Graph.Metadata.Constants.Resource.hasPID };
+            if (ignoreInvalidProperties)
+            {                
+                var validationresults = validationFacade.ValidationResults.ToList();
+                foreach (var errResult in validationresults)
+                {
+                    if (ignorePoroperties.Contains(errResult.Path))
+                        continue;
+
+                    if (!_validationService.CheckPropertyIsMandatory(errResult.Path, metadata))
+                    {                        
+                        if (requestResource.Properties.TryGetValue(errResult.Path, out var curProperty))
+                        {
+                            if (curProperty.Count > 1)
+                            {
+                                //Remove From RequestResource
+                                int curIndex = curProperty.IndexOf(errResult.ResultValue.Split("^^")[0]);
+                                if (curIndex > -1)
+                                {
+                                    curProperty.RemoveAt(curIndex);
+
+                                    //Remove from Validation error
+                                    validationFacade.ValidationResults.Remove(errResult);
+                                }
+                            }
+                            else
+                            {
+                                //Remove From RequestResource
+                                requestResource.Properties.Remove(errResult.Path);
+
+                                //Remove from Validation error
+                                validationFacade.ValidationResults.Remove(errResult);
+                            }
+                        }
+                    }
+                }
+            }
+            
             // The following processes may only be executed for the main entry, so that the function already ends here with nested validations.
             if (nestedValidation)
             {
@@ -110,13 +162,13 @@ namespace COLID.RegistrationService.Services.Implementation
                 return new Tuple<ValidationResult, bool, EntityValidationFacade>(nestedValidationResult, failedValidation, validationFacade);
             }
 
-            var validationResult = await _validationService.ValidateEntity(requestResource, metadata).ConfigureAwait(true);
+            var validationResult = await _validationService.ValidateEntity(requestResource, metadata, ignoreInvalidProperties).ConfigureAwait(true);
             validationResult.Results = validationResult.Results.Select(r =>
             {
                 r.ResultSeverity = IsWarningSeverity(r, resourceCrudAction) ? ValidationResultSeverity.Warning : r.ResultSeverity;
 
                 return r;
-            }).ToList();
+            }).ToList();            
 
             string validationResourceId = validationFacade.ResourceCrudAction == ResourceCrudAction.Create ? null : resourcesCTO.GetDraftOrPublishedVersion().Id;
             var duplicateResults = _identifierValidationService.CheckDuplicates(requestResource, validationResourceId, resourceRequestDTO.HasPreviousVersion);
@@ -196,7 +248,7 @@ namespace COLID.RegistrationService.Services.Implementation
         /// <param name="property"></param>
         /// <param name="validationFacade"></param>
         /// <returns></returns>
-        private async Task ValidateEndpoint(KeyValuePair<string, List<dynamic>> property, EntityValidationFacade validationFacade)
+        private async Task ValidateEndpoint(KeyValuePair<string, List<dynamic>> property, EntityValidationFacade validationFacade, bool ignoreInvalidProperties)
         {
             var key = property.Key;
 
@@ -241,7 +293,7 @@ namespace COLID.RegistrationService.Services.Implementation
                     var entityId = GetNestedEntityId(key, parsedValue, validationFacade.ResourcesCTO);
 
                     // The consumer group of the parent must be included in the process.
-                    Tuple<ValidationResult, bool, EntityValidationFacade> subResult = await ValidateAndPreProcessResource(entityId, entityRequest, entitiesCTO, subEntityCrudAction, true, validationFacade.ConsumerGroup);
+                    Tuple<ValidationResult, bool, EntityValidationFacade> subResult = await ValidateAndPreProcessResource(entityId, entityRequest, entitiesCTO, subEntityCrudAction, true, validationFacade.ConsumerGroup, false, ignoreInvalidProperties);
 
                     // Add validationResults to resource results
                     validationFacade.ValidationResults.AddRange(subResult.Item1.Results);
@@ -276,6 +328,6 @@ namespace COLID.RegistrationService.Services.Implementation
             }*/
 
             return subEntity.Id;
-        }
+        }        
     }
 }

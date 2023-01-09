@@ -6,4 +6,10 @@
         public const string SuperAdmin = "COLID.Superadministration.ReadWrite";
         public const string ApiToApi = "Resource.ReadWrite.Api";
     }
+
+    public static class Users
+    {
+        public const string BackgroundProcessUser = "colid@bayer.com";
+        
+    }
 }

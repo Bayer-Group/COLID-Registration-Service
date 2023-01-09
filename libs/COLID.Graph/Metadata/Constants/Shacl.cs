@@ -15,6 +15,7 @@
 
         public const string Class = "http://www.w3.org/ns/shacl#class";
         public const string IsFacet = "https://pid.bayer.com/kos/19050#isFacet";
+        public const string PropertyShape = "http://www.w3.org/ns/shacl#PropertyShape";
 
         public class NodeKinds
         {

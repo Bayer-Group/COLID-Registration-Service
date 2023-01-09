@@ -17,7 +17,7 @@ namespace COLID.Graph.Metadata.Services
         /// <param name="entity">the entity to validate</param>
         /// <param name="metadataProperties">the properties to consider</param>
         /// <returns>the result of validation</returns>
-        Task<ValidationResult> ValidateEntity(Entity entity, IList<MetadataProperty> metadataProperties);
+        Task<ValidationResult> ValidateEntity(Entity entity, IList<MetadataProperty> metadataProperties, bool ignoreInvalidProperties = false);
 
         /// <summary>
         /// Validates a list of entities.
@@ -48,5 +48,13 @@ namespace COLID.Graph.Metadata.Services
         /// <param name="entity">The entity to be checked</param>
         /// <returns>Returns a list of critical validation results properties. These show which properties are not allowed to be stored</returns>
         IList<ValidationResultProperty> CheckForbiddenProperties<TEntity>(TEntity entity) where TEntity : Entity;
+
+        /// <summary>
+        /// Check whether a property is marked mandetory in the given metadata or not, return true if mandetory else false
+        /// </summary>
+        /// <param name="Property"></param>
+        /// <param name="metadata"></param>
+        /// <returns></returns>
+        bool CheckPropertyIsMandatory(string Property, IList<Graph.Metadata.DataModels.Metadata.MetadataProperty> metadata);
     }
 }

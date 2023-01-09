@@ -77,10 +77,12 @@ namespace COLID.Graph.Metadata.Constants
             public const string IsManagedIn = "https://pid.bayer.com/kos/19050/IsManagedIn";
             public const string LinkedToRdfData = "https://pid.bayer.com/kos/19050/linkedToRdfData";
             public const string Uses = "https://pid.bayer.com/kos/19050/227898";
+            public const string ConsistsOf = "https://pid.bayer.com/kos/19050/227899";
             public const string ProcessData = "https://pid.bayer.com/kos/19050/78975";
             public const string UsesApplication = "https://pid.bayer.com/kos/19050/78974";
             public const string IsReplacedBy = "https://pid.bayer.com/kos/19050/225896";
             public const string IsNestedColumn = "https://pid.bayer.com/kos/19050/444505";
+            public const string HasLinkToStudy = "http://pid.bayer.com/dinos/ontologies/KUMO_Ontology#hasLinkToStudy";
 
             public static readonly ISet<string> AllLinkTypes = new HashSet<string>() {
                 IsCopyOfDataset ,
@@ -100,10 +102,12 @@ namespace COLID.Graph.Metadata.Constants
                 IsManagedIn,
                 LinkedToRdfData,
                 Uses,
+                ConsistsOf,
                 ProcessData,
                 UsesApplication,
                 IsReplacedBy,
-                IsNestedColumn
+                IsNestedColumn,
+                HasLinkToStudy
             };
         }
 
@@ -151,6 +155,11 @@ namespace COLID.Graph.Metadata.Constants
         public const string hasPID = "http://pid.bayer.com/kos/19014/hasPID";
         public const string HasRevision = "https://pid.bayer.com/kos/19050/hasRevision";
         public const string HasSourceID = "https://pid.bayer.com/kos/19050/hasSourceID";
+
+        public const string HasResourceReviewCyclePolicy = "https://pid.bayer.com/kos/19050/hasResourceReviewCyclePolicy";
+        public const string HasNextReviewDueDate = "https://pid.bayer.com/kos/19050/hasNextReviewDueDate";
+        public const string HasLastReviewer = "https://pid.bayer.com/kos/19050/hasLastReviewer";
+        public const string HasLastReviewDate = "https://pid.bayer.com/kos/19050/hasLastReviewDate";
 
         #region excel export uris
         public const string ScientificLicense = "https://pid.bayer.com/kos/19050/ScientificLicense";

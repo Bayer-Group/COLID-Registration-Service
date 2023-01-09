@@ -121,6 +121,19 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         }
 
         /// <summary>
+        /// Returns all the Link Types  present in metadata graphs.
+        /// </summary>
+        /// <response code="200">Returns the current category filter that is saved in neptune in a format that is usable in the marketplace</response>
+        /// <response code="500">If an unexpected error occurs</response>
+        [HttpGet]
+        [Route("linkTypes")]
+        public IActionResult GetLinkTypes()
+        {
+            var result = _metadataService.GetLinkTypes();
+            return Ok(result);
+        }
+
+        /// <summary>
         /// Returns all the category filters including the resource types in a raw format as it is saved in neptune.
         /// </summary>
         /// <returns>The current category filter that is saved in neptune in a format that is usable in the marketplace</returns>

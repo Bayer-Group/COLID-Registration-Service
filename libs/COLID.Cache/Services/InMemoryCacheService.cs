@@ -100,6 +100,22 @@ namespace COLID.Cache.Services
             }
         }
 
+        public bool Exists<T>(string key, Func<T> function)
+        {
+            Guard.ArgumentNotNullOrWhiteSpace(key, nameof(key));
+
+            var entryKey = BuildCacheEntryKey(key, function);
+            try
+            {
+                _logger.LogDebug($"Check if key exists {entryKey}", entryKey);
+                return _memoryCache.TryGetValue(entryKey, out _);
+            }
+            catch (System.Exception ex) when (ex is NotSupportedException || ex is TimeoutException)
+            {
+                return false;
+            }
+        }
+
         public void Clear()
         {
             foreach (var key in _keys)
@@ -308,7 +324,7 @@ namespace COLID.Cache.Services
 
             var entryKey = BuildCacheEntryKey(key, method);
             Delete(entryKey);
-            method.Invoke();
+            //method.Invoke();
         }
 
         public void Delete(object o, Action method)
@@ -325,7 +341,7 @@ namespace COLID.Cache.Services
         /// Create the correct name for a cache key, based on the ApplicationName and EnvironmentName variables.
         /// </summary>
         /// <param name="suffix">the key suffix, appended to prefix</param>
-        private string BuildCacheEntryKey(string suffix)
+        public string BuildCacheEntryKey(string suffix)
         {
             var prefix = $"{_environment.ApplicationName}:{_environment.EnvironmentName}".ToLower()
                 .Replace(".webapi", "")
@@ -339,13 +355,13 @@ namespace COLID.Cache.Services
             return suffix.ToLower();
         }
 
-        private string BuildCacheEntryKey(string suffix, Action method)
+        public string BuildCacheEntryKey(string suffix, Action method)
         {
             var calledClassName = method?.Target?.GetType().DeclaringType?.Name ?? method?.Target?.GetType().Name;
             return BuildCacheEntryKey($"{calledClassName}:{suffix}");
         }
 
-        private string BuildCacheEntryKey<T>(string suffix, Func<T> function)
+        public string BuildCacheEntryKey<T>(string suffix, Func<T> function)
         {
             var calledClassName = function?.Target?.GetType().DeclaringType?.Name ?? function?.Target?.GetType().Name;
             return BuildCacheEntryKey($"{calledClassName}:{suffix}");

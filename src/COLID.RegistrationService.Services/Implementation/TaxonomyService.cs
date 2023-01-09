@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using AutoMapper;
 using COLID.Cache.Services;
@@ -20,6 +22,7 @@ namespace COLID.RegistrationService.Services.Implementation
     {
         private readonly ITaxonomyRepository _taxonomyRepository;
         private readonly ICacheService _cacheService;
+        private readonly IMetadataGraphConfigurationService _metadataGraphConfigurationService;
 
         public TaxonomyService(
             IMapper mapper,
@@ -27,10 +30,12 @@ namespace COLID.RegistrationService.Services.Implementation
             IValidationService validationService,
             ITaxonomyRepository taxonomyRepository,
             ILogger<TaxonomyService> logger,
+            IMetadataGraphConfigurationService metadataGraphConfigurationService,
             ICacheService cacheService) : base(mapper, metadataService, validationService, taxonomyRepository, logger)
         {
             _taxonomyRepository = taxonomyRepository;
             _cacheService = cacheService;
+            _metadataGraphConfigurationService = metadataGraphConfigurationService;
         }
 
         public override TaxonomyResultDTO GetEntity(string id)
@@ -56,19 +61,61 @@ namespace COLID.RegistrationService.Services.Implementation
         {
             var taxonomies = _cacheService.GetOrAdd($"type:{taxonomyType}", () =>
             {
-                var graphs = _metadataService.GetMultiInstanceGraph(taxonomyType);
-                var taxonomyList = _taxonomyRepository.GetTaxonomies(taxonomyType, graphs);
+                // This block fetches multiple graphs for a field type from metadata config
+                // This can be dynamically extended for future taxonomies which need multiple graphs
+                var taxonomyList = new List<Taxonomy>();
+                var configurationGraphs = new HashSet<Uri>();
+                var latestMetadataGraphConfiguration = _metadataGraphConfigurationService.GetLatestConfiguration();
+                var graphList = latestMetadataGraphConfiguration.Properties.GetValueOrNull(taxonomyType, false);
+
+                if (graphList.Count > 0)
+                {
+                    foreach (var graphitem in graphList)
+                    {
+                        configurationGraphs.Add(new Uri(graphitem));
+                    }
+                    taxonomyList = (List<Taxonomy>)_taxonomyRepository.BuildTaxonomy(taxonomyType, configurationGraphs);
+                }
+                else
+                {
+                    var graphs = _metadataService.GetMultiInstanceGraph(taxonomyType);
+                    taxonomyList = (List<Taxonomy>)_taxonomyRepository.GetTaxonomies(taxonomyType, graphs);
+                }
                 return TransformTaxonomyListToHierarchy(taxonomyList);
             });
             return taxonomies;
         }
 
-        public IList<Taxonomy> GetAllTaxonomies()
+        public IList<TaxonomyLabel> GetTaxonomyLabels()
         {
-            var taxonomies = _cacheService.GetOrAdd($"type:AllTaxonomies", () =>
+            var taxonomies = _cacheService.GetOrAdd($"type:TaxonomyLabels", () =>
             {
-                var graphs = _metadataService.GetAllGraph();
-                var taxonomyList = _taxonomyRepository.GetTaxonomies(graphs);
+                var latestGraphs = _metadataGraphConfigurationService.GetLatestConfiguration();
+
+                latestGraphs.Properties.TryRemoveKey(COLID.Graph.Metadata.Constants.MetadataGraphConfiguration.Type);
+                latestGraphs.Properties.TryRemoveKey(COLID.Graph.Metadata.Constants.MetadataGraphConfiguration.HasConsumerGroupGraph);
+                latestGraphs.Properties.TryRemoveKey(COLID.Graph.Metadata.Constants.MetadataGraphConfiguration.HasExtendedUriTemplateGraph);
+                latestGraphs.Properties.TryRemoveKey(COLID.Graph.Metadata.Constants.MetadataGraphConfiguration.HasCategoryFilterGraph);
+                latestGraphs.Properties.TryRemoveKey(COLID.Graph.Metadata.Constants.MetadataGraphConfiguration.HasPidUriTemplatesGraph);
+                latestGraphs.Properties.TryRemoveKey(COLID.Graph.Metadata.Constants.MetadataGraphConfiguration.HasResourcesGraph);
+                latestGraphs.Properties.TryRemoveKey(COLID.Graph.Metadata.Constants.MetadataGraphConfiguration.HasResourcesDraftGraph);
+                latestGraphs.Properties.TryRemoveKey(COLID.Graph.Metadata.Constants.MetadataGraphConfiguration.HasLinkHistoryGraph);
+                latestGraphs.Properties.TryRemoveKey(COLID.Graph.Metadata.Constants.MetadataGraphConfiguration.HasResourceHistoryGraph);
+                latestGraphs.Properties.TryRemoveKey(EnterpriseCore.HasStartDateTime);
+                
+                ISet<Uri> graphs = new HashSet<Uri>();
+                foreach (var typ in latestGraphs.Properties)
+                {
+                    foreach(string grph in typ.Value)
+                    {
+                        if (Uri.TryCreate(grph, UriKind.Absolute, out Uri graphUri))
+                        {
+                            graphs.Add(graphUri);
+                        }
+                    }
+                }
+
+                var taxonomyList = _taxonomyRepository.GetTaxonomyLabels(graphs);
                 return taxonomyList;
             });
             return taxonomies;
@@ -78,8 +125,27 @@ namespace COLID.RegistrationService.Services.Implementation
         {
             var plainTaxonomies = _cacheService.GetOrAdd($"list:type:{taxonomyType}", () =>
             {
-                var graphs = _metadataService.GetMultiInstanceGraph(taxonomyType);
-                var taxonomies = _taxonomyRepository.GetTaxonomies(taxonomyType, graphs);
+                var taxonomies = new List<Taxonomy>();
+                var configurationGraphs = new HashSet<Uri>();
+
+                // This block fetches multiple graphs for a field type from metadata config
+                // This can be dynamically extended for future taxonomies which need multiple graphs
+                var latestMetadataGraphConfiguration = _metadataGraphConfigurationService.GetLatestConfiguration();
+                var graphList = latestMetadataGraphConfiguration.Properties.GetValueOrNull(taxonomyType, false);
+                
+                if (graphList.Count > 0)
+                {
+                    foreach (var graphitem in graphList)
+                    {
+                        configurationGraphs.Add(new Uri(graphitem));
+                    }
+                    taxonomies = (List<Taxonomy>)_taxonomyRepository.BuildTaxonomy(taxonomyType, configurationGraphs);
+                }
+                else
+                {
+                    var graphs = _metadataService.GetMultiInstanceGraph(taxonomyType);
+                    taxonomies = (List<Taxonomy>)_taxonomyRepository.GetTaxonomies(taxonomyType, graphs);
+                }
                 return CreateHierarchicalStructureFromTaxonomyList(taxonomies);
             });
 
