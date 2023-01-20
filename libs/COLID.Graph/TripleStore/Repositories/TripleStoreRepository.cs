@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using COLID.Graph.Metadata.Constants;
 using COLID.Graph.TripleStore.Configuration;
@@ -31,6 +31,7 @@ namespace COLID.Graph.TripleStore.Repositories
             var updateEndpoint = new SparqlRemoteUpdateEndpoint(options.CurrentValue.UpdateUrl);
             updateEndpoint.SetCredentials(options.CurrentValue.Username, options.CurrentValue.Password);
             _queryEndpoint = new SparqlRemoteEndpoint(options.CurrentValue.ReadUrl);
+            _queryEndpoint.SetCredentials(options.CurrentValue.Username, options.CurrentValue.Password);
             _queryEndpoint.Timeout = 120000;
             _updateEndpoint = updateEndpoint;
             _logger = logger;
