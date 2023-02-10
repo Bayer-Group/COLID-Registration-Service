@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using COLID.Graph.Metadata.DataModels.Resources;using COLID.Graph.TripleStore.DataModels.Base;
 using COLID.RegistrationService.Common.DataModel.DistributionEndpoints;
 using COLID.RegistrationService.Common.DataModel.Resources;
-using COLID.RegistrationService.Common.DataModel.Search;
+using COLID.RegistrationService.Common.DataModel.Search;using COLID.RegistrationService.Common.DataModels.LinkHistory;
 using COLID.RegistrationService.Common.DataModels.Resources;
 
 namespace COLID.RegistrationService.Services.Interface
@@ -284,5 +284,13 @@ namespace COLID.RegistrationService.Services.Interface
         /// link repair 
         /// </summary>
         void linkFix();
+
+        /// <summary>
+        /// Get Link History
+        /// </summary>
+        /// <param name="startPidUri">The unique id of the start resource</param>
+        /// <param name="endPidUri">The unique id of the end resource</param>
+        /// <returns></returns>
+        List<LinkHistoryDto> GetLinkHistory(Uri startPidUri, Uri endPidUri);
     }
 }

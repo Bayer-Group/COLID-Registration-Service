@@ -9,6 +9,7 @@ using COLID.Graph.TripleStore.DataModels.Base;
 using COLID.Identity.Requirements;
 using COLID.RegistrationService.Common.DataModel.Resources;
 using COLID.RegistrationService.Common.DataModel.Search;
+using COLID.RegistrationService.Common.DataModels.LinkHistory;
 using COLID.RegistrationService.Common.DataModels.Resources;
 using COLID.RegistrationService.Services.Authorization.Requirements;
 using COLID.RegistrationService.Services.Interface;
@@ -762,6 +763,24 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
             return NoContent();
         }
 
+        /// <summary>
+        /// Get Link History
+        /// Note: Only deleted links are considered as history.
+        /// </summary>
+        /// <param name="startPidUri">The pid uri of the start resource.</param>   
+        /// <param name="endPidUri">Optional pid uri of the end resource.</param>  
+        /// <returns>List of link history</returns>
+        /// <response code="200">Returns list of link history</response>
+        /// <response code="404">If link history does not exist</response>
+        [HttpGet]
+        [Route("linkHistory")]
+        [ValidateActionParameters]
+        [ProducesResponseType(typeof(List<LinkHistoryDto>), StatusCodes.Status200OK)]        
+        public IActionResult GetLinkHistory([FromQuery] Uri startPidUri, [FromQuery, NotRequired] Uri endPidUri)
+        {
+            var linkHistory = _resourceService.GetLinkHistory(startPidUri, endPidUri);
+            return Ok(linkHistory);
+        }
     }
 }
 

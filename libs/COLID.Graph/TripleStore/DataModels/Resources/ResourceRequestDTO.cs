@@ -4,7 +4,7 @@ using COLID.Graph.TripleStore.DataModels.Base;
 
 namespace COLID.Graph.Metadata.DataModels.Resources
 {
-    [Type(Constants.Resource.Type.FirstResouceType)]
+    [Type(Constants.TypeMap.FirstResouceType)]
     public class ResourceRequestDTO : EntityBase
     {
         public string HasPreviousVersion { get; set; }

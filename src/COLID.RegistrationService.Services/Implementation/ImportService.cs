@@ -881,7 +881,7 @@ namespace COLID.RegistrationService.Services.Implementation
                                     {
                                         var (validationResultForCrt, failedForCrt, validationFacadeForCrt) =
                                         _resourcePreprocessService.ValidateAndPreProcessResource(Graph.Metadata.Constants.Entity.IdPrefix + Guid.NewGuid(), markedResource.Resource, new ResourcesCTO(), ResourceCrudAction.Create).Result;                                        
-                                        if (validationResultForCrt.Results.Count > 0 || validationResultForCrt.Conforms == false || failedForCrt)
+                                        if (failedForCrt)
                                         {
                                             markedResource.ActionResponseMessage = "Validation Failed : " + JsonConvert.SerializeObject(validationResultForCrt.Results);
                                             break;
@@ -890,13 +890,27 @@ namespace COLID.RegistrationService.Services.Implementation
 
                                     //Create draft record
                                     var createResult = _resourceService.CreateResource(markedResource.Resource).Result;
-                                    markedResource.ActionResponseMessage = (createResult.ValidationResult.Conforms ? "Created Draft" + createResult.Resource.PidUri : "Something went wrong. " + JsonConvert.SerializeObject(createResult.Resource));
+                                    if (createResult.ValidationResult.Severity == ValidationResultSeverity.Violation)
+                                    {
+                                        markedResource.ActionResponseMessage = "Something went wrong while creating draft Resource: " + JsonConvert.SerializeObject(createResult.Resource) + " Error:" + JsonConvert.SerializeObject(createResult.ValidationResult);
+                                    }
+                                    else
+                                    {
+                                        markedResource.ActionResponseMessage = "Created Draft" + createResult.Resource.PidUri;
+                                    }
                                     
                                     //publish record if marked as piblished
                                     if (markedResource.PublishOrDraft == PUBLISHED)
                                     {
                                         var publishCreatedResult = _resourceService.PublishResource(createResult.Resource.PidUri).Result;
-                                        markedResource.ActionResponseMessage = (createResult.ValidationResult.Conforms ? "Created Published" + createResult.Resource.PidUri : "Something went wrong while publishing. " + JsonConvert.SerializeObject(createResult.Resource));                                       
+                                        if (publishCreatedResult.ValidationResult.Severity == ValidationResultSeverity.Violation || publishCreatedResult.ValidationResult.Severity == ValidationResultSeverity.Warning)
+                                        {
+                                            markedResource.ActionResponseMessage = "Something went wrong while publishing Resource: " + JsonConvert.SerializeObject(publishCreatedResult.Resource) + " Error:" + JsonConvert.SerializeObject(publishCreatedResult.ValidationResult);
+                                        }
+                                        else
+                                        {
+                                            markedResource.ActionResponseMessage = "Created Published" + publishCreatedResult.Resource.PidUri;
+                                        }                                        
                                     }
                                     break;
                                 case UPDATE:
@@ -909,7 +923,7 @@ namespace COLID.RegistrationService.Services.Implementation
                                         var (validationResultForUpd, failedForUpd, validationFacadeForUpd) =
                                             _resourcePreprocessService.ValidateAndPreProcessResource(id, markedResource.Resource, resourcesCTO, ResourceCrudAction.Publish, markedResource.Action == CHANGETYPE, null).Result;
 
-                                        if (validationResultForUpd.Results.Count > 0 || validationResultForUpd.Conforms == false || failedForUpd)
+                                        if (failedForUpd)
                                         {
                                             markedResource.ActionResponseMessage = "Validation Failed : " + JsonConvert.SerializeObject(validationResultForUpd.Results);
                                             break;
@@ -918,13 +932,27 @@ namespace COLID.RegistrationService.Services.Implementation
 
                                     //Update draft record
                                     var UpdateResult = _resourceService.EditResource(new Uri(markedResource.pidUri), markedResource.Resource, markedResource.Action == CHANGETYPE).Result;
-                                    markedResource.ActionResponseMessage = (UpdateResult.ValidationResult.Conforms ? "Updated " + UpdateResult.Resource.PidUri : "Something went wrong. " + JsonConvert.SerializeObject(UpdateResult.Resource));
-
+                                    if (UpdateResult.ValidationResult.Severity == ValidationResultSeverity.Violation)
+                                    {
+                                        markedResource.ActionResponseMessage = "Something went wrong while Editing Resource: " + JsonConvert.SerializeObject(UpdateResult.Resource) + " Error:" + JsonConvert.SerializeObject(UpdateResult.ValidationResult);
+                                    }
+                                    else
+                                    {
+                                        markedResource.ActionResponseMessage = "Update Resource" + UpdateResult.Resource.PidUri;
+                                    }
+                                    
                                     //publish record if marked as piblished
                                     if (markedResource.PublishOrDraft == PUBLISHED)
                                     {
                                         var publishCreatedResult = _resourceService.PublishResource(UpdateResult.Resource.PidUri).Result;
-                                        markedResource.ActionResponseMessage = (UpdateResult.ValidationResult.Conforms ? "Update Published" + UpdateResult.Resource.PidUri : "Something went wrong while publishing. " + JsonConvert.SerializeObject(UpdateResult.Resource));
+                                        if (publishCreatedResult.ValidationResult.Severity == ValidationResultSeverity.Violation || publishCreatedResult.ValidationResult.Severity == ValidationResultSeverity.Warning)
+                                        {
+                                            markedResource.ActionResponseMessage = "Something went wrong while publishing Resource: " + JsonConvert.SerializeObject(publishCreatedResult.Resource) + " Error:" + JsonConvert.SerializeObject(publishCreatedResult.ValidationResult);
+                                        }
+                                        else
+                                        {
+                                            markedResource.ActionResponseMessage = "Update Published" + publishCreatedResult.Resource.PidUri;
+                                        }                                        
                                     }
                                     break;
                                 case DELETE:
@@ -1091,70 +1119,69 @@ namespace COLID.RegistrationService.Services.Implementation
                     //Ignore Properties
                     if (ignoreProperties.Contains(pidUris.ElementAt(colCtr)))
                         continue;
-
-
-                    switch (pidUris.ElementAt(colCtr))
+                    
+                    if (pidUris.ElementAt(colCtr) == Graph.Metadata.Constants.Resource.hasPID)
                     {
-
-                        case Graph.Metadata.Constants.Resource.hasPID:
-                            // Treat hasPid differently
-                            curResource.Properties.Add(pidUris.ElementAt(colCtr), new List<dynamic> {
+                        // Treat hasPid differently
+                        curResource.Properties.Add(pidUris.ElementAt(colCtr), new List<dynamic> {
                                 new COLID.Graph.TripleStore.DataModels.Base.Entity(rowData.ElementAt(ColPidUri), new Dictionary<string,List<dynamic>>() {
                                     { Graph.Metadata.Constants.RDF.Type, new List<dynamic> { Graph.Metadata.Constants.Identifier.Type } },
                                     { Graph.Metadata.Constants.Identifier.HasUriTemplate,  new List<dynamic> {rowData.ElementAt(ColPidUriTemplate) } }
                                 })
                             });
-                            break;
-                        case Graph.Metadata.Constants.Resource.BaseUri:
-                            // Treat hasBaseUri differently
-                            curResource.Properties.Add(pidUris.ElementAt(colCtr), new List<dynamic> {
+                    }
+                    else if(pidUris.ElementAt(colCtr) == Graph.Metadata.Constants.Resource.BaseUri) 
+                    {
+                        // Treat hasBaseUri differently
+                        curResource.Properties.Add(pidUris.ElementAt(colCtr), new List<dynamic> {
                                 new COLID.Graph.TripleStore.DataModels.Base.Entity(rowData.ElementAt(ColBaseUri), new Dictionary<string,List<dynamic>>() {
                                     { Graph.Metadata.Constants.RDF.Type, new List<dynamic> { Graph.Metadata.Constants.Identifier.Type } },
                                     { Graph.Metadata.Constants.Identifier.HasUriTemplate,  new List<dynamic> {rowData.ElementAt(ColBaseUriTemplate) == string.Empty? rowData.ElementAt(ColPidUriTemplate) : rowData.ElementAt(ColBaseUriTemplate) } }
                                 })
                             });
-                            break;
-                        case Graph.Metadata.Constants.Resource.Distribution:
-                        case Graph.Metadata.Constants.Resource.MainDistribution:
-                            // Collect distributionendpoint information
-                            string[] endpoints = rowData.ElementAt(colCtr).Split(",");
-                            List<dynamic> curDistributionList = new List<dynamic>();
-                            for (int ctr = 0; ctr < endpoints.Count(); ctr++)
-                            {
-                                if (int.TryParse(endpoints[ctr], out int result))
-                                {
-                                    List<string> curcurDistEndPointRowData = this.getRowValues(result + 3, doc, rowContainer);
-                                    var curDistEndPoint = ConvertToResource(pidUris, pidUriTypes, curcurDistEndPointRowData, ignoreProperties, doc, rowContainer, userEmail);
-                                    curDistributionList.Add(new COLID.Graph.TripleStore.DataModels.Base.Entity("", curDistEndPoint.Properties));
-                                }
-                            }
-                            curResource.Properties.Add(pidUris.ElementAt(colCtr), curDistributionList);
-                            break;
-                        case Graph.Metadata.Constants.Resource.DateCreated:
-                        case Graph.Metadata.Constants.Resource.DateModified:
-                            curResource.Properties.Add(pidUris.ElementAt(colCtr), new List<dynamic> { DateTime.UtcNow });
-                            break;
-                        case Graph.Metadata.Constants.Resource.Author:
-                        case Graph.Metadata.Constants.Resource.LastChangeUser:
-                            curResource.Properties.Add(pidUris.ElementAt(colCtr), new List<dynamic> { userEmail });
-                            break;
-                        default:
-                            if (pidUriTypes.ElementAt(colCtr).Contains("comma separated"))
-                            {
-                                string[] values = rowData.ElementAt(colCtr).Split(",");
-                                List<dynamic> curValues = new List<dynamic>();
-                                for (int ctr = 0; ctr < values.Count(); ctr++)
-                                {
-                                    curValues.Add(values.ElementAt(ctr));
-                                }
-                                curResource.Properties.Add(pidUris.ElementAt(colCtr), curValues);
-                            }
-                            else
-                            {
-                                curResource.Properties.Add(pidUris.ElementAt(colCtr), new List<dynamic> { rowData.ElementAt(colCtr) });
-                            }
-                            break;
                     }
+                    else if (pidUris.ElementAt(colCtr) == Graph.Metadata.Constants.Resource.Distribution || pidUris.ElementAt(colCtr) == Graph.Metadata.Constants.Resource.MainDistribution)
+                    {
+                        // Collect distributionendpoint information
+                        string[] endpoints = rowData.ElementAt(colCtr).Split(",");
+                        List<dynamic> curDistributionList = new List<dynamic>();
+                        for (int ctr = 0; ctr < endpoints.Count(); ctr++)
+                        {
+                            if (int.TryParse(endpoints[ctr], out int result))
+                            {
+                                List<string> curcurDistEndPointRowData = this.getRowValues(result + 3, doc, rowContainer);
+                                var curDistEndPoint = ConvertToResource(pidUris, pidUriTypes, curcurDistEndPointRowData, ignoreProperties, doc, rowContainer, userEmail);
+                                curDistributionList.Add(new COLID.Graph.TripleStore.DataModels.Base.Entity("", curDistEndPoint.Properties));
+                            }
+                        }
+                        curResource.Properties.Add(pidUris.ElementAt(colCtr), curDistributionList);
+                    }
+                    else if (pidUris.ElementAt(colCtr) == Graph.Metadata.Constants.Resource.DateCreated || pidUris.ElementAt(colCtr) == Graph.Metadata.Constants.Resource.DateModified)
+                    {
+                        curResource.Properties.Add(pidUris.ElementAt(colCtr), new List<dynamic> { DateTime.UtcNow });
+                    }
+                    else if (pidUris.ElementAt(colCtr) == Graph.Metadata.Constants.Resource.Author || pidUris.ElementAt(colCtr) == Graph.Metadata.Constants.Resource.LastChangeUser)
+                    {
+                        curResource.Properties.Add(pidUris.ElementAt(colCtr), new List<dynamic> { userEmail });
+                    }
+                    else
+                    {
+                        if (pidUriTypes.ElementAt(colCtr).Contains("comma separated"))
+                        {
+                            string[] values = rowData.ElementAt(colCtr).Split(",");
+                            List<dynamic> curValues = new List<dynamic>();
+                            for (int ctr = 0; ctr < values.Count(); ctr++)
+                            {
+                                if(values.ElementAt(ctr) != null || values.ElementAt(ctr) != string.Empty)
+                                    curValues.Add(values.ElementAt(ctr).Trim());
+                            }
+                            curResource.Properties.Add(pidUris.ElementAt(colCtr), curValues);
+                        }
+                        else
+                        {
+                            curResource.Properties.Add(pidUris.ElementAt(colCtr), new List<dynamic> { rowData.ElementAt(colCtr) });
+                        }
+                    }                    
                 }
             }
 

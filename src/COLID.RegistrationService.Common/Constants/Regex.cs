@@ -4,7 +4,7 @@ namespace COLID.RegistrationService.Common.Constants
 {
     public static class Regex
     {
-        public const string ResourceKey = @"^(?:" + Entity.IdPrefix + "){1}" + Guid;
+        public static readonly string ResourceKey = @"^(?:" + Entity.IdPrefix + "){1}" + Guid;
         public const string Guid = "[0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}";
         public const string PidUriTemplate = @"(\{\w+(:\d+)?\})";
         public const string Version = @"^(\d+\.)*\d+$";

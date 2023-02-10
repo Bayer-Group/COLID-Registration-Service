@@ -3,7 +3,7 @@ using COLID.Graph.TripleStore.DataModels.Base;
 
 namespace COLID.RegistrationService.Common.DataModel.ExtendedUriTemplates
 {
-    [Type(COLID.Graph.Metadata.Constants.ExtendedUriTemplate.Type)]
+    [Type(COLID.Graph.Metadata.Constants.TypeMap.ExtendedUriTemplate)]
     public class ExtendedUriTemplate : Entity
     {
     }

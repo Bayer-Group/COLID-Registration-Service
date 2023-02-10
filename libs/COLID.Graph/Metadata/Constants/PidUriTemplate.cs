@@ -1,19 +1,29 @@
-﻿namespace COLID.Graph.Metadata.Constants
+﻿using System.IO;
+using Microsoft.Extensions.Configuration;
+
+namespace COLID.Graph.Metadata.Constants
 {
     public static class PidUriTemplate
     {
-        public const string Type = "https://pid.bayer.com/kos/19050#PidUriTemplate";
-        public const string HasBaseUrl = "https://pid.bayer.com/kos/19050#hasBaseUrl";
-        public const string HasRoute = "https://pid.bayer.com/kos/19050#hasRoute";
-        public const string HasPidUriTemplateIdType = "https://pid.bayer.com/kos/19050#hasPidUriTemplateIdType";
-        public const string HasIdLength = "https://pid.bayer.com/kos/19050#hasIdLength";
-        public const string HasPidUriTemplateSuffix = "https://pid.bayer.com/kos/19050#hasPidUriTemplateSuffix";
-        public const string HasLifecycleStatus = "https://pid.bayer.com/kos/19050/hasPidUriTemplateLifecycleStatus";
+        private static readonly string basePath = Path.GetFullPath("appsettings.json");
+        private static readonly string filePath = basePath.Substring(0, basePath.Length - 16);
+        private static IConfigurationRoot configuration = new ConfigurationBuilder()
+                     .SetBasePath(filePath)
+                    .AddJsonFile("appsettings.json")
+                    .Build();
+        public static readonly string ServiceUrl = configuration.GetValue<string>("ServiceUrl");
+        public static readonly string Type = ServiceUrl + "kos/19050#PidUriTemplate";
+        public static readonly string HasBaseUrl = ServiceUrl + "kos/19050#hasBaseUrl";
+        public static readonly string HasRoute = ServiceUrl + "kos/19050#hasRoute";
+        public static readonly string HasPidUriTemplateIdType = ServiceUrl + "kos/19050#hasPidUriTemplateIdType";
+        public static readonly string HasIdLength = ServiceUrl + "kos/19050#hasIdLength";
+        public static readonly string HasPidUriTemplateSuffix = ServiceUrl + "kos/19050#hasPidUriTemplateSuffix";
+        public static readonly string HasLifecycleStatus = ServiceUrl + "kos/19050/hasPidUriTemplateLifecycleStatus";
 
         public static class LifecycleStatus
         {
-            public const string Active = "https://pid.bayer.com/kos/19050/active";
-            public const string Deprecated = "https://pid.bayer.com/kos/19050/deprecated";
+            public static readonly string Active = ServiceUrl + "kos/19050/active";
+            public static readonly string Deprecated = ServiceUrl + "kos/19050/deprecated";
         }
     }
 }

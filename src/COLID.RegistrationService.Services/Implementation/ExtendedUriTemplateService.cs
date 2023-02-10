@@ -63,33 +63,31 @@ namespace COLID.RegistrationService.Services.Implementation
             // This is the only way to iterrate, since the values are not changed. Otherwise use the same function as in preprocessservice.
             foreach (var property in extendedUriTemplate.Properties)
             {
-                switch (property.Key)
+                if (property.Key == COLID.Graph.Metadata.Constants.ExtendedUriTemplate.HasPidUriSearchRegex)
                 {
-                    case COLID.Graph.Metadata.Constants.ExtendedUriTemplate.HasPidUriSearchRegex:
-                        foreach (var prop in property.Value)
+                    foreach (var prop in property.Value)
+                    {
+                        var prefix = $"^https://{_colidDomain}";
+                        string valueString = prop;
+                        if (!valueString.StartsWith(prefix))
                         {
-                            var prefix = $"^https://{_colidDomain}";
-                            string valueString = prop;
-                            if (!valueString.StartsWith(prefix))
-                            {
-                                validationResults.Add(new ValidationResultProperty(extendedUriTemplate.Id, property.Key, valueString, $"The regex has to start with prefix {prefix}", ValidationResultSeverity.Violation));
-                            }
+                            validationResults.Add(new ValidationResultProperty(extendedUriTemplate.Id, property.Key, valueString, $"The regex has to start with prefix {prefix}", ValidationResultSeverity.Violation));
                         }
-                        break;
-
-                    case COLID.Graph.Metadata.Constants.ExtendedUriTemplate.HasOrder:
-                        foreach (var propValue in property.Value)
-                        {
-                            if (orders.TryGetValue(propValue, out string id) && id != extendedUriTemplate.Id)
-                            {
-                                orders.TryRemoveKey(extendedUriTemplate.Id);
-
-                                var message = $"The number of order corresponds to an order of another template. The following numbers are already in use: {string.Join(" , ", orders.Keys)}";
-                                validationResults.Add(new ValidationResultProperty(extendedUriTemplate.Id, property.Key, propValue, message, ValidationResultSeverity.Violation));
-                            }
-                        }
-                        break;
+                    }
                 }
+                else if (property.Key == COLID.Graph.Metadata.Constants.ExtendedUriTemplate.HasOrder)
+                {
+                    foreach (var propValue in property.Value)
+                    {
+                        if (orders.TryGetValue(propValue, out string id) && id != extendedUriTemplate.Id)
+                        {
+                            orders.TryRemoveKey(extendedUriTemplate.Id);
+
+                            var message = $"The number of order corresponds to an order of another template. The following numbers are already in use: {string.Join(" , ", orders.Keys)}";
+                            validationResults.Add(new ValidationResultProperty(extendedUriTemplate.Id, property.Key, propValue, message, ValidationResultSeverity.Violation));
+                        }
+                    }
+                }                
             }
 
             return validationResults;

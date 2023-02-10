@@ -8,8 +8,8 @@ using COLID.Identity;
 using COLID.Maintenance;
 using COLID.Maintenance.Filters;
 using COLID.MessageQueue;
+using COLID.RegistrationService.Common;
 using COLID.RegistrationService.Services.Authorization;
-using COLID.RegistrationService.Services.Implementation;
 using COLID.RegistrationService.WebApi.Filters;
 using COLID.SQS;
 using COLID.SQS.Model;
@@ -23,8 +23,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 
@@ -55,7 +53,7 @@ namespace COLID.RegistrationService.WebApi
         {
             services.AddDefaultCorrelationId();
             services.AddCorrelationIdLogger();
-
+            Settings.InitializeServiceUrl(Configuration);
             services.AddCors();
 
             var mvcBuilder = services.AddControllers(configure => configure.Filters.Add(typeof(ValidateActionParametersAttribute)))

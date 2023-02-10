@@ -2,7 +2,8 @@
 {
     public static class PidUri
     {
-        public const string Wallet = "https://pid.bayer.com/kos/19050#PidUriWallet";
-        public const string WasPublished = "https://pid.bayer.com/kos/19050#wasPublished";
+        public static readonly string ServiceUrl = Settings.GetServiceUrl();
+        public static readonly string Wallet = ServiceUrl + "kos/19050#PidUriWallet";
+        public static readonly string WasPublished = ServiceUrl + "kos/19050#wasPublished";
     }
 }

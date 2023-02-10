@@ -5,7 +5,7 @@ using COLID.Graph.TripleStore.DataModels.Base;
 
 namespace COLID.Graph.Metadata.DataModels.MetadataGraphConfiguration
 {
-    [Type(Constants.MetadataGraphConfiguration.Type)]
+    [Type(Constants.TypeMap.MetadataGraphConfiguration)]
     public class MetadataGraphConfiguration : Entity
     {
         public IList<string> GetMetadataGraphs()

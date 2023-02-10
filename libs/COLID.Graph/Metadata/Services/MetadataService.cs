@@ -263,27 +263,24 @@ namespace COLID.Graph.Metadata.Services
             }
             catch (BusinessException)
             {
-                switch (entityType)
-                {
-                    case ConsumerGroup.Type:
-                        return GetInstanceGraphByConfig(MetadataGraphConfiguration.HasConsumerGroupGraph);
-                    case PidUriTemplate.Type:
-                        return GetInstanceGraphByConfig(MetadataGraphConfiguration.HasPidUriTemplatesGraph);
-                    case ExtendedUriTemplate.Type:
-                        return GetInstanceGraphByConfig(MetadataGraphConfiguration.HasExtendedUriTemplateGraph);
-                    case Keyword.Type:
-                        return GetInstanceGraphByConfig(MetadataGraphConfiguration.HasKeywordsGraph);
-                    case PIDO.PidConcept:
-                        return GetInstanceGraphByConfig(MetadataGraphConfiguration.HasResourcesGraph);
-                    case "draft":
-                        return GetInstanceGraphByConfig(MetadataGraphConfiguration.HasResourcesDraftGraph); //resource named graph mit <https://pid.bayer.com/resource/4.0/Draft>
-                    case "linkHistory":
-                        return GetInstanceGraphByConfig(MetadataGraphConfiguration.HasLinkHistoryGraph); //resource named graph mit <https://pid.bayer.com/resource/4.0/Draft>
-                    case MetadataGraphConfiguration.Type:
-                        return new Uri(MetadataGraphConfiguration.Type);
-                    default:
-                        throw new BusinessException($"Instance graph for type {entityType} is not stored in the system and must be stored in the metadata or metadata config. ");
-                }
+                if (entityType == ConsumerGroup.Type)
+                    return GetInstanceGraphByConfig(MetadataGraphConfiguration.HasConsumerGroupGraph);
+                else if (entityType == PidUriTemplate.Type)
+                    return GetInstanceGraphByConfig(MetadataGraphConfiguration.HasPidUriTemplatesGraph);
+                else if (entityType == ExtendedUriTemplate.Type)
+                    return GetInstanceGraphByConfig(MetadataGraphConfiguration.HasExtendedUriTemplateGraph);
+                else if (entityType == Keyword.Type)
+                    return GetInstanceGraphByConfig(MetadataGraphConfiguration.HasKeywordsGraph);
+                else if (entityType == Resource.Type.FirstResouceType)
+                    return GetInstanceGraphByConfig(MetadataGraphConfiguration.HasResourcesGraph);
+                else if (entityType == "draft")
+                    return GetInstanceGraphByConfig(MetadataGraphConfiguration.HasResourcesDraftGraph); //resource named graph mit <https://pid.bayer.com/resource/4.0/Draft>
+                else if (entityType == "linkHistory")
+                    return GetInstanceGraphByConfig(MetadataGraphConfiguration.HasLinkHistoryGraph); //resource named graph mit <https://pid.bayer.com/resource/4.0/Draft>
+                else if (entityType == MetadataGraphConfiguration.Type)
+                    return new Uri(MetadataGraphConfiguration.Type);
+                else
+                    throw new BusinessException($"Instance graph for type {entityType} is not stored in the system and must be stored in the metadata or metadata config. ");
             }
         }
 

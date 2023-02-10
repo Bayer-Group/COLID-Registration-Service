@@ -20,7 +20,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\COLID.Common\COLID.Common.csproj" />
     <ProjectReference Include="..\COLID.Exception\COLID.Exception.csproj" />
   </ItemGroup>
 

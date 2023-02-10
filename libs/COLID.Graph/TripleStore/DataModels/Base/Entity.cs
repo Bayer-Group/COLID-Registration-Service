@@ -4,7 +4,7 @@ using Newtonsoft.Json;
 
 namespace COLID.Graph.TripleStore.DataModels.Base
 {
-    [Type(Metadata.Constants.Entity.Type)]
+    [Type(Metadata.Constants.TypeMap.FirstResouceType)]
     public class Entity : EntityBase
     {
         public string Id { get; set; }

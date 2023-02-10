@@ -56,7 +56,7 @@ namespace COLID.RegistrationService.Services.Implementation
             {
                 var _resourceService = scope.ServiceProvider.GetService<IResourceService>();
                 var _metadataService = scope.ServiceProvider.GetService<IMetadataService>();
-                var resourceTypes = _metadataService.GetInstantiableEntityTypes(Graph.Metadata.Constants.Entity.Type);
+                var resourceTypes = _metadataService.GetInstantiableEntityTypes(Graph.Metadata.Constants.Resource.Type.FirstResouceType);
                 foreach (var resourceType in resourceTypes)
                 {
                     int index = 0;

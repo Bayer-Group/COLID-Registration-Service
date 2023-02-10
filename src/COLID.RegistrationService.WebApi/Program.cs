@@ -12,7 +12,7 @@ namespace COLID.RegistrationService.WebApi
             int minWorker, minIOC;
             ThreadPool.GetMinThreads(out minWorker, out minIOC);
             ThreadPool.SetMinThreads(100, minIOC);
-            
+
             //CreateHostBuilder(args).Build().Run();
             CreateHostBuilder(args)
                 .UseDefaultServiceProvider(options => { })

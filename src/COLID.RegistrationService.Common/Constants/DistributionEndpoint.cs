@@ -4,13 +4,15 @@
     {
         public static class LifeCycleStatus
         {
-            public const string Active = "https://pid.bayer.com/kos/19050/active";
-            public const string Deprecated = "https://pid.bayer.com/kos/19050/deprecated";
+            public static readonly string ServiceUrl = Settings.GetServiceUrl();
+            public static readonly string Active = ServiceUrl + "kos/19050/active";
+            public static readonly string Deprecated = ServiceUrl + "kos/19050/deprecated";
         }
 
         public static class Types
         {
-            public const string MaintenancePoint = "http://pid.bayer.com/kos/19014/MaintenancePoint";
+            public static readonly string HttpServiceUrl = Settings.GetHttpServiceUrl();
+            public static readonly string MaintenancePoint = HttpServiceUrl + "kos/19014/MaintenancePoint";
         }
     }
 }

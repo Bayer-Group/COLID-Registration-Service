@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netcoreapp3.1</TargetFramework>
@@ -8,5 +8,9 @@
     <ProjectReference Include="..\..\libs\COLID.AWS\COLID.AWS.csproj" />
     <ProjectReference Include="..\..\libs\COLID.Graph\COLID.Graph.csproj" />
   </ItemGroup>
+
+  <Target Name="AddSettings">
+    <Copy SourceFiles="appsettings.json" />
+  </Target>
 
 </Project>

@@ -3,7 +3,7 @@ using COLID.Graph.TripleStore.DataModels.Base;
 
 namespace COLID.RegistrationService.Common.DataModel.Identifier
 {
-    [Type(COLID.Graph.Metadata.Constants.Identifier.Type)]
+    [Type(COLID.Graph.Metadata.Constants.TypeMap.PermanentIdentifier)]
     public class Identifier : Entity
     {
     }

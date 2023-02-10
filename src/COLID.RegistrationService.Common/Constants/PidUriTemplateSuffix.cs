@@ -2,6 +2,7 @@
 {
     public static class PidUriTemplateSuffix
     {
-        public const string Type = "https://pid.bayer.com/kos/19050#PidUriTemplateSuffix";
+        public static readonly string ServiceUrl = Settings.GetServiceUrl();
+        public static readonly string Type = ServiceUrl + "kos/19050#PidUriTemplateSuffix";
     }
 }

@@ -2,7 +2,8 @@
 {
     public static class PidUriTemplateIdType
     {
-        public const string Type = "https://pid.bayer.com/kos/19050#PidUriTemplateIdType";
+        public static readonly string ServiceUrl = Settings.GetServiceUrl();
+        public static readonly string Type = ServiceUrl + "kos/19050#PidUriTemplateIdType";
         public const string Guid = "GUID";
         public const string Number = "Number";
     }

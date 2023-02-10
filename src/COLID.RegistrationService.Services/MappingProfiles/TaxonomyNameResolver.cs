@@ -21,11 +21,10 @@ namespace COLID.RegistrationService.Services.MappingProfiles
 
             string entityType = source.Properties.GetValueOrNull(Graph.Metadata.Constants.RDF.Type, true);
 
-            switch (entityType)
-            {
-                case COLID.Graph.Metadata.Constants.PidUriTemplate.Type:
-                    var flatPidUriTemplate = _pidUriTemplateService.GetFlatPidUriTemplateByPidUriTemplate(source);
-                    return _pidUriTemplateService.FormatPidUriTemplateName(flatPidUriTemplate);
+            if (entityType == COLID.Graph.Metadata.Constants.PidUriTemplate.Type)
+            {                
+                var flatPidUriTemplate = _pidUriTemplateService.GetFlatPidUriTemplateByPidUriTemplate(source);
+                return _pidUriTemplateService.FormatPidUriTemplateName(flatPidUriTemplate);
             }
 
             return prefLabel ?? rdfLabel;

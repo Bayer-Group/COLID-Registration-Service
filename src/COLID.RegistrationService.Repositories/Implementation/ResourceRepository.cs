@@ -1490,7 +1490,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
 
             var parameterizedString = new SparqlParameterizedString
             {
-                CommandText = @"SELECT DISTINCT ?resource ?pidUri ?version ?baseUri
+                CommandText = @"SELECT DISTINCT ?resource ?pidUri ?version ?laterVersion ?baseUri
                   @resourceNamedGraph
                   WHERE {
                   ?subject @hasPid @hasPidUri
@@ -1500,15 +1500,17 @@ namespace COLID.RegistrationService.Repositories.Implementation
                       ?resource pid3:hasVersion ?version .
                       ?resource @hasPid ?pidUri .
                       OPTIONAL { ?resource @hasBaseUri ?baseUri }.
+                      OPTIONAL { ?resource pid3:hasLaterVersion ?laterVersion } .
                   } UNION {
                       ?subject  @hasLaterVersion* ?resource.
                       ?resource pid3:hasVersion ?version .
                       ?resource @hasPid ?pidUri .
                       OPTIONAL { ?resource @hasBaseUri ?baseUri }.
+                      OPTIONAL { ?resource pid3:hasLaterVersion ?laterVersion } .
                   }
                   Filter NOT EXISTS { ?draftResource  @hasPidEntryDraft ?resource}
                   }
-                  ORDER BY xsd:integer(?version)"
+                  "
             };
 
             // Select all resources with their PID and target Url, which are of type resource and published
@@ -1531,10 +1533,24 @@ namespace COLID.RegistrationService.Repositories.Implementation
                 Id = result.GetNodeValuesFromSparqlResult("resource").Value,
                 Version = result.GetNodeValuesFromSparqlResult("version").Value,
                 PidUri = result.GetNodeValuesFromSparqlResult("pidUri").Value,
-                BaseUri = result.GetNodeValuesFromSparqlResult("baseUri").Value
+                BaseUri = result.GetNodeValuesFromSparqlResult("baseUri").Value,
+                LaterVersion = result.GetNodeValuesFromSparqlResult("laterVersion").Value
             }).ToList();
 
-            return resourceVersions;
+            //Sort Version ,considering laterVersion info
+            var sortedResourceVersion = new List<VersionOverviewCTO>();
+            string curLaterVersion = null;
+            for (int i = 0; i < resourceVersions.Count; i++)
+            {
+                var curResource = resourceVersions.Where(x => x.LaterVersion == curLaterVersion).FirstOrDefault();
+                if (curResource != null)
+                {
+                    sortedResourceVersion.Add(curResource);
+                    curLaterVersion = curResource.Id;
+                }
+            }
+            sortedResourceVersion.Reverse();
+            return sortedResourceVersion;
         }
 
         public IList<string> GetAllPidUris(Uri namedGraph, ISet<Uri> metadataGraphs)
@@ -2121,6 +2137,25 @@ namespace COLID.RegistrationService.Repositories.Implementation
             _tripleStoreRepository.UpdateTripleStore(queryString);
         }
 
+        public void CreateProperty(Uri id, Uri predicate, DateTime literal, Uri namedGraph)
+        {
+            var queryString = new SparqlParameterizedString
+            {
+                CommandText = @"INSERT DATA {
+                      GRAPH @namedGraph {
+                          @subject @predicate @object
+                      }
+                  }"
+            };
+
+            queryString.SetUri("namedGraph", namedGraph);
+            queryString.SetUri("subject", id);
+            queryString.SetUri("predicate", predicate);
+            queryString.SetLiteral("object", literal);
+
+            _tripleStoreRepository.UpdateTripleStore(queryString);
+        }
+
         public void CreateLinkPropertyWithGivenPid(Uri id, Uri predicate, string pidUri, Uri namedGraph)
         {
             var queryString = new SparqlParameterizedString
@@ -2308,7 +2343,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
                         @hasLabel ?labelOfColumnResource;
                     }
                     Optional{
-                     ?inboundlinkedResource <https://pid.bayer.com/kos/19050/444505> ?inboundlinkedColumn.
+                     ?inboundlinkedResource @isNestedColumn ?inboundlinkedColumn.
                     ?inboundlinkedColumn pid2:hasPID ?inboundLinkedPidUri.                       
                     }
                     Optional{
@@ -2349,8 +2384,8 @@ namespace COLID.RegistrationService.Repositories.Implementation
                 ORDER BY ?linkTypes"
             };
 
-            //queryString.SetUri("linkType", new Uri(Graph.Metadata.Constants.Resource.Groups.LinkTypes));
             queryString.SetUri("pidUri", pidUri);
+            queryString.SetUri("isNestedColumn", new Uri(Graph.Metadata.Constants.Resource.LinkTypes.IsNestedColumn));
             queryString.SetUri("hasLabel", new Uri(Graph.Metadata.Constants.Resource.HasLabel));
             queryString.SetUri("hasEntryLifecycleStatus", new Uri(Graph.Metadata.Constants.Resource.HasEntryLifecycleStatus));
             queryString.SetUri("published", new Uri(Graph.Metadata.Constants.Resource.ColidEntryLifecycleStatus.Published));
@@ -2710,6 +2745,223 @@ namespace COLID.RegistrationService.Repositories.Implementation
                 GetSubcolumns(item, namedGraph);
             }
             return displayTableAndColumn;
+        }
+
+        public List<LinkHistoryDto> GetLinkHistory(Uri pidUri, Uri linkHistoryGraph, Uri resourceGraph, ISet<Uri> metadataGraph)
+        {
+            var parametrizedSparql = new SparqlParameterizedString
+            {
+                CommandText =
+                     @"SELECT ?linkHistory ?isInBound ?hasLinkStatus ?hasLinkType ?linkTypeLabel ?hasDateCreated ?hasDateDeleted ?hasAuthor ?hasDeletedBy 
+                              ?hasLinkStart ?linkStartPid ?linkStartLabel ?linkStartType ?linkStartTypeLabel 
+                               ?hasLinkEnd ?linkEndPid ?linkEndLabel ?linkEndType ?linkEndTypeLabel
+                        FROM @linkHistoryGraph
+                        FROM @resourceGraph
+                        @metadataGraph
+                        WHERE
+                        {
+                          ?resource @hasPid @pidUri .                                                  
+                          {
+                              ?linkHistory @hasLinkEnd ?resource.  
+                              OPTIONAL {
+                                  ?linkHistory @hasLinkDeletedOn ?hasDateDeleted .
+                                  ?linkHistory @hasLinkDeletedBy ?hasDeletedBy .
+                              }
+                              ?linkHistory @hasLinkEnd ?hasLinkEnd .
+                              ?linkHistory @hasLinkStatus ?hasLinkStatus .
+                              ?linkHistory @hasLinkType ?hasLinkType .
+                              ?hasLinkType @hasRdfsLabel ?linkTypeLabel .
+                              ?linkHistory @hasLinkStart ?hasLinkStart .
+                              ?linkHistory @hasLinkCreator ?hasAuthor .
+                              ?linkHistory @hasLinkCreatedOn ?hasDateCreated .    
+                              ?hasLinkStart @hasPid ?linkStartPid .
+                              ?hasLinkStart @hasLabel ?linkStartLabel .
+                              ?hasLinkStart @hasRdfType ?linkStartType .
+                              ?linkStartType @hasRdfsLabel ?linkStartTypeLabel .
+                              ?hasLinkEnd  @hasPid ?linkEndPid .
+                              ?hasLinkEnd @hasLabel ?linkEndLabel .
+                              ?hasLinkEnd @hasRdfType ?linkEndType .
+                              ?linkEndType @hasRdfsLabel ?linkEndTypeLabel .
+                              BIND ('true' as ?isInBound) .
+                          }
+                          UNION
+                         {
+                              ?linkHistory @hasLinkStart ?resource.
+                              OPTIONAL {
+                                  ?linkHistory @hasLinkDeletedOn ?hasDateDeleted .
+                                  ?linkHistory @hasLinkDeletedBy ?hasDeletedBy .
+                              }
+                              ?linkHistory @hasLinkEnd ?hasLinkEnd .
+                              ?linkHistory @hasLinkStatus ?hasLinkStatus .
+                              ?linkHistory @hasLinkType ?hasLinkType .
+                              ?hasLinkType @hasRdfsLabel ?linkTypeLabel .
+                              ?linkHistory @hasLinkStart ?hasLinkStart .
+                              ?linkHistory @hasLinkCreator ?hasAuthor .
+                              ?linkHistory @hasLinkCreatedOn ?hasDateCreated .    
+                              ?hasLinkStart @hasPid ?linkStartPid .
+                              ?hasLinkStart @hasLabel ?linkStartLabel .
+                              ?hasLinkStart @hasRdfType ?linkStartType .
+                              ?linkStartType @hasRdfsLabel ?linkStartTypeLabel .
+                              ?hasLinkEnd  @hasPid ?linkEndPid .
+                              ?hasLinkEnd @hasLabel ?linkEndLabel .
+                              ?hasLinkEnd @hasRdfType ?linkEndType .
+                              ?linkEndType @hasRdfsLabel ?linkEndTypeLabel .
+                              BIND ('false' as ?isInBound) .
+                          }
+                        FILTER langMatches(lang(?linkStartTypeLabel), @language) 
+                        FILTER langMatches(lang(?linkEndTypeLabel), @language)                        
+                        } "
+            };
+
+            parametrizedSparql.SetUri("linkHistoryGraph", linkHistoryGraph);
+            parametrizedSparql.SetUri("resourceGraph", resourceGraph);
+            parametrizedSparql.SetPlainLiteral("metadataGraph", metadataGraph.JoinAsFromNamedGraphs());
+            parametrizedSparql.SetUri("pidUri", pidUri);
+            parametrizedSparql.SetUri("hasLinkStart", new Uri(Graph.Metadata.Constants.LinkHistory.HasLinkStart));
+            parametrizedSparql.SetUri("hasLinkEnd", new Uri(Graph.Metadata.Constants.LinkHistory.HasLinkEnd));
+            parametrizedSparql.SetUri("hasLinkType", new Uri(Graph.Metadata.Constants.LinkHistory.HasLinkType));
+            parametrizedSparql.SetUri("hasLinkStatus", new Uri(Graph.Metadata.Constants.LinkHistory.HasLinkStatus));
+            parametrizedSparql.SetUri("hasLinkDeletedOn", new Uri(Graph.Metadata.Constants.LinkHistory.DateDeleted));
+            parametrizedSparql.SetUri("hasLinkDeletedBy", new Uri(Graph.Metadata.Constants.LinkHistory.DeletedBy));
+            parametrizedSparql.SetUri("hasLinkStatusDeleted", new Uri(Graph.Metadata.Constants.LinkHistory.LinkStatus.Deleted));
+            parametrizedSparql.SetUri("hasLinkCreator", new Uri(Graph.Metadata.Constants.Resource.Author));
+            parametrizedSparql.SetUri("hasLinkCreatedOn", new Uri(Graph.Metadata.Constants.Resource.DateCreated));
+            parametrizedSparql.SetUri("hasLabel", new Uri(Graph.Metadata.Constants.Resource.HasLabel));
+            parametrizedSparql.SetUri("hasRdfsLabel", new Uri(Graph.Metadata.Constants.RDFS.Label));
+            parametrizedSparql.SetUri("hasRdfType", new Uri(Graph.Metadata.Constants.RDF.Type));
+            parametrizedSparql.SetUri("hasPid", new Uri(Graph.Metadata.Constants.Resource.hasPID));
+            parametrizedSparql.SetLiteral("language", Graph.Metadata.Constants.I18n.DefaultLanguage);
+
+            var result = _tripleStoreRepository.QueryTripleStoreResultSet(parametrizedSparql).ToList();
+
+            if (!result.Any())
+            {
+                return new List<LinkHistoryDto>();
+            }
+
+            var linkhistories = result.Select(result => new LinkHistoryDto()
+            {
+                LinkHistoryId = new Uri(result.GetNodeValuesFromSparqlResult("linkHistory").Value),
+                InBound = Boolean.Parse(result.GetNodeValuesFromSparqlResult("isInBound").Value),
+                LinkStatus = new Uri(result.GetNodeValuesFromSparqlResult("hasLinkStatus").Value),
+                LinkType = new Uri(result.GetNodeValuesFromSparqlResult("hasLinkType").Value),
+                LinkTypeLabel = result.GetNodeValuesFromSparqlResult("linkTypeLabel").Value,
+                DateCreated = result.GetNodeValuesFromSparqlResult("hasDateCreated").Value,
+                DateDeleted = result.GetNodeValuesFromSparqlResult("hasDateDeleted").Value,
+                Author = result.GetNodeValuesFromSparqlResult("hasAuthor").Value,
+                DeletedBy = result.GetNodeValuesFromSparqlResult("hasDeletedBy").Value,
+                LinkStartResourcetId = new Uri(result.GetNodeValuesFromSparqlResult("hasLinkStart").Value),
+                LinkStartResourcePidUri = new Uri(result.GetNodeValuesFromSparqlResult("linkStartPid").Value),
+                LinkStartResourceLabel = result.GetNodeValuesFromSparqlResult("linkStartLabel").Value,
+                LinkStartResourceType = new Uri(result.GetNodeValuesFromSparqlResult("linkStartType").Value),
+                LinkStartResourceTypeLabel = result.GetNodeValuesFromSparqlResult("linkStartTypeLabel").Value,
+                LinkEndResourcetId = new Uri(result.GetNodeValuesFromSparqlResult("hasLinkEnd").Value),
+                LinkEndResourcePidUri = new Uri(result.GetNodeValuesFromSparqlResult("linkEndPid").Value),
+                LinkEndResourceLabel = result.GetNodeValuesFromSparqlResult("linkEndLabel").Value,
+                LinkEndResourceType = new Uri(result.GetNodeValuesFromSparqlResult("linkEndType").Value),
+                LinkEndResourceTypeLabel = result.GetNodeValuesFromSparqlResult("linkEndTypeLabel").Value,
+                LastModifiedOn = result.GetNodeValuesFromSparqlResult("hasDateDeleted").Value != null ? DateTime.Parse(result.GetNodeValuesFromSparqlResult("hasDateDeleted").Value) : DateTime.Parse(result.GetNodeValuesFromSparqlResult("hasDateCreated").Value)
+            });
+
+            return linkhistories.OrderByDescending(o => o.LastModifiedOn).ToList();
+        }
+
+        public List<LinkHistoryDto> GetLinkHistory(Uri startPidUri, Uri endPidUri, Uri linkHistoryGraph, Uri resourceGraph, ISet<Uri> metadataGraph)
+        {
+            var parametrizedSparql = new SparqlParameterizedString
+            {
+                CommandText =
+                     @"SELECT ?linkHistory ?isInBound ?hasLinkStatus ?hasLinkType ?linkTypeLabel ?hasDateCreated ?hasDateDeleted ?hasAuthor ?hasDeletedBy 
+                              ?hasLinkStart ?linkStartPid ?linkStartLabel ?linkStartType ?linkStartTypeLabel 
+                               ?hasLinkEnd ?linkEndPid ?linkEndLabel ?linkEndType ?linkEndTypeLabel
+                        FROM @linkHistoryGraph
+                        FROM @resourceGraph
+                        @metadataGraph
+                        WHERE
+                        {
+                          ?startResource @hasPid @startPidUri .
+                          ?endResource @hasPid @endPidUri .                          
+                          {
+                              ?linkHistory @hasLinkStart ?startResource.
+                              ?linkHistory @hasLinkEnd ?endResource.  
+                              OPTIONAL {
+                                  ?linkHistory @hasLinkDeletedOn ?hasDateDeleted .
+                                  ?linkHistory @hasLinkDeletedBy ?hasDeletedBy .
+                              }
+                              ?linkHistory @hasLinkEnd ?hasLinkEnd .
+                              ?linkHistory @hasLinkStatus ?hasLinkStatus .
+                              ?linkHistory @hasLinkType ?hasLinkType .
+                              ?hasLinkType @hasRdfsLabel ?linkTypeLabel .
+                              ?linkHistory @hasLinkStart ?hasLinkStart .
+                              ?linkHistory @hasLinkCreator ?hasAuthor .
+                              ?linkHistory @hasLinkCreatedOn ?hasDateCreated .    
+                              ?hasLinkStart @hasPid ?linkStartPid .
+                              ?hasLinkStart @hasLabel ?linkStartLabel .
+                              ?hasLinkStart @hasRdfType ?linkStartType .
+                              ?linkStartType @hasRdfsLabel ?linkStartTypeLabel .
+                              ?hasLinkEnd  @hasPid ?linkEndPid .
+                              ?hasLinkEnd @hasLabel ?linkEndLabel .
+                              ?hasLinkEnd @hasRdfType ?linkEndType .
+                              ?linkEndType @hasRdfsLabel ?linkEndTypeLabel .
+                              BIND ('false' as ?isInBound) .
+                          }                          
+                        FILTER langMatches(lang(?linkStartTypeLabel), @language) 
+                        FILTER langMatches(lang(?linkEndTypeLabel), @language)                        
+                        } "
+            };
+
+            parametrizedSparql.SetUri("linkHistoryGraph", linkHistoryGraph);
+            parametrizedSparql.SetUri("resourceGraph", resourceGraph);
+            parametrizedSparql.SetPlainLiteral("metadataGraph", metadataGraph.JoinAsFromNamedGraphs());
+            parametrizedSparql.SetUri("startPidUri", startPidUri);
+            parametrizedSparql.SetUri("endPidUri", endPidUri);
+            parametrizedSparql.SetUri("hasLinkStart", new Uri(Graph.Metadata.Constants.LinkHistory.HasLinkStart));
+            parametrizedSparql.SetUri("hasLinkEnd", new Uri(Graph.Metadata.Constants.LinkHistory.HasLinkEnd));
+            parametrizedSparql.SetUri("hasLinkType", new Uri(Graph.Metadata.Constants.LinkHistory.HasLinkType));
+            parametrizedSparql.SetUri("hasLinkStatus", new Uri(Graph.Metadata.Constants.LinkHistory.HasLinkStatus));
+            parametrizedSparql.SetUri("hasLinkDeletedOn", new Uri(Graph.Metadata.Constants.LinkHistory.DateDeleted));
+            parametrizedSparql.SetUri("hasLinkDeletedBy", new Uri(Graph.Metadata.Constants.LinkHistory.DeletedBy));
+            parametrizedSparql.SetUri("hasLinkStatusDeleted", new Uri(Graph.Metadata.Constants.LinkHistory.LinkStatus.Deleted));
+            parametrizedSparql.SetUri("hasLinkCreator", new Uri(Graph.Metadata.Constants.Resource.Author));
+            parametrizedSparql.SetUri("hasLinkCreatedOn", new Uri(Graph.Metadata.Constants.Resource.DateCreated));
+            parametrizedSparql.SetUri("hasLabel", new Uri(Graph.Metadata.Constants.Resource.HasLabel));
+            parametrizedSparql.SetUri("hasRdfsLabel", new Uri(Graph.Metadata.Constants.RDFS.Label));
+            parametrizedSparql.SetUri("hasRdfType", new Uri(Graph.Metadata.Constants.RDF.Type));
+            parametrizedSparql.SetUri("hasPid", new Uri(Graph.Metadata.Constants.Resource.hasPID));
+            parametrizedSparql.SetLiteral("language", Graph.Metadata.Constants.I18n.DefaultLanguage);
+
+            var result = _tripleStoreRepository.QueryTripleStoreResultSet(parametrizedSparql).ToList();
+
+            if (!result.Any())
+            {
+                return new List<LinkHistoryDto>();
+            }
+
+            var linkhistories = result.Select(result => new LinkHistoryDto()
+            {
+                LinkHistoryId = new Uri(result.GetNodeValuesFromSparqlResult("linkHistory").Value),
+                InBound = Boolean.Parse(result.GetNodeValuesFromSparqlResult("isInBound").Value),
+                LinkStatus = new Uri(result.GetNodeValuesFromSparqlResult("hasLinkStatus").Value),
+                LinkType = new Uri(result.GetNodeValuesFromSparqlResult("hasLinkType").Value),
+                LinkTypeLabel = result.GetNodeValuesFromSparqlResult("linkTypeLabel").Value,
+                DateCreated = result.GetNodeValuesFromSparqlResult("hasDateCreated").Value,
+                DateDeleted = result.GetNodeValuesFromSparqlResult("hasDateDeleted").Value,
+                Author = result.GetNodeValuesFromSparqlResult("hasAuthor").Value,
+                DeletedBy = result.GetNodeValuesFromSparqlResult("hasDeletedBy").Value,
+                LinkStartResourcetId = new Uri(result.GetNodeValuesFromSparqlResult("hasLinkStart").Value),
+                LinkStartResourcePidUri = new Uri(result.GetNodeValuesFromSparqlResult("linkStartPid").Value),
+                LinkStartResourceLabel = result.GetNodeValuesFromSparqlResult("linkStartLabel").Value,
+                LinkStartResourceType = new Uri(result.GetNodeValuesFromSparqlResult("linkStartType").Value),
+                LinkStartResourceTypeLabel = result.GetNodeValuesFromSparqlResult("linkStartTypeLabel").Value,
+                LinkEndResourcetId = new Uri(result.GetNodeValuesFromSparqlResult("hasLinkEnd").Value),
+                LinkEndResourcePidUri = new Uri(result.GetNodeValuesFromSparqlResult("linkEndPid").Value),
+                LinkEndResourceLabel = result.GetNodeValuesFromSparqlResult("linkEndLabel").Value,
+                LinkEndResourceType = new Uri(result.GetNodeValuesFromSparqlResult("linkEndType").Value),
+                LinkEndResourceTypeLabel = result.GetNodeValuesFromSparqlResult("linkEndTypeLabel").Value,
+                LastModifiedOn = result.GetNodeValuesFromSparqlResult("hasDateDeleted").Value != null ? DateTime.Parse(result.GetNodeValuesFromSparqlResult("hasDateDeleted").Value) : DateTime.Parse(result.GetNodeValuesFromSparqlResult("hasDateCreated").Value)
+            });
+
+            return linkhistories.OrderByDescending(o => o.LastModifiedOn).ToList();
         }
     }
 }

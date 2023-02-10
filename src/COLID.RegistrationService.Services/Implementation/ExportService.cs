@@ -1009,7 +1009,7 @@ namespace COLID.RegistrationService.Services.Implementation
                         resTypePropertiesRow.Append(new Cell { DataType = CellValues.String, CellValue = new CellValue(prop.Properties[Shacl.Path]) });
                         resTypePropertiesRow.Append(new Cell { DataType = CellValues.String, CellValue = new CellValue(prop.Properties[Shacl.Name]) });
                        
-                        int chkMaxCount = 0;
+                        int chkMaxCount = 10;
                         int chkMinCount = 0;                        
                         if (prop.Properties.ContainsKey(Shacl.MinCount))
                             chkMinCount = int.Parse(prop.Properties[Shacl.MinCount]);

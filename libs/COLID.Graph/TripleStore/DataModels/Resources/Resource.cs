@@ -8,7 +8,7 @@ using COLID.RegistrationService.Common.DataModel.Resources;
 
 namespace COLID.Graph.Metadata.DataModels.Resources
 {
-    [Type(Constants.Resource.Type.FirstResouceType)]
+    [Type(Constants.TypeMap.FirstResouceType)]
     public class Resource : Entity
     {
         public Uri PidUri => GetIdentifier(Constants.EnterpriseCore.PidUri);

@@ -361,7 +361,14 @@ namespace COLID.RegistrationService.Repositories.Interface
         /// <param name="namedGraph">Named graph for current resources</param> 
         void CreateProperty(Uri subject, Uri predicate, string literal, Uri namedGraph);
 
-
+        /// <summary>
+        /// Insert a new date property into the graph (triple store).
+        /// </summary>
+        /// <param name="subject">the subject to insert</param> 
+        /// <param name="predicate">the predicate to insert</param> 
+        /// <param name="literal">the date literal to insert</param> 
+        /// <param name="namedGraph">Named graph for current resources</param> 
+        void CreateProperty(Uri id, Uri predicate, DateTime literal, Uri namedGraph);
 
         /// <summary> 
         /// Creates a linkingproperty between source and target resource based on the PidUri of the target Resource. 
@@ -432,5 +439,26 @@ namespace COLID.RegistrationService.Repositories.Interface
         /// <param name="publishedGraph">Published graph</param>
         /// <returns>Uri</returns>
         Uri GetResourceTypeByPidUri(Uri pidUri, Uri namedGraphUri, Dictionary<Uri, bool> publishedGraph);
+
+        /// <summary>
+        /// Get Link History
+        /// </summary>
+        /// <param name="pidUri">The unique id of the resource</param>
+        /// <param name="linkHistoryGraph">Link History graph</param>
+        /// <param name="resourceGraph">Named graph for current resources</param>
+        /// <param name="metadataGraph">Metadata graphs for current resources</param>
+        /// <returns>List of Link history of the given resource pidUri</returns>
+        List<LinkHistoryDto> GetLinkHistory(Uri pidUri, Uri linkHistoryGraph, Uri resourceGraph, ISet<Uri> metadataGraph);
+
+        /// <summary>
+        /// Get Link History
+        /// </summary>
+        /// <param name="startPidUri">The unique id of the start resource</param>
+        /// <param name="endPidUri">The unique id of the end resource</param>
+        /// <param name="linkHistoryGraph">Link History graph</param>
+        /// <param name="resourceGraph">Named graph for current resources</param>
+        /// <param name="metadataGraph">Metadata graphs for current resources</param>
+        /// <returns>List of Link history of the given resource pidUri</returns>
+        List<LinkHistoryDto> GetLinkHistory(Uri startPidUri, Uri endPidUri, Uri linkHistoryGraph, Uri resourceGraph, ISet<Uri> metadataGraph);
     }
 }

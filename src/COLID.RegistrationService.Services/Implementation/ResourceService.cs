@@ -418,7 +418,7 @@ namespace COLID.RegistrationService.Services.Implementation
             // update Status deleted, deleted by and date
             _resourceRepository.CreateProperty(linkHistoryRecord, new Uri(LinkHistory.HasLinkStatus), new Uri(LinkHistory.LinkStatus.Deleted), GetLinkHistoryGraph());
             _resourceRepository.CreateProperty(linkHistoryRecord, new Uri(LinkHistory.DeletedBy), requester, GetLinkHistoryGraph());
-            _resourceRepository.CreateProperty(linkHistoryRecord, new Uri(LinkHistory.DateDeleted), $"{DateTime.UtcNow.ToString("o")}^^xsd:dateTime", GetLinkHistoryGraph());
+            _resourceRepository.CreateProperty(linkHistoryRecord, new Uri(LinkHistory.DateDeleted), DateTime.UtcNow, GetLinkHistoryGraph());
         }
 
         private async Task SetLinkHistoryEntryStatusToDeleted(Uri linkHistoryRecord, string requester)
@@ -429,7 +429,7 @@ namespace COLID.RegistrationService.Services.Implementation
             // update Status deleted, deleted by and date
             _resourceRepository.CreateProperty(linkHistoryRecord, new Uri(LinkHistory.HasLinkStatus), new Uri(LinkHistory.LinkStatus.Deleted), GetLinkHistoryGraph());
             _resourceRepository.CreateProperty(linkHistoryRecord, new Uri(LinkHistory.DeletedBy), requester, GetLinkHistoryGraph());
-            _resourceRepository.CreateProperty(linkHistoryRecord, new Uri(LinkHistory.DateDeleted), $"{DateTime.UtcNow.ToString("o")}^^xsd:dateTime", GetLinkHistoryGraph());
+            _resourceRepository.CreateProperty(linkHistoryRecord, new Uri(LinkHistory.DateDeleted),DateTime.UtcNow, GetLinkHistoryGraph());
         }
 
         public async Task<Resource> RemoveResourceLink(string pidUri, string linkType, string pidUriToUnLink, bool returnTargetResource, string requester)
@@ -652,7 +652,7 @@ namespace COLID.RegistrationService.Services.Implementation
            graphList.Add(GetResourceInstanceGraph());
            graphList.Add(GetResourceDraftInstanceGraph());
 
-           var types = _metadataService.GetInstantiableEntityTypes(Graph.Metadata.Constants.Entity.Type);
+           var types = _metadataService.GetInstantiableEntityTypes(Graph.Metadata.Constants.Resource.Type.FirstResouceType);
            return _resourceRepository.GetDistributionEndpoints(pidUri, types, GetResourceInstanceGraph());
        }
 
@@ -1460,48 +1460,48 @@ namespace COLID.RegistrationService.Services.Implementation
 
                 string resourceLifeCycleStatus = resource?.Properties.GetValueOrNull(Graph.Metadata.Constants.Resource.HasEntryLifecycleStatus, true);
                 string deleteMessage = string.Empty;
-                switch (resourceLifeCycleStatus)
+
+                if (resourceLifeCycleStatus == Graph.Metadata.Constants.Resource.ColidEntryLifecycleStatus.Draft && resourcesCto.HasPublished)
                 {
-                    case Graph.Metadata.Constants.Resource.ColidEntryLifecycleStatus.Draft
-                        when resourcesCto.HasPublished:
-                        {
-                            // TODO: Remove later after testing - No need to delete it, because the edge is already removed in DeleteDraftResource
-                            //_resourceRepository.DeleteProperty(new Uri(resource.PublishedVersion),
-                            //    new Uri(Constants.Metadata.HasPidEntryDraft), new Uri(resource.Id)); 
+                    // TODO: Remove later after testing - No need to delete it, because the edge is already removed in DeleteDraftResource
+                    //_resourceRepository.DeleteProperty(new Uri(resource.PublishedVersion),
+                    //    new Uri(Constants.Metadata.HasPidEntryDraft), new Uri(resource.Id)); 
 
-                            DeleteDraftResource(pidUri, resource, resourcesCto, out deleteMessage);
-                            return deleteMessage;
-                        }
-                    case Graph.Metadata.Constants.Resource.ColidEntryLifecycleStatus.Draft
-                        when !resourcesCto.HasPublished:
-                        {
-                            // Muss bleiben
-                            if (!_resourceLinkingService.UnlinkResourceFromList(pidUri, true,
-                                out string unlinkMessage))
-                            {
-                                return unlinkMessage;
-                            }
+                    DeleteDraftResource(pidUri, resource, resourcesCto, out deleteMessage);
+                    return deleteMessage;
+                }
+                else if(resourceLifeCycleStatus == Graph.Metadata.Constants.Resource.ColidEntryLifecycleStatus.Draft && !resourcesCto.HasPublished)
+                {
+                    // Muss bleiben
+                    if (!_resourceLinkingService.UnlinkResourceFromList(pidUri, true,
+                        out string unlinkMessage))
+                    {
+                        return unlinkMessage;
+                    }
 
-                            DeleteDraftResource(pidUri, resource, resourcesCto, out deleteMessage);
-                            _remoteAppDataService.NotifyResourceDeleted(pidUri, resource);
+                    DeleteDraftResource(pidUri, resource, resourcesCto, out deleteMessage);
+                    _remoteAppDataService.NotifyResourceDeleted(pidUri, resource);
 
-                            return deleteMessage;
-                        }
-                    case Graph.Metadata.Constants.Resource.ColidEntryLifecycleStatus.Published:
-                        throw new BusinessException(Common.Constants.Messages.Resource.Delete.DeleteFailedNotMarkedDeleted);
+                    return deleteMessage;
+                }
+                else if(resourceLifeCycleStatus == Graph.Metadata.Constants.Resource.ColidEntryLifecycleStatus.Published)
+                {
+                    throw new BusinessException(Common.Constants.Messages.Resource.Delete.DeleteFailedNotMarkedDeleted);
+                }
+                else if(resourceLifeCycleStatus == Graph.Metadata.Constants.Resource.ColidEntryLifecycleStatus.MarkedForDeletion)
+                {
+                    if (!_userInfoService.HasAdminPrivileges())
+                    {
+                        throw new BusinessException(Common.Constants.Messages.Resource.Delete.DeleteFailedNoAdminRights);
+                    }
 
-                    case Graph.Metadata.Constants.Resource.ColidEntryLifecycleStatus.MarkedForDeletion:
-                        if (!_userInfoService.HasAdminPrivileges())
-                        {
-                            throw new BusinessException(Common.Constants.Messages.Resource.Delete.DeleteFailedNoAdminRights);
-                        }
-
-                        DeleteMarkedForDeletionResource(pidUri, resource, resourcesCto, requester, out deleteMessage);
-                        _proxyConfigService.DeleteNginxConfigRepository(pidUri);
-                        return deleteMessage;
-
-                    default:
-                        throw new BusinessException(Common.Constants.Messages.Resource.Delete.DeleteFailed);
+                    DeleteMarkedForDeletionResource(pidUri, resource, resourcesCto, requester, out deleteMessage);
+                    _proxyConfigService.DeleteNginxConfigRepository(pidUri);
+                    return deleteMessage;
+                }
+                else
+                {
+                    throw new BusinessException(Common.Constants.Messages.Resource.Delete.DeleteFailed);
                 }
             }
         }
@@ -1629,13 +1629,13 @@ namespace COLID.RegistrationService.Services.Implementation
 
                 switch (resourceLifeCycleStatus)
                 {
-                    case Graph.Metadata.Constants.Resource.ColidEntryLifecycleStatus.Draft:
+                    case var value when value == Graph.Metadata.Constants.Resource.ColidEntryLifecycleStatus.Draft:
                         throw new BusinessException(Common.Constants.Messages.Resource.Delete.MarkedDeletedFailedDraftExists);
 
-                    case Graph.Metadata.Constants.Resource.ColidEntryLifecycleStatus.MarkedForDeletion:
+                    case var value when value == Graph.Metadata.Constants.Resource.ColidEntryLifecycleStatus.MarkedForDeletion:
                         throw new BusinessException(Common.Constants.Messages.Resource.Delete
                             .MarkedDeletedFailedAlreadyMarked);
-                    case Graph.Metadata.Constants.Resource.ColidEntryLifecycleStatus.Published:
+                    case var value when value == Graph.Metadata.Constants.Resource.ColidEntryLifecycleStatus.Published:
                         using (var transaction = _resourceRepository.CreateTransaction())
                         {
                             _resourceRepository.DeleteAllProperties(new Uri(resource.Id), new Uri(Graph.Metadata.Constants.Resource.HasEntryLifecycleStatus), instanceGraphUri);
@@ -2087,6 +2087,18 @@ namespace COLID.RegistrationService.Services.Implementation
 
 
             return emailList;
+        }
+
+        public List<LinkHistoryDto> GetLinkHistory(Uri startPidUri, Uri endPidUri)
+        {
+            var metadataGraphs = _metadataService.GetMetadataGraphs();            
+            Uri linkHistoryGraphUri = GetLinkHistoryGraph(); 
+            Uri instanceGraphUri = GetResourceInstanceGraph();
+            if (endPidUri == null)
+                return _resourceRepository.GetLinkHistory(startPidUri, linkHistoryGraphUri, instanceGraphUri, metadataGraphs);
+            else
+                return _resourceRepository.GetLinkHistory(startPidUri, endPidUri, linkHistoryGraphUri, instanceGraphUri, metadataGraphs);
+            
         }
     }
 }

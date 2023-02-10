@@ -1,4 +1,5 @@
 ﻿using System;
+using COLID.Graph.Metadata.Constants;
 
 namespace COLID.Graph.TripleStore.DataModels.Attributes
 {
@@ -9,7 +10,7 @@ namespace COLID.Graph.TripleStore.DataModels.Attributes
 
         public TypeAttribute(string type)
         {
-            Type = type;
+            Type = TypeMap.GetTypeValue(type);
         }
     }
 }
