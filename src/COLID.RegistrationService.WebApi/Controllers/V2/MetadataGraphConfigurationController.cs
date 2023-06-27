@@ -14,13 +14,16 @@ using COLID.Graph.Metadata.Services;
 
 namespace COLID.RegistrationService.WebApi.Controllers.V2
 {
+    /// <summary>
+    /// 
+    /// </summary>
     [ApiController]
     [Authorize(Policy = nameof(SuperadministratorRequirement))]
     [ApiVersion(Constants.API.Version.V2)]
     [Route("api/v{version:apiVersion}/metadataGraphConfiguration")]
     [Produces(MediaTypeNames.Application.Json)]
     [TransformIdPropertyResponseFilter]
-    [Obsolete]
+    [Obsolete("A new version of this endpoint is available")]
     public class MetadataGraphConfigurationController : Controller
     {
         private readonly IMetadataGraphConfigurationService _MetadataGraphConfigurationService;

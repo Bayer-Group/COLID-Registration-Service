@@ -20,7 +20,7 @@ namespace COLID.MessageQueue.Services
     internal class MessageQueueService : IMessageQueueService
     {
         private readonly ICorrelationContextAccessor _correlationContext;
-        private readonly IConnectionFactory _connectionFactory;
+        //private readonly IConnectionFactory _connectionFactory;
         private readonly IConnection _connection;
         private readonly ILogger _logger;
         private readonly IModel _channel;
@@ -42,38 +42,36 @@ namespace COLID.MessageQueue.Services
             var options = messageQueueOptionsAccessor.CurrentValue;
             ConnectionFactory _connectionFactory;
 
-            if (options.UseSsl)
-            {
-                X509Store store = new X509Store(StoreName.Root, StoreLocation.LocalMachine);
+            if (options.UseSsl)
+            {
+                using X509Store store = new X509Store(StoreName.Root, StoreLocation.LocalMachine);
                 store.Open(OpenFlags.ReadOnly);
-                // default recovery time every 5 seconds
-                _connectionFactory = new ConnectionFactory()
-                {
-                    HostName = options.HostName,
-                    UserName = options.Username,
-                    Password = options.Password,
-                    Port = 5671,
-                    Ssl = new SslOption()
-                    {
-                        ServerName = options.HostName,
-                        Enabled = true,
-                        Certs = store.Certificates
-                    }
-                };
-            } 
-            else
-            {
-                _connectionFactory = new ConnectionFactory()
-                {
-                    HostName = options.HostName,
-                    UserName = options.Username,
-                    Password = options.Password
-                };
+                // default recovery time every 5 seconds
+                _connectionFactory = new ConnectionFactory()
+                {
+                    HostName = options.HostName,
+                    UserName = options.Username,
+                    Password = options.Password,
+                    Port = 5671,
+                    Ssl = new SslOption()
+                    {
+                        ServerName = options.HostName,
+                        Enabled = true,
+                        Certs = store.Certificates
+                    }
+                };
+            } 
+            else
+            {
+                _connectionFactory = new ConnectionFactory()
+                {
+                    HostName = options.HostName,
+                    UserName = options.Username,
+                    Password = options.Password
+                };
             }
-
-            
+           
             _exchangeName = options.ExchangeName;
-
             int retryCount = 0;
             do
             {

@@ -23,17 +23,17 @@ namespace COLID.RegistrationService.Services.Implementation.Comparison
 
             if (ids.Count() < 2)
             {
-                throw new BusinessException(Common.Constants.Messages.Resource.Comparison.MinimumNumberOfResourcesNotReached);
+                throw new BusinessException(Common.Constants.Messages.Resource.ComparisonMsg.MinimumNumberOfResourcesNotReached);
             }
 
             if (ids.Count() > 2)
             {
-                throw new BusinessException(Common.Constants.Messages.Resource.Comparison.MaximumNumberOfResourcesExceeded);
+                throw new BusinessException(Common.Constants.Messages.Resource.ComparisonMsg.MaximumNumberOfResourcesExceeded);
             }
 
             if (ids.GroupBy(id => id).Any(g => g.Count() > 1))
             {
-                throw new BusinessException(Common.Constants.Messages.Resource.Comparison.EqualIdentifiersNotAllowed);
+                throw new BusinessException(Common.Constants.Messages.Resource.ComparisonMsg.EqualIdentifiersNotAllowed);
             }
         }
     }

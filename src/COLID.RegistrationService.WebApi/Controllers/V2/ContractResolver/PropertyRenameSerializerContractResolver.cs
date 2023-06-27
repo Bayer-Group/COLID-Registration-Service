@@ -8,15 +8,27 @@ using Newtonsoft.Json.Serialization;
 
 namespace COLID.RegistrationService.WebApi.Controllers.V2.ContractResolver
 {
+    /// <summary>
+    /// 
+    /// </summary>
     public class PropertyRenameSerializerContractResolver : DefaultContractResolver
     {
         private readonly Dictionary<Type, Dictionary<string, string>> _renames;
 
+        /// <summary>
+        /// 
+        /// </summary>
         public PropertyRenameSerializerContractResolver()
         {
             _renames = new Dictionary<Type, Dictionary<string, string>>();
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="type"></param>
+        /// <param name="propertyName"></param>
+        /// <param name="newJsonPropertyName"></param>
         public void RenameProperty(Type type, string propertyName, string newJsonPropertyName)
         {
             if (!_renames.ContainsKey(type))
@@ -25,6 +37,12 @@ namespace COLID.RegistrationService.WebApi.Controllers.V2.ContractResolver
             _renames[type][propertyName] = newJsonPropertyName;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="member"></param>
+        /// <param name="memberSerialization"></param>
+        /// <returns></returns>
         protected override JsonProperty CreateProperty(MemberInfo member, MemberSerialization memberSerialization)
         {
             var property = base.CreateProperty(member, memberSerialization);

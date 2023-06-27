@@ -357,10 +357,10 @@ namespace COLID.Cache.Services
         public string BuildCacheEntryKey(string suffix)
         {
             var prefix = $"{_environment.ApplicationName}:{_environment.EnvironmentName}".ToLower()
-                .Replace(".webapi", "")
-                .Replace(".", ":");
+                .Replace(".webapi", "", StringComparison.Ordinal)
+                .Replace(".", ":", StringComparison.Ordinal);
 
-            if (!suffix.Contains(prefix))
+            if (!suffix.Contains(prefix, StringComparison.Ordinal))
             {
                 return $"{prefix}:{suffix}".ToLower();
             }

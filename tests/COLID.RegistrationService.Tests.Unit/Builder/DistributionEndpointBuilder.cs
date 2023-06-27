@@ -1,9 +1,8 @@
 ﻿using System;
 using COLID.Graph.Metadata.Constants;
-using COLID.RegistrationService.Common.Enums.DistributionEndpoint;
 using COLID.RegistrationService.Common.Extensions;
 using Entity = COLID.Graph.TripleStore.DataModels.Base.Entity;
-using Type = COLID.RegistrationService.Common.Enums.DistributionEndpoint.Type;
+using Type = COLID.RegistrationService.Common.Enums.DistributionEndpoint;
 
 namespace COLID.RegistrationService.Tests.Common.Builder
 {

@@ -4,6 +4,9 @@ namespace COLID.Exception.Models.Business
 {
     public class RequestException : BusinessException
     {
+        public RequestException() : base()
+        {
+        }
         public RequestException(string message) : base(message)
         {
         }

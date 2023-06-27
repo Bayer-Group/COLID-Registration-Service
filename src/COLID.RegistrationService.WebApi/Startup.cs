@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Reflection;
 using COLID.Common.Logger;
 using COLID.Exception;
@@ -28,6 +29,9 @@ using Newtonsoft.Json.Serialization;
 
 namespace COLID.RegistrationService.WebApi
 {
+    /// <summary>
+    /// 
+    /// </summary>
     public partial class Startup
     {
         /// <summary>
@@ -65,8 +69,15 @@ namespace COLID.RegistrationService.WebApi
 
             services.AddApiVersioning();
             services.AddHttpContextAccessor();
-            services.AddHttpClient();
-           
+            services.AddHttpClient("NoProxy").ConfigurePrimaryHttpMessageHandler(() =>
+            {
+                return new HttpClientHandler
+                {
+                    UseProxy = false,
+                    Proxy = null
+                };
+            });
+
 
             // Disable automatic model state validation. Model state will be checked in ValidateActionParametersAttribute.
             services.Configure<ApiBehaviorOptions>(options =>

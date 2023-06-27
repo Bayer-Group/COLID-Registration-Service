@@ -8,7 +8,9 @@ using Newtonsoft.Json;
 
 namespace COLID.Graph.TripleStore.DataModels.Base
 {
+#pragma warning disable CA1036 // Override methods on comparable types
     public class EntityBase : IComparable
+#pragma warning restore CA1036 // Override methods on comparable types
     {
         [JsonConverter(typeof(EntityPropertyConverter))]
         public IDictionary<string, List<dynamic>> Properties { get; set; }

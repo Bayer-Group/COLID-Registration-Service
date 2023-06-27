@@ -24,7 +24,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V2
     [Route("api/v{version:apiVersion}")]
     [Produces(MediaTypeNames.Application.Json)]
     [TransformIdPropertyResponseFilter]
-    [Obsolete]
+    [Obsolete("A new version of this endpoint is available")]
     public class PidUriTemplateController : Controller
     {
         private readonly IPidUriTemplateService _pidUriTemplateService;
@@ -132,7 +132,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V2
         /// If a permanent identifier references the pid uri template, the status is set to deprecated,
         /// otherwise the pid uri template will be deleted.
         /// </summary>
-        /// <param name="id">The Id of the pidUri Template to set as deprecated or delete.</param>
+        /// <param name="subject">The Id of the pidUri Template to set as deprecated or delete.</param>
         /// <returns>A status code</returns>
         /// <response code="200">Returns a status code with a corresponding error message</response>
         /// <response code="409">If a template has a reference to a consumer group</response>

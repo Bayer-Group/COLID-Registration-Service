@@ -523,7 +523,7 @@ namespace COLID.RegistrationService.Services.Implementation
         /// <param name="resourceProxy">Resource Proxy to match the extended URI templates to.</param>
         /// <param name="extendedUris">List of all extended URI templates.</param>
         /// <returns>All templates matching the current location URL and target URL.></returns>
-        private IList<ExtendedUriTemplateResultDTO> GetMatchedExtendedUriTemplate(ResourceProxyDTO resourceProxy, IList<ExtendedUriTemplateResultDTO> extendedUris)
+        private static IList<ExtendedUriTemplateResultDTO> GetMatchedExtendedUriTemplate(ResourceProxyDTO resourceProxy, IList<ExtendedUriTemplateResultDTO> extendedUris)
         {
             return extendedUris.Where(t =>
             {
@@ -554,7 +554,7 @@ namespace COLID.RegistrationService.Services.Implementation
 
             var extractedPidUrlPath = GetUrlPath(pidUrl);
 
-            if (!pidUrlSearchRegex.Contains("(.*)"))
+            if (!pidUrlSearchRegex.Contains("(.*)", StringComparison.Ordinal))
             {
                 return $"^{extractedPidUrlPath}$";
             }
@@ -578,11 +578,13 @@ namespace COLID.RegistrationService.Services.Implementation
                 //In all other cases the matched path will be replaced by the regex
                 else
                 {
-                    return $"^{extractedPidUrlPath.Replace(extractedMatch.Value, trimmedPidUrlSearchRegex)}";
+                    return $"^{extractedPidUrlPath.Replace(extractedMatch.Value, trimmedPidUrlSearchRegex, StringComparison.Ordinal)}";
                 }
             }
 
+#pragma warning disable CA2201 // Do not raise reserved exception types
             throw new System.Exception($"The regex of the extended uri template { pidUrlSearchRegex } failed on pidurl { pidUrl}.");
+#pragma warning restore CA2201 // Do not raise reserved exception types
         }
 
         /// <summary>
@@ -651,7 +653,8 @@ namespace COLID.RegistrationService.Services.Implementation
                 }
                 else 
                 { 
-                    var escapedConfigValue = (sectionHead.Equals("server") || sectionHead.Equals("\tserver") || sectionHead.Equals("events") || sectionHead.Equals("http")) ? string.Empty : "\"";
+                    var escapedConfigValue = (sectionHead.Equals("server", StringComparison.Ordinal) || sectionHead.Equals("\tserver", StringComparison.Ordinal) || 
+                        sectionHead.Equals("events", StringComparison.Ordinal) || sectionHead.Equals("http", StringComparison.Ordinal)) ? string.Empty : "\"";
                     sb.AppendLine($"{nextIndentation}{ keyValuePair.Key } {escapedConfigValue}{ keyValuePair.Value }{escapedConfigValue};");
                 }
             }
@@ -833,7 +836,7 @@ namespace COLID.RegistrationService.Services.Implementation
  
 
 
-        private ResourceProxyDTO ConvertResourceToProxyDto(ResourceRequestDTO resource)
+        private static ResourceProxyDTO ConvertResourceToProxyDto(ResourceRequestDTO resource)
         {
             var hasPid = resource.Properties.GetValueOrNull(Graph.Metadata.Constants.Resource.hasPID, true);
             string pidUri = hasPid != null ? hasPid.Id : "";

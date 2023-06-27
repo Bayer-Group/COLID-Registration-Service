@@ -32,7 +32,7 @@ namespace COLID.RegistrationService.Services.Implementation
         private readonly IConfiguration _configuration;
         private readonly ITokenService<ColidIndexingCrawlerServiceTokenOptions> _tokenService;        
         private readonly string IndexingCrawlerServiceReindexApi;
-
+        private readonly bool _bypassProxy;
         public Action<string, string, BasicProperty> PublishMessage { get; set; }
 
         public ReindexingService(
@@ -53,11 +53,12 @@ namespace COLID.RegistrationService.Services.Implementation
            
             var serverUrl = _configuration.GetConnectionString("indexingCrawlerServiceUrl");
             IndexingCrawlerServiceReindexApi = $"{serverUrl}/api/reindex";
+            _bypassProxy = configuration.GetValue<bool>("BypassProxy");
         }
 
         public async Task Reindex()
         {
-            using (var httpClient = _clientFactory.CreateClient())
+            using (var httpClient = (_bypassProxy ? _clientFactory.CreateClient("NoProxy") : _clientFactory.CreateClient()))
             {
                 var accessToken = await _tokenService.GetAccessTokenForWebApiAsync();
                 var response = await httpClient.SendRequestWithOptionsAsync(HttpMethod.Post, IndexingCrawlerServiceReindexApi,

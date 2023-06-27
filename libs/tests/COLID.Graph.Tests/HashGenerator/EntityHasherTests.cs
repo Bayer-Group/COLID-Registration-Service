@@ -37,7 +37,7 @@ namespace COLID.Graph.Tests.HashGenerator
         [Fact]
         public void HashEntity_Custom_Ignored_Property_Should_Be_Removed()
         {
-            const string customProperty = Graph.Metadata.Constants.Resource.HasResourceDefintion;
+            var customProperty = Graph.Metadata.Constants.Resource.HasResourceDefintion;
             var entity = new Entity { Properties = new Dictionary<string, List<dynamic>> { { customProperty, new List<dynamic> { "<p>remove me</p>" } } } };
             ISet<string> ignoredKeys = new HashSet<string> { customProperty };
 

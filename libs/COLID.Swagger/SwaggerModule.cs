@@ -199,7 +199,7 @@ namespace COLID.Swagger
             try
             {
                 var serviceName = AppDomain.CurrentDomain.FriendlyName.Split('.')[1];
-                serviceName = serviceName.Replace("Service", string.Empty);
+                serviceName = serviceName.Replace("Service", string.Empty, StringComparison.Ordinal);
 
                 return serviceName;
             }

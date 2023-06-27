@@ -9,7 +9,10 @@ namespace COLID.RegistrationService.Services.Interface
     public interface IEndpointTestService
     {
         void PushEndpointsInQueue();
+        void PushSingleEndpointInQueue(Uri distributionPidUri);
 
         void TestEndpoints(string mqValue);
+
+        IList<DistributionEndpointsTest> GetBrokenEndpoints();
     }
 }

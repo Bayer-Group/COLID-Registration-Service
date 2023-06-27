@@ -16,6 +16,8 @@ using COLID.Exception.Models;
 using COLID.Exception.Models.Business;
 using COLID.Graph.Metadata.DataModels.Metadata.Comparison;
 using Entity = COLID.Graph.TripleStore.DataModels.Base.Entity;
+using COLID.Graph.Metadata.DataModels.FilterGroup;
+
 namespace COLID.Graph.Metadata.Services
 {
     public class MetadataService : IMetadataService
@@ -296,7 +298,7 @@ namespace COLID.Graph.Metadata.Services
 
             string instanceGraph = entityTypeClass?.Properties?.GetValueOrNull(PIDO.Shacl.InstanceGraph, true);
 
-            // TODO:  In the future all graphs will be taken from ontology.
+            // TODO:  In the future all graphs will be taken from ontology. still todo?
             if (string.IsNullOrWhiteSpace(instanceGraph) || graphs.All(t => t.ToString() != instanceGraph))
             {
                 throw new BusinessException($"Instance graph for type {entityType} is not stored in metadata config. ");
@@ -518,7 +520,7 @@ namespace COLID.Graph.Metadata.Services
             return instantiableResourceTypes;
         }
 
-        public List<Entity> GetLinkedEntityTypes(List<Entity> entityType)
+        public IList<Entity> GetLinkedEntityTypes(IList<Entity> entityType)
         {
             foreach (var item in entityType)
             {
@@ -531,13 +533,13 @@ namespace COLID.Graph.Metadata.Services
 
         public IList<CategoryFilterDTO> GetCategoryFilter()
         {
-            List<CategoryFilterDTO> result = _metadataRepository.GetCategoryFilter();
+            IList<CategoryFilterDTO> result = _metadataRepository.GetCategoryFilter();
             return result;
 
         }
         public IList<CategoryFilterDTO> GetCategoryFilter(string categoryName)
         {
-            List<CategoryFilterDTO> result = _metadataRepository.GetCategoryFilter(categoryName);
+            IList<CategoryFilterDTO> result = _metadataRepository.GetCategoryFilter(categoryName);
             return result;
         }
         public IList<ResourceHierarchyDTO> GetCategoryFilterDmp()
@@ -582,17 +584,17 @@ namespace COLID.Graph.Metadata.Services
 
         }
 
-        public void CreateOrUpdateCategoryFilter(CategoryFilterDTO CategoryFilterDTO)
+        public void CreateOrUpdateCategoryFilter(CategoryFilterDTO categoryList)
         {
            // CategoryFilterDTO.ResourceTypes.ToList().ForEach(x => Guard.IsValidUri(new Uri(x)));
 
-            bool categoryExists = ! GetCategoryFilter(CategoryFilterDTO.Name).IsNullOrEmpty();
+            bool categoryExists = ! GetCategoryFilter(categoryList.Name).IsNullOrEmpty();
 
             if (categoryExists)
             {
                 throw new BusinessException($"Category already exist");
             }
-            _metadataRepository.AddCategoryFilter(CategoryFilterDTO);
+            _metadataRepository.AddCategoryFilter(categoryList);
         }
 
         public void DeleteCategoryFilter(string categoryName)
@@ -619,7 +621,15 @@ namespace COLID.Graph.Metadata.Services
         }
         public Dictionary<string, string> GetLinkTypes()
         {
-            return _metadataRepository.GetLinkTypes(); ;
+            return _metadataRepository.GetLinkTypes();
+        }
+
+        public IList<FilterGroup> GetFilterGroupAndProperties()
+        {
+            //Get Filter Groups and properties
+            var filterGrp = _metadataRepository.GetFilterGroups();
+
+            return filterGrp;
         }
     }
 }

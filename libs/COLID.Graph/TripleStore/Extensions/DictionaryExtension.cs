@@ -65,7 +65,9 @@ namespace COLID.Graph.TripleStore.Extensions
             return false;
         }
 
+#pragma warning disable CA1715 // Identifiers should have correct prefix
         public static void AddRange<T, S>(this IDictionary<T, S> source, IEnumerable<KeyValuePair<T, S>> collection)
+#pragma warning restore CA1715 // Identifiers should have correct prefix
         {
             if (collection == null)
             {

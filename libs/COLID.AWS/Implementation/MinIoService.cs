@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -36,12 +36,12 @@ namespace COLID.AWS.Implementation
 
         public override string GenerateS3ObjectUrl(string bucketName, string fileObjectPathPrefix, string fileName) => GenerateS3ObjectUrl(bucketName, $"{fileObjectPathPrefix}/{fileName}");
 
-        public override string GenerateS3ObjectUrl(string bucketName, string fileObjectPath)
+        public override string GenerateS3ObjectUrl(string bucketName, string fullKeyName)
         {
             UriBuilder builder = new UriBuilder(_awsConfig.S3ServiceUrl);
             builder.Host = "localhost";
 
-            return $"{builder}{bucketName}/{HttpUtility.UrlEncode(fileObjectPath)}";
+            return $"{builder}{bucketName}/{HttpUtility.UrlEncode(fullKeyName)}";
         }
     }
 }

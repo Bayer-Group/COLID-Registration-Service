@@ -73,11 +73,11 @@ namespace COLID.RegistrationService.Common.DataModel.Search
         /// <summary>
         /// Specifies the PID URIs for which resources should be returned. Specified filters affect the list.
         /// </summary>
-        public List<Uri> PidUris { get; set; }
+        public IList<Uri> PidUris { get; set; }
 
         /// <summary>
         /// Specifies the base uris for which resources should be returned. Specified filters affect the list.
         /// </summary>
-        public List<Uri> BaseUris { get; set; }
+        public IList<Uri> BaseUris { get; set; }
     }
 }

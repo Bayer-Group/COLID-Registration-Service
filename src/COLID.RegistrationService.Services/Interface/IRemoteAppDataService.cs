@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using COLID.Graph.Metadata.DataModels.Resources;
 using COLID.Graph.TripleStore.DataModels.Base;
 using COLID.RegistrationService.Common.DataModel.DistributionEndpoints;
+using COLID.RegistrationService.Common.DataModels.Contacts;
 using COLID.RegistrationService.Common.DataModels.TransferObjects;
 
 namespace COLID.RegistrationService.Services.Interface
@@ -66,17 +67,25 @@ namespace COLID.RegistrationService.Services.Interface
         Task NotifyInvalidDistributionEndpoint(InvalidDistributionEndpointMessage message);
 
         /// <summary>
+        /// Notify users about invalid data stewards and distribution endpoint contacts
+        /// </summary>
+        /// <param name="message">Containing the email to whom send the notification and list of the resources 
+        /// containing invalid contacts</param>
+        /// <returns></returns>
+        Task NotifyInvalidContact(ColidEntryContactInvalidUsersDto message);
+
+        /// <summary>
         /// 
         /// </summary>
         /// <param name="checkSuccessful"></param>
-        Task DeleteByAdditionalInfoAsync(List<string> checkSuccessful);
+        Task DeleteByAdditionalInfoAsync(IList<string> checkSuccessful);
 
         /// <summary>
         /// 
         /// </summary>
         /// <param name="checkUnsuccessful"></param>
         /// <returns></returns>
-        Task<List<(string pidUri, DateTime createdAt)>> GetByAdditionalInfoAsync(List<string> checkUnsuccessful);
+        Task<List<(string pidUri, DateTime createdAt)>> GetByAdditionalInfoAsync(IList<string> checkUnsuccessful);
 
         /// <summary>
         /// sends generic message to colid user
@@ -86,5 +95,13 @@ namespace COLID.RegistrationService.Services.Interface
         /// <param name="email"></param>
         /// <returns></returns>
         Task SendGenericMessage(string subject, string body, string email);
+
+        /// <summary>
+        /// Check a given list of user emails for invalid contacts
+        /// </summary>
+        /// <param name="userEmails">list of user emails</param>
+        /// <returns></returns>
+        Task<IList<AdUserDto>> CheckUsersValidity(ISet<string> userEmails);
+
     }
 }

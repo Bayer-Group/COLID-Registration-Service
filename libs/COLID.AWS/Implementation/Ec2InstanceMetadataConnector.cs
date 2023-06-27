@@ -41,7 +41,7 @@ namespace COLID.AWS.Implementation
             }
 
             _logger.LogInformation("Fetching AWS IAM Role");
-            var cancellationToken = new CancellationTokenSource();
+            using var cancellationToken = new CancellationTokenSource();
 
             try
             {
@@ -77,7 +77,7 @@ namespace COLID.AWS.Implementation
             }
 
             var awsIamRole = await GetIAMRoleIMDSv1();
-            var cancellationToken = new CancellationTokenSource();
+            using var cancellationToken = new CancellationTokenSource();
 
             _logger.LogInformation("Fetching AWS credentials");
             try

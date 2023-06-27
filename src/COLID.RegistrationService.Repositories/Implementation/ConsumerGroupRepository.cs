@@ -118,5 +118,38 @@ namespace COLID.RegistrationService.Repositories.Implementation
 
             return result.Result;
         }
+
+        //hasConsumerGroupContactPerson
+        public string GetContactPersonforConsumergroupe(Uri consumerGroupURI, Uri resourceNamedGraph)
+        {
+
+            SparqlParameterizedString parameterizedString = new SparqlParameterizedString();
+
+            var queryString =
+                @"
+                SELECT ?contacPerson
+                From @namedGraph
+                WHERE {
+                    @consumerGroup rdf:type pid:ConsumerGroup.
+                    @consumerGroup @contacPerson ?contacPerson
+                 }";
+
+            parameterizedString.CommandText = queryString;
+            parameterizedString.SetUri("consumerGroup", (consumerGroupURI));
+            parameterizedString.SetUri("namedGraph", resourceNamedGraph);
+            parameterizedString.SetUri("contacPerson", new Uri(Graph.Metadata.Constants.ConsumerGroup.HasContactPerson));
+
+            SparqlResultSet results = _tripleStoreRepository.QueryTripleStoreResultSet(parameterizedString);
+
+            var result = results.FirstOrDefault();
+
+            if (!results.Any())
+            {
+                return null;
+            }
+
+
+            return result.GetNodeValuesFromSparqlResult("contacPerson").Value ?? null;
+        }
     }
 }

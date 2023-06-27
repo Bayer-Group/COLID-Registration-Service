@@ -121,7 +121,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         [Authorize(Policy = nameof(SuperadministratorRequirement))]
         [ProducesResponseType(typeof(string), 404)]
         [Log(LogType.AuditTrail)]
-        public async Task<IActionResult> DeleteOrphanedIdentifierList([FromBody] List<string> uris)
+        public async Task<IActionResult> DeleteOrphanedIdentifierList([FromBody] IList<string> uris)
         {
             var result= await _identifierService.DeleteOrphanedIdentifierList(uris);
             return Ok(result);

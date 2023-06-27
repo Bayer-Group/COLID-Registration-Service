@@ -18,7 +18,9 @@ namespace COLID.RegistrationService.Services.Implementation.Comparison
             var firstLiteralLength = firstLiteral.Length;
             var secondLiteralLength = secondLiteral.Length;
 
+#pragma warning disable CA1814 // Prefer jagged arrays over multidimensional
             var matrix = new int[firstLiteralLength + 1, secondLiteralLength + 1];
+#pragma warning restore CA1814 // Prefer jagged arrays over multidimensional
 
             // First calculation, if one entry is empty return full length
             if (firstLiteralLength == 0)

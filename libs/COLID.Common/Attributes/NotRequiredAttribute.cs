@@ -2,7 +2,7 @@
 
 namespace COLID.Common.DataModel.Attributes
 {
-    public class NotRequiredAttribute : ValidationAttribute
+    public sealed class NotRequiredAttribute : ValidationAttribute
     {
         /// <summary>
         ///  Initializes a new instance of the NotRequiredAttribute class

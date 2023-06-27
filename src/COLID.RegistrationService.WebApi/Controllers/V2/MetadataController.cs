@@ -19,7 +19,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V2
     [ApiVersion(Constants.API.Version.V2)]
     [Route("api/v{version:apiVersion}/metadata")]
     [Produces(MediaTypeNames.Application.Json)]
-    [Obsolete]
+    [Obsolete("A new version of this endpoint is available")]
     public class MetadataController : Controller
     {
         private readonly IMetadataService _metadataService;

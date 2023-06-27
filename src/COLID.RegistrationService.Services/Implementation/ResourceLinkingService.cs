@@ -45,9 +45,9 @@ namespace COLID.RegistrationService.Services.Implementation
             return LinkResourceIntoList(pidUri, resourcePidUriToLink, out _);
         }
 
-        public string LinkResourceIntoList(Uri pidUri, Uri resourcePidUriToLink, out IList<VersionOverviewCTO> versionList)
+        public string LinkResourceIntoList(Uri pidUri, Uri pidUriToLink, out IList<VersionOverviewCTO> versionList)
         {
-            _logger.LogInformation("Link resource with pidUri {pidUri} with list of resource with {resourcePidUriToLink}.", pidUri, resourcePidUriToLink);
+            _logger.LogInformation("Link resource with pidUri {pidUri} with list of resource with {resourcePidUriToLink}.", pidUri, pidUriToLink);
 
             Uri draftGraphUri = DraftInstanceGraph();
             Uri instanceGraphUri = InstanceGraph();
@@ -68,80 +68,85 @@ namespace COLID.RegistrationService.Services.Implementation
 
             var resourceToLink = _resourceRepository.GetMainResourceByPidUri(pidUri, resourceTypes, graphsToSearchIn);
 
-            string resourceVersion = resourceToLink.Properties.GetValueOrNull(Graph.Metadata.Constants.Resource.HasVersion, true);
-
-            if (resourceVersion == null)
+            if (resourceToLink.Properties.GetValueOrNull(Graph.Metadata.Constants.Resource.HasVersion, true) == null)
             {
                 throw new BusinessException(Common.Constants.Messages.Resource.Linking.LinkFailedNoVersionGiven);
-            }
-
-            if (resourceToLink.LaterVersion != null)
-            {
-                throw new BusinessException(Common.Constants.Messages.Resource.Linking.LinkFailedAlreadyInList);
             }
 
             Dictionary<Uri, bool> graphsToSearchIn2 = new Dictionary<Uri, bool>();
             graphsToSearchIn2.Add(draftGraphUri, false);
             graphsToSearchIn2.Add(instanceGraphUri, false);
 
-            var resourceExists2 = checkIfResourceExistAndReturnNamedGraph(resourcePidUriToLink, resourceTypes);
+            var resourceExists2 = checkIfResourceExistAndReturnNamedGraph(pidUriToLink, resourceTypes);
             var namedGraph2 = !resourceExists2.GetValueOrDefault(draftGraphUri) ? instanceGraphUri : draftGraphUri;
             graphsToSearchIn2[namedGraph2] = true;
 
-            var resourceToLinkTo = _resourceRepository.GetMainResourceByPidUri(resourcePidUriToLink, resourceTypes, graphsToSearchIn2);
-            var listOfResourceVersions = resourceToLinkTo.Versions;
+            var resourceToLinkTo = _resourceRepository.GetMainResourceByPidUri(pidUriToLink, resourceTypes, graphsToSearchIn2);
 
-            if (listOfResourceVersions != null &&
-                listOfResourceVersions.Any(r => r.Version.CompareVersionTo(resourceVersion) == 0))
-            {
-                throw new BusinessException(Common.Constants.Messages.Resource.Linking.LinkFailedVersionAlreadyInList);
-            }
-
-            if (listOfResourceVersions == null)
+            if (resourceToLinkTo.Properties.GetValueOrNull(Graph.Metadata.Constants.Resource.HasVersion, true) == null)
             {
                 throw new BusinessException(Common.Constants.Messages.Resource.Linking.LinkFailedNoVersionGiven);
             }
 
-            var (previousVersionPidUri, laterVersionPidUri) =
-                FindPositionInVersionList(listOfResourceVersions, resourceVersion);
+            var listOfResourceVersionsOrigin = resourceToLink.Versions;
+            var listOfResourceVersionsTarget = resourceToLinkTo.Versions;
 
+            if (listOfResourceVersionsOrigin.Any(versionOrigin => listOfResourceVersionsTarget.Any(versionTarget => versionTarget.Version.CompareTo(versionOrigin.Version) == 0))) {
+                throw new BusinessException(Common.Constants.Messages.Resource.Linking.LinkFailedVersionAlreadyInList);
+            }
+            var listOfResourceVersions = listOfResourceVersionsOrigin.Concat(listOfResourceVersionsTarget).ToList();
+            listOfResourceVersions.Sort((a, b) => ListStringExtension.CompareVersionTo(a.Version, b.Version));
+
+            var resourcesToReindex = new List<Uri>();
             using (var transaction = _resourceRepository.CreateTransaction())
             {
-                if (previousVersionPidUri != null && laterVersionPidUri != null)
+                foreach (var version in listOfResourceVersions)
                 {
+                    var laterVersionPidUri =
+                    FindPositionInVersionList(listOfResourceVersions, version.Version);
 
-                    _resourceRepository.DeleteLinkingProperty(new Uri(previousVersionPidUri),
-                        new Uri(Graph.Metadata.Constants.Resource.HasLaterVersion), _resourceRepository.GetIdByPidUri(new Uri(laterVersionPidUri), allGraph), instanceGraphUri); ;
-                    _resourceRepository.DeleteLinkingProperty(new Uri(previousVersionPidUri),
-                        new Uri(Graph.Metadata.Constants.Resource.HasLaterVersion), _resourceRepository.GetIdByPidUri(new Uri(laterVersionPidUri), allGraph), draftGraphUri);
-                }
+                    var id = laterVersionPidUri != null ? _resourceRepository.GetIdByPidUri(new Uri(laterVersionPidUri), allGraph) : null;
 
-                if (previousVersionPidUri != null)
-                {
-                    _resourceRepository.CreateLinkingProperty(new Uri(previousVersionPidUri),
-                        new Uri(Graph.Metadata.Constants.Resource.HasLaterVersion), _resourceRepository.GetIdByPidUri(resourceToLink.PidUri, allGraph), instanceGraphUri);
-                    _resourceRepository.CreateLinkingProperty(new Uri(previousVersionPidUri),
-                       new Uri(Graph.Metadata.Constants.Resource.HasLaterVersion), _resourceRepository.GetIdByPidUri(resourceToLink.PidUri, allGraph), draftGraphUri);
-                }
+                    if (id != null && version.LaterVersion != id.ToString())
+                    {
+                        if (version.LaterVersion != null)
+                        {
+                            _resourceRepository.DeleteLinkingProperty(new Uri(version.PidUri),
+                            new Uri(Graph.Metadata.Constants.Resource.HasLaterVersion), new Uri(version.LaterVersion), instanceGraphUri);
+                            _resourceRepository.DeleteLinkingProperty(new Uri(version.PidUri),
+                                new Uri(Graph.Metadata.Constants.Resource.HasLaterVersion), new Uri(version.LaterVersion), draftGraphUri);
+                        }
 
-                if (laterVersionPidUri != null)
-                {
-                    _resourceRepository.CreateLinkingProperty(resourceToLink.PidUri,
-                        new Uri(Graph.Metadata.Constants.Resource.HasLaterVersion), _resourceRepository.GetIdByPidUri(new Uri(laterVersionPidUri), allGraph), instanceGraphUri);
-                    _resourceRepository.CreateLinkingProperty(resourceToLink.PidUri,
-                        new Uri(Graph.Metadata.Constants.Resource.HasLaterVersion), _resourceRepository.GetIdByPidUri(new Uri(laterVersionPidUri), allGraph), draftGraphUri);
+                        _resourceRepository.CreateLinkingProperty(new Uri(version.PidUri),
+                            new Uri(Graph.Metadata.Constants.Resource.HasLaterVersion), _resourceRepository.GetIdByPidUri(new Uri(laterVersionPidUri), allGraph), instanceGraphUri);
+                        _resourceRepository.CreateLinkingProperty(new Uri(version.PidUri),
+                           new Uri(Graph.Metadata.Constants.Resource.HasLaterVersion), _resourceRepository.GetIdByPidUri(new Uri(laterVersionPidUri), allGraph), draftGraphUri);
+
+                        resourcesToReindex.Add(new Uri(version.PidUri));
+                    }
 
                 }
 
                 transaction.Commit();
-
-                var linkedResources = _resourceRepository.GetResourcesByPidUri(pidUri, resourceTypes, graphsToSearchIn);
-                versionList = linkedResources.Versions;
-
-                _reindexingService.IndexLinkedResource(pidUri, linkedResources.GetDraftOrPublishedVersion(), linkedResources);
-
-                return Common.Constants.Messages.Resource.Linking.LinkSuccessful;
             }
+
+            foreach (var resource in resourcesToReindex)
+            {
+                Dictionary<Uri, bool> graphsToBeSearched = new Dictionary<Uri, bool>();
+                graphsToBeSearched.Add(draftGraphUri, false);
+                graphsToBeSearched.Add(instanceGraphUri, false);
+
+                var checkResult = checkIfResourceExistAndReturnNamedGraph(resource, resourceTypes);
+                var graphToSearchIn = !checkResult.GetValueOrDefault(draftGraphUri) ? instanceGraphUri : draftGraphUri;
+                graphsToBeSearched[graphToSearchIn] = true;
+                var resourceCTO = _resourceRepository.GetResourcesByPidUri(resource, resourceTypes, graphsToBeSearched);
+                _reindexingService.IndexLinkedResource(resource, resourceCTO.GetDraftOrPublishedVersion(), resourceCTO);
+            }
+
+            var linkedResources = _resourceRepository.GetResourcesByPidUri(pidUri, resourceTypes, graphsToSearchIn);
+            versionList = linkedResources.Versions;
+
+            return Common.Constants.Messages.Resource.Linking.LinkSuccessful;
         }
 
         public bool UnlinkResourceFromList(Uri pidUri, bool deletingProcess, out string message)
@@ -230,7 +235,7 @@ namespace COLID.RegistrationService.Services.Implementation
             }
         }
 
-        public List<RRMResource> GetLinksOfPublishedResource(List<Uri> pidUris)
+        public IList<RRMResource> GetLinksOfPublishedResource(IList<Uri> pidUris)
         {
             if (!pidUris.Any())
             {
@@ -329,12 +334,12 @@ namespace COLID.RegistrationService.Services.Implementation
             }).ToList();
         }
 
-        private IList<VersionOverviewCTO> GetPredecessorVersionList(Resource resource)
+        private static IList<VersionOverviewCTO> GetPredecessorVersionList(Resource resource)
         {
             var currentVersion = Convert.ToInt32(resource.Versions.Single(x => x.PidUri == resource.PidUri.ToString())?.Version);
             return resource.Versions.Where(x => Convert.ToInt32(x.Version) < currentVersion).ToList(); //take only predecessors
         }
-        private bool AllowedToUnlink(Resource resource, out string message)
+        private static bool AllowedToUnlink(Resource resource, out string message)
         {
             message = string.Empty;
 
@@ -352,31 +357,26 @@ namespace COLID.RegistrationService.Services.Implementation
             return true;
         }
 
-        private static (string previousVersion, string laterVersion) FindPositionInVersionList(
+        private static string FindPositionInVersionList(
             IList<VersionOverviewCTO> listOfResourceVersions, string newResourceVersion)
         {
-            string prev = null;
             string later = null;
 
             if (listOfResourceVersions == null)
             {
-                return (prev, later);
+                return later;
             }
 
             foreach (var resource in listOfResourceVersions)
             {
-                if (resource.Version.CompareVersionTo(newResourceVersion) < 0)
-                {
-                    prev = resource.PidUri;
-                }
-                else if (resource.Version.CompareVersionTo(newResourceVersion) >= 0)
+                if (resource.Version.CompareVersionTo(newResourceVersion) > 0)
                 {
                     later = resource.PidUri;
                     break;
                 }
             }
 
-            return (prev, later);
+            return later;
         }
 
         private Uri InstanceGraph()

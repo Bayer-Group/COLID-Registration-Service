@@ -162,7 +162,7 @@ namespace COLID.Graph.HashGenerator.Services
         /// - Main Distribution
         /// </summary>
         /// <param name="entity">the entity to use</param>
-        private IDictionary<string, List<dynamic>> RemoveIdFromDistributionEndpoints(IDictionary<string, List<dynamic>> properties)
+        private static IDictionary<string, List<dynamic>> RemoveIdFromDistributionEndpoints(IDictionary<string, List<dynamic>> properties)
         {
             return properties
                 .Select(propertyValues =>
@@ -215,7 +215,7 @@ namespace COLID.Graph.HashGenerator.Services
             return sortedProperties;
         }
 
-        private string GetKeyToOrderBy(dynamic value)
+        private static string GetKeyToOrderBy(dynamic value)
         {
             if (DynamicExtension.IsType<Entity>(value, out Entity entity))
             {
@@ -239,7 +239,7 @@ namespace COLID.Graph.HashGenerator.Services
         /// <summary>
         /// Get a list of technical and invisible technical keys to ignore.
         /// </summary>
-        private ISet<string> GetTechnicalKeys()
+        private static ISet<string> GetTechnicalKeys()
         {
             return new HashSet<string>
             {

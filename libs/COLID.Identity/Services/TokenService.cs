@@ -38,7 +38,7 @@ namespace COLID.Identity.Services
 
         public async Task<string> GetAccessTokenForWebApiAsync()
         {
-            if (!serviceEnabled)
+            if (!serviceEnabled)//why is serviceEnabled false?
             {
                 return null;
             }

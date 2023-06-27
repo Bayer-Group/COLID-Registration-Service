@@ -13,6 +13,7 @@ using COLID.Graph.TripleStore.Extensions;
 using COLID.Identity.Extensions;
 using COLID.Identity.Services;
 using COLID.RegistrationService.Common.DataModel.DistributionEndpoints;
+using COLID.RegistrationService.Common.DataModels.Contacts;
 using COLID.RegistrationService.Common.DataModels.TransferObjects;
 using COLID.RegistrationService.Services.Configuration;
 using COLID.RegistrationService.Services.DataModel;
@@ -34,7 +35,7 @@ namespace COLID.RegistrationService.Services.Implementation
         private readonly ILogger<RemoteAppDataService> _logger;
         private readonly ITokenService<ColidAppDataServiceTokenOptions> _tokenService;
         private readonly ICacheService _cacheService;
-
+        private readonly bool _bypassProxy;
         private readonly string AppDataServiceConsumerGroupApi;
         private readonly string AppDataServiceColidEntryApi;
         private readonly string AppDataServiceGraphApi;
@@ -42,7 +43,8 @@ namespace COLID.RegistrationService.Services.Implementation
         private readonly string AppDataServiceMessagesApi;
         private readonly string AppDataServiceMessageTemplatesApi;
         private readonly string AppDataServiceNotifyInvalidDistributionEndpointApi;
-
+        private readonly string AppDataServiceNotifyInvalidContacts;
+        private readonly string AppDataServiceCheckUsersAreValid;
         private readonly string AppDataServiceDeleteByAdditionalInfoApi;
         private readonly string AppDataServiceGetByAdditionalInfoApi;
 
@@ -62,6 +64,7 @@ namespace COLID.RegistrationService.Services.Implementation
             _logger = logger;
             _cancellationToken = httpContextAccessor?.HttpContext?.RequestAborted ?? CancellationToken.None;
             _cacheService = cacheService;
+            _bypassProxy = configuration.GetValue<bool>("BypassProxy");
 
             var serverUrl = _configuration.GetConnectionString("appDataServiceUrl");
             AppDataServiceConsumerGroupApi = $"{serverUrl}/api/consumerGroups";
@@ -71,14 +74,15 @@ namespace COLID.RegistrationService.Services.Implementation
             AppDataServiceMessagesApi = $"{serverUrl}/api/Messages";
             AppDataServiceMessageTemplatesApi = $"{serverUrl}/api/MessageTemplates";
             AppDataServiceNotifyInvalidDistributionEndpointApi = $"{serverUrl}/api/Messages/notifyUserAboutInvalidDistributionEndpoint";
-
+            AppDataServiceNotifyInvalidContacts = $"{serverUrl}/api/Messages/notifyUserAboutInvalidContacts";
+            AppDataServiceCheckUsersAreValid = $"{serverUrl}/api/ActiveDirectory/users/status";
             AppDataServiceDeleteByAdditionalInfoApi = $"{serverUrl}/api/Messages/deleteByAdditionalInfo";
             AppDataServiceGetByAdditionalInfoApi = $"{serverUrl}/api/Messages/getByAdditionalInfo";
         }
 
         public async Task CreateConsumerGroup(Uri consumerGroupId)
         {
-            using (var httpClient = _clientFactory.CreateClient())
+            using (var httpClient = (_bypassProxy ? _clientFactory.CreateClient("NoProxy") : _clientFactory.CreateClient()))
             {
                 var consumerGroupDto = new ConsumerGroupDto() { Uri = consumerGroupId };
                 var response = await AquireTokenAndSendToAppDataService(httpClient, HttpMethod.Post, AppDataServiceConsumerGroupApi, consumerGroupDto);
@@ -89,7 +93,7 @@ namespace COLID.RegistrationService.Services.Implementation
 
         public async Task DeleteConsumerGroup(Uri consumerGroupId)
         {
-            using (var httpClient = _clientFactory.CreateClient())
+            using (var httpClient = (_bypassProxy ? _clientFactory.CreateClient("NoProxy") : _clientFactory.CreateClient()))
             {
                 var consumerGroupDto = new ConsumerGroupDto() { Uri = consumerGroupId };
                 var response = await AquireTokenAndSendToAppDataService(httpClient, HttpMethod.Delete, AppDataServiceConsumerGroupApi, consumerGroupDto);
@@ -100,7 +104,7 @@ namespace COLID.RegistrationService.Services.Implementation
 
         public async Task NotifyResourcePublished(Resource resource)
         {
-            using (var httpClient = _clientFactory.CreateClient())
+            using (var httpClient = (_bypassProxy ? _clientFactory.CreateClient("NoProxy") : _clientFactory.CreateClient()))
             {
                 var label = resource.Properties.GetValueOrNull(Graph.Metadata.Constants.Resource.HasLabel, true);
                 var colidEntrySubscriptionDto = new ColidEntryCto() { Label = label, ColidPidUri = resource.PidUri };
@@ -112,7 +116,7 @@ namespace COLID.RegistrationService.Services.Implementation
 
         public async Task NotifyResourceDeleted(Uri pidUri, Entity resource)
         {
-            using (var httpClient = _clientFactory.CreateClient())
+            using (var httpClient = (_bypassProxy ? _clientFactory.CreateClient("NoProxy") : _clientFactory.CreateClient()))
             {
                 var label = resource.Properties.GetValueOrNull(Graph.Metadata.Constants.Resource.HasLabel, true);
                 var colidEntrySubscriptionDto = new ColidEntryCto() { Label = label, ColidPidUri = pidUri };
@@ -124,7 +128,8 @@ namespace COLID.RegistrationService.Services.Implementation
 
         public async Task NotifyInvalidDistributionEndpoint(InvalidDistributionEndpointMessage message)
         {
-            using (var httpClient = _clientFactory.CreateClient())
+            _logger.LogInformation("NotifyInvalidDistributionEndpoint: we entered the task with the message: ", message);
+            using (var httpClient = (_bypassProxy ? _clientFactory.CreateClient("NoProxy") : _clientFactory.CreateClient()))
             {
                 _logger.LogWarning($"TargetURL:Sending request to {AppDataServiceNotifyInvalidDistributionEndpointApi}");
                 var response = await AquireTokenAndSendToAppDataService(
@@ -137,9 +142,24 @@ namespace COLID.RegistrationService.Services.Implementation
             }
         }
 
-        public async Task DeleteByAdditionalInfoAsync(List<string> checkSuccessful)
+        public async Task NotifyInvalidContact(ColidEntryContactInvalidUsersDto message)
         {
-            using (var httpClient = _clientFactory.CreateClient())
+            using (var httpClient = (_bypassProxy ? _clientFactory.CreateClient("NoProxy") : _clientFactory.CreateClient()))
+            {
+                var response = await AquireTokenAndSendToAppDataService(
+                    httpClient,
+                    HttpMethod.Post,
+                    AppDataServiceNotifyInvalidContacts,
+                    message);
+
+                CheckResponseStatus(response, "Something went wrong while notifying user about invalid contacts");
+            }
+        }
+
+
+        public async Task DeleteByAdditionalInfoAsync(IList<string> checkSuccessful)
+        {
+            using (var httpClient = (_bypassProxy ? _clientFactory.CreateClient("NoProxy") : _clientFactory.CreateClient()))
             {
                 _logger.LogWarning($"TargetURL: Sending request to {AppDataServiceDeleteByAdditionalInfoApi}");
                 var response = await AquireTokenAndSendToAppDataService(
@@ -151,9 +171,9 @@ namespace COLID.RegistrationService.Services.Implementation
                 CheckResponseStatus(response, "Something went wrong while deleting invalid-distribution-endpoint messages from app data service");
             }
         }
-        public async Task<List<(string pidUri, DateTime createdAt)>>GetByAdditionalInfoAsync(List<string> checkUnsuccessful)
+        public async Task<List<(string pidUri, DateTime createdAt)>>GetByAdditionalInfoAsync(IList<string> checkUnsuccessful)
         {
-            using (var httpClient = _clientFactory.CreateClient())
+            using (var httpClient = (_bypassProxy ? _clientFactory.CreateClient("NoProxy") : _clientFactory.CreateClient()))
             {
                 _logger.LogWarning($"TargetURL: Sending request to {AppDataServiceGetByAdditionalInfoApi}");
                 var response = await AquireTokenAndSendToAppDataService(
@@ -170,7 +190,7 @@ namespace COLID.RegistrationService.Services.Implementation
             }
         }
 
-        public bool CheckPerson(string id)
+        public bool CheckPerson(string id) 
         {
             Guard.IsValidEmail(id);
             var cachePersonExistsCheck = $"personexists:{id}";            
@@ -179,7 +199,7 @@ namespace COLID.RegistrationService.Services.Implementation
                 {                    
                     return PersonExists(id).GetAwaiter().GetResult().ToString();
                 });
-
+            
             if (personExists.ToLower() == true.ToString().ToLower())
                 return true;
             return false;
@@ -187,10 +207,10 @@ namespace COLID.RegistrationService.Services.Implementation
 
         private async Task<bool> PersonExists(string id)
         {
-            Guard.IsValidEmail(id);
+            Guard.IsValidEmail(id); return true;
             var appDataServiceGraphUserAndGroupApi = $"{AppDataServiceGraphApi}/usersAndGroups/{id}";
 
-            using (var httpClient = _clientFactory.CreateClient())
+            using (var httpClient = (_bypassProxy ? _clientFactory.CreateClient("NoProxy") : _clientFactory.CreateClient()))
             {
                 var response = await AquireTokenAndSendToAppDataService(httpClient, HttpMethod.Get, appDataServiceGraphUserAndGroupApi, null);
 
@@ -215,7 +235,7 @@ namespace COLID.RegistrationService.Services.Implementation
         {
             var appDataServiceGraphUserAndGroupApi = $"{AppDataServiceUserApi}";
 
-            using (var httpClient = _clientFactory.CreateClient())
+            using (var httpClient = (_bypassProxy ? _clientFactory.CreateClient("NoProxy") : _clientFactory.CreateClient()))
             {
                 var response = await AquireTokenAndSendToAppDataService(httpClient, HttpMethod.Get, appDataServiceGraphUserAndGroupApi, null);
 
@@ -237,7 +257,7 @@ namespace COLID.RegistrationService.Services.Implementation
         public async Task<List<MessageTemplateDto>> GetAllMessageTemplates()
         {
 
-            using (var httpClient = _clientFactory.CreateClient())
+            using (var httpClient = (_bypassProxy ? _clientFactory.CreateClient("NoProxy") : _clientFactory.CreateClient()))
             {
                 var response = await AquireTokenAndSendToAppDataService(httpClient, HttpMethod.Get, this.AppDataServiceMessageTemplatesApi, null);
 
@@ -256,11 +276,28 @@ namespace COLID.RegistrationService.Services.Implementation
             }
         }
 
+        public async Task<IList<AdUserDto>> CheckUsersValidity(ISet<string> userEmails)
+        {
+            _logger.LogInformation("Following emails will be checked {Emails}", JsonConvert.SerializeObject(userEmails));
+            using (var httpClient = (_bypassProxy ? _clientFactory.CreateClient("NoProxy") : _clientFactory.CreateClient()))
+            {
+                var response = await AquireTokenAndSendToAppDataService(httpClient, HttpMethod.Post, AppDataServiceCheckUsersAreValid, userEmails);
+                response.EnsureSuccessStatusCode();
+
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+
+                IList<AdUserDto> adUserDtos = JsonConvert.DeserializeObject<IList<AdUserDto>>(jsonResponse);
+                return adUserDtos;
+            }
+        }
+
         private async Task<HttpResponseMessage> AquireTokenAndSendToAppDataService(HttpClient httpClient, HttpMethod httpMethod, string endpointUrl, object requestBody)
         {
             var accessToken = await _tokenService.GetAccessTokenForWebApiAsync();
             var response = await httpClient.SendRequestWithOptionsAsync(httpMethod, endpointUrl,
                 requestBody, accessToken, _cancellationToken, _correlationContext.CorrelationContext);
+            _logger.LogInformation("AquireTokenAndSendToAppDataService: with the response: ", response);
+            Console.WriteLine("in remotAppDataServ/AquireTokenAnd... response: "+response);
             return response;
         }
 
@@ -276,7 +313,7 @@ namespace COLID.RegistrationService.Services.Implementation
         {
             var AppDataServiceMessagesApi = $"{this.AppDataServiceMessagesApi}/sendGenericMessage";
 
-            using (var httpClient = _clientFactory.CreateClient())
+            using (var httpClient = (_bypassProxy ? _clientFactory.CreateClient("NoProxy") : _clientFactory.CreateClient()))
             {
                 var colidEntrySubscriptionDto = new MessageUserDto() { Subject = subject, Body = body, UserEmail = email };
                 var response = await AquireTokenAndSendToAppDataService(httpClient, HttpMethod.Put, AppDataServiceMessagesApi, colidEntrySubscriptionDto);

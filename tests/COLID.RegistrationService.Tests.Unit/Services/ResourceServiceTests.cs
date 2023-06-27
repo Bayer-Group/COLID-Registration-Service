@@ -31,6 +31,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
+using static COLID.Graph.Metadata.Constants.Resource;
 using Entity = COLID.Graph.TripleStore.DataModels.Base.Entity;
 using Resource = COLID.Graph.Metadata.DataModels.Resources.Resource;
 

@@ -19,7 +19,7 @@ namespace COLID.SQS
         public static IServiceCollection AddAWSSQSModule(this IServiceCollection services, IConfiguration configuration)
         {
             if (configuration.GetSection("AWSSQSConfiguration") == null)
-                throw new ArgumentNullException("AWSSQSConfiguration");
+                throw new ArgumentNullException("configuration");
 
             //services.Configure<AWSSQSConfiguration>(configuration.GetSection("AWSSQSConfiguration"));
             //services.Configure<AWSSQSConfiguration>(options =>

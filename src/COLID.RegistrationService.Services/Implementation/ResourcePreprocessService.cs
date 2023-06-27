@@ -203,7 +203,7 @@ namespace COLID.RegistrationService.Services.Implementation
             return new Tuple<ValidationResult, bool, EntityValidationFacade>(validationResult, failed, validationFacade);
         }
 
-        private bool ProcessFailed(ValidationResult validationResult, ResourceCrudAction resourceCrudAction)
+        private static bool ProcessFailed(ValidationResult validationResult, ResourceCrudAction resourceCrudAction)
         {
             if (validationResult.Severity == ValidationResultSeverity.Violation)
             {
@@ -214,7 +214,7 @@ namespace COLID.RegistrationService.Services.Implementation
                    resourceCrudAction == ResourceCrudAction.Publish;
         }
 
-        private bool IsWarningSeverity(ValidationResultProperty property, ResourceCrudAction resourceCrudAction)
+        private static bool IsWarningSeverity(ValidationResultProperty property, ResourceCrudAction resourceCrudAction)
         {
             return property.ResultSeverity == ValidationResultSeverity.Violation &&
                    !Common.Constants.Validation.CriticalProperties.Contains(property.Path) &&
@@ -224,7 +224,7 @@ namespace COLID.RegistrationService.Services.Implementation
         /// <summary>
         /// While publishing a resource, ensure property is on the right resource
         /// </summary>
-        private void UpdatePropertyFromRepositoryResource(string propertyName, EntityValidationFacade validationFacade)
+        private static void UpdatePropertyFromRepositoryResource(string propertyName, EntityValidationFacade validationFacade)
         {
             var repoResource = validationFacade.ResourcesCTO.GetDraftOrPublishedVersion();
 
@@ -234,7 +234,7 @@ namespace COLID.RegistrationService.Services.Implementation
             }
         }
 
-        private void RemoveProperty(string propertyName, Entity resource)
+        private static void RemoveProperty(string propertyName, Entity resource)
         {
             if (resource.Properties.ContainsKey(propertyName))
             {
@@ -320,7 +320,7 @@ namespace COLID.RegistrationService.Services.Implementation
         /// <param name="subEntity">The sub entity.</param>
         /// <param name="mainResource">The resource, where the sub entity belongs to.</param>
         /// <returns>The entity id of the nested entity. Empty, if the subproperty should be saved as a copy with a new id.</returns>
-        private string GetNestedEntityId(string key, Entity subEntity, ResourcesCTO mainResource)
+        private static string GetNestedEntityId(string key, Entity subEntity, ResourcesCTO mainResource)
         {
            /* if(key != Graph.Metadata.Constants.AttachmentConstants.HasAttachment && mainResource.HasPublishedAndNoDraft)
             {

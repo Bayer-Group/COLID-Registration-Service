@@ -24,7 +24,7 @@ namespace COLID.RegistrationService.Services.Validation
         private readonly IResourceRepository _resourceRepository;
         private readonly IIdentifierService _identifierService;
 
-        private readonly string _cachePrefix;
+        //private readonly string _cachePrefix;
 
         public IdentifierValidationService(IMetadataService metadataService, IIdentifierService identifierService, IResourceRepository resourceRepository)
         {
@@ -70,7 +70,7 @@ namespace COLID.RegistrationService.Services.Validation
             var targetUriResults = GetDuplicateResultsByTargetUri(resource, out var targetUri);
 
             // allow the pidURI to be duplicate when changing resource type
-            if (pidUri!=null && pidUri!=string.Empty)
+            if (!string.IsNullOrEmpty(pidUri))
             {
                 if (pidUriResults.Count==2 && pidUriResults[0].Type!=pidUriResults[1].Type && resource.Id!=null)
                 {
@@ -125,7 +125,7 @@ namespace COLID.RegistrationService.Services.Validation
         /// <param name="resource">Id of the entity to be checked</param>
         /// <param name="resourceId">Resource id of the main entry (parent entry id)</param>
         /// <returns></returns>
-        private bool CheckIdentifierIsDuplicate(IList<DuplicateResult> pidUriResults, Entity resource, string resourceId, out bool orphaned )
+        private static bool CheckIdentifierIsDuplicate(IList<DuplicateResult> pidUriResults, Entity resource, string resourceId, out bool orphaned )
         {
             string resourceType = resource.Properties.GetValueOrNull(Graph.Metadata.Constants.RDF.Type, true);
             orphaned = false;

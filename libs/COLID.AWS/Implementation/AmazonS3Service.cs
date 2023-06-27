@@ -46,36 +46,33 @@ namespace COLID.AWS.Implementation
             return new AmazonS3Client(awsCredentials.AccessKeyId, awsCredentials.SecretAccessKey, RegionEndpoint.GetBySystemName(_awsConfig.S3Region));
         }
 
-        private async Task<AmazonWebServicesSecurityCredentials> GetECSCredentials()
-        {
-            try
-            {
-                string uri = System.Environment.GetEnvironmentVariable(ECSTaskCredentials.ContainerCredentialsURIEnvVariable);
-                if (!string.IsNullOrEmpty(uri))
-                {
-                    IWebProxy webProxy = System.Net.WebRequest.GetSystemWebProxy();
-                    var ecsTaskCredentials = new ECSTaskCredentials(webProxy);
-                    var credentials = ecsTaskCredentials.GetCredentials();
-
-                    return new AmazonWebServicesSecurityCredentials()
-                    {
-                        AccessKeyId= credentials.AccessKey,
-                        SecretAccessKey=credentials.SecretKey,
-                        Token=credentials.Token 
-                    };
-                }
-            }
-            catch (SecurityException e)
-            {
-                Logger.GetLogger(typeof(ECSTaskCredentials)).Error(e, "Failed to access environment variable {0}", ECSTaskCredentials.ContainerCredentialsURIEnvVariable);
-            }
-           
+        private async Task<AmazonWebServicesSecurityCredentials> GetECSCredentials()
+        {
+            try
+            {
+                string uri = System.Environment.GetEnvironmentVariable(ECSTaskCredentials.ContainerCredentialsURIEnvVariable);
+                if (!string.IsNullOrEmpty(uri))
+                {
+                    IWebProxy webProxy = System.Net.WebRequest.GetSystemWebProxy();
+                    using var ecsTaskCredentials = new ECSTaskCredentials(webProxy);
+                    var credentials = ecsTaskCredentials.GetCredentials();
+                    return new AmazonWebServicesSecurityCredentials()
+                    {
+                        AccessKeyId= credentials.AccessKey,                        SecretAccessKey=credentials.SecretKey,
+                        Token=credentials.Token 
+                    };
+                }
+            }
+            catch (SecurityException e)
+            {
+                Logger.GetLogger(typeof(ECSTaskCredentials)).Error(e, "Failed to access environment variable {0}", ECSTaskCredentials.ContainerCredentialsURIEnvVariable);
+            }           
             return new AmazonWebServicesSecurityCredentials
             {
                 Expiration = DateTime.Now.AddMonths(36).ToString(),
                 AccessKeyId = _awsConfig.AccessKeyId,
                 SecretAccessKey = _awsConfig.SecretAccessKey
-            };
+            };
         }
 
         private async Task<AmazonWebServicesSecurityCredentials> GetCredentials()
@@ -248,10 +245,10 @@ namespace COLID.AWS.Implementation
 
         public virtual string GenerateS3ObjectUrl(string bucketName, string fileObjectPathPrefix, string fileName) => GenerateS3ObjectUrl(bucketName, $"{fileObjectPathPrefix}/{fileName}");
         
-        public virtual string GenerateS3ObjectUrl(string bucketName, string fileObjectPath)
+        public virtual string GenerateS3ObjectUrl(string bucketName, string fullKeyName)
         {
             return
-                $"https://{bucketName}.s3.{_awsConfig.S3Region}.amazonaws.com/{HttpUtility.UrlEncode(NormalizeForAmazonS3(fileObjectPath))}";
+                $"https://{bucketName}.s3.{_awsConfig.S3Region}.amazonaws.com/{HttpUtility.UrlEncode(NormalizeForAmazonS3(fullKeyName))}";
         }
 
         /// <summary>
@@ -259,12 +256,12 @@ namespace COLID.AWS.Implementation
         /// </summary>
         /// <param name="key">the key to normalize</param>
         /// <returns></returns>
-        protected string NormalizeForAmazonS3(string key)
+        protected static string NormalizeForAmazonS3(string key)
         {
             Guard.ArgumentNotNullOrWhiteSpace(key, "key can not be null");
             return key
-                .Replace("+", "_")
-                .Replace(" ", "_");
+                .Replace("+", "_",StringComparison.Ordinal)
+                .Replace(" ", "_",StringComparison.Ordinal);
         }
 
         private System.Exception HandleAmazonServiceException(AmazonServiceException ex)

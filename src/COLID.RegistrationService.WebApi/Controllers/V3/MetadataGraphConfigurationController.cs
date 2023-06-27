@@ -12,6 +12,9 @@ using COLID.Graph.Metadata.DataModels.MetadataGraphConfiguration;
 
 namespace COLID.RegistrationService.WebApi.Controllers.V3
 {
+    /// <summary>
+    /// 
+    /// </summary>
     [ApiController]
     [Authorize(Policy = nameof(SuperadministratorRequirement))]
     [ApiVersion(Constants.API.Version.V3)]
@@ -26,6 +29,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         /// API endpoint for metadata graph configurations.
         /// </summary>
         /// <param name="MetadataGraphConfigurationService">The service for metadata graph configurations</param>
+        /// <param name="indexingService">The service for indexing</param>
         public MetadataGraphConfigurationController(
             IMetadataGraphConfigurationService MetadataGraphConfigurationService,
             IReindexingService indexingService)

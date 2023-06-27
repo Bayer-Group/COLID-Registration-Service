@@ -57,11 +57,11 @@ namespace COLID.Graph.TripleStore.Repositories
         /// <summary>
         /// Searches for entities filtered by given criteria parameters.
         /// </summary>
-        /// <param name="search">Criteria to search for</param>
+        /// <param name="entitySearch">Criteria to search for</param>
         /// <param name="types">the type list to filter by</param>
         /// <param name="namedGraphs">Named graphs where the instances are stored</param>
         /// <returns>List of entities matching the search criteria</returns>
-        IList<T> GetEntities(EntitySearch search, IList<string> types, ISet<Uri> namedGraphs);
+        IList<T> GetEntities(EntitySearch entitySearch, IList<string> types, ISet<Uri> namedGraphs);
 
         /// <summary>
         /// Creates a new transaction, used for transactional processing.

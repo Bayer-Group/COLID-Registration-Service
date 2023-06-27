@@ -99,10 +99,9 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         /// Download the graph with the specified graph name in turtlefile format.
         /// </summary>
         [HttpGet("download")]
-        public async Task<IActionResult> DownloadGraph([FromQuery] Uri graph)
+        public IActionResult DownloadGraph([FromQuery] Uri graph)
         {
-            var stream = await _graphService.DownloadGraph(graph);
-            var file = File(stream, _mimetypeOctetStream, GraphUtils.GetFileName(graph));
+            var file = File(_graphService.DownloadGraph(graph), _mimetypeOctetStream, GraphUtils.GetFileName(graph));
             
             return file;
         }

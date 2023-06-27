@@ -1,10 +1,12 @@
-using System;
+﻿using System;
 using System.IO;
+using System.Net;
 using COLID.Graph.Metadata.Constants;
 using COLID.Graph.TripleStore.Configuration;
 using COLID.Graph.TripleStore.Extensions;
 using COLID.Graph.TripleStore.Transactions;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using VDS.RDF;
@@ -20,17 +22,17 @@ namespace COLID.Graph.TripleStore.Repositories
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1001:Implement IDisposable Correctly", Justification = "<Pending>")]
     public class TripleStoreRepository : ITripleStoreRepository, ICommitable
     {
-        private readonly SparqlRemoteEndpoint _queryEndpoint;
-        private readonly SparqlRemoteUpdateEndpoint _updateEndpoint;
+        private readonly CustomSparqlEndpoint _queryEndpoint;
+        private readonly CustomSparqlUpdateEndpoint _updateEndpoint;
         private ITripleStoreTransaction _transaction;
         private ILogger<TripleStoreTransaction> _logger;
 
 
-        public TripleStoreRepository(IOptionsMonitor<ColidTripleStoreOptions> options, ILogger<TripleStoreTransaction> logger)
+        public TripleStoreRepository(IOptionsMonitor<ColidTripleStoreOptions> options, ILogger<TripleStoreTransaction> logger, IConfiguration configuration)
         {
-            var updateEndpoint = new SparqlRemoteUpdateEndpoint(options.CurrentValue.UpdateUrl);
+            var updateEndpoint = new CustomSparqlUpdateEndpoint(options.CurrentValue.UpdateUrl, configuration);
             updateEndpoint.SetCredentials(options.CurrentValue.Username, options.CurrentValue.Password);
-            _queryEndpoint = new SparqlRemoteEndpoint(options.CurrentValue.ReadUrl);
+            _queryEndpoint = new CustomSparqlEndpoint(options.CurrentValue.ReadUrl, configuration);
             _queryEndpoint.SetCredentials(options.CurrentValue.Username, options.CurrentValue.Password);
             _queryEndpoint.Timeout = 120000;
             _updateEndpoint = updateEndpoint;
@@ -43,6 +45,7 @@ namespace COLID.Graph.TripleStore.Repositories
 
         public SparqlResultSet QueryTripleStoreResultSet(SparqlParameterizedString queryString)
         {
+            //set Querytriplestor result
             queryString.AddAllColidNamespaces();
             return _queryEndpoint.QueryWithResultSet(queryString.ToString());
         }
@@ -68,7 +71,7 @@ namespace COLID.Graph.TripleStore.Repositories
         public void UpdateTripleStore(SparqlParameterizedString updateString)
         {
             if (updateString == null) return;
-
+            //why is transaction null? 
             if (_transaction != null)
             {
                 _transaction.AddUpdateString(updateString);

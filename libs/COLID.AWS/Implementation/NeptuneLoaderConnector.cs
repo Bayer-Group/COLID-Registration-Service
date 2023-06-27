@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using COLID.AWS.DataModels;
 using COLID.AWS.Exceptions;
 using COLID.AWS.Interface;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
@@ -19,20 +20,22 @@ namespace COLID.AWS.Implementation
     {
         private readonly IHttpClientFactory _clientFactory;
         private readonly ILogger<NeptuneLoaderConnector> _logger;
-
+        private readonly bool _bypassProxy;
         private readonly DefaultContractResolver _contractResolver = new DefaultContractResolver { NamingStrategy = new CamelCaseNamingStrategy() };
         private readonly string _loaderUrl;
         private readonly string _iamRoleArn;
         private readonly string _region;
 
         public NeptuneLoaderConnector(IHttpClientFactory clientFactory, ILogger<NeptuneLoaderConnector> logger,
-            IOptionsMonitor<ColidTripleStoreOptions> tripleStoreOptions, IOptionsMonitor<AmazonWebServicesOptions> awsOptions)
+            IOptionsMonitor<ColidTripleStoreOptions> tripleStoreOptions, IOptionsMonitor<AmazonWebServicesOptions> awsOptions, 
+            IConfiguration configuration)
         {
             _clientFactory = clientFactory;
             _logger = logger;
             _loaderUrl = tripleStoreOptions.CurrentValue.LoaderUrl.OriginalString;
             _iamRoleArn = awsOptions.CurrentValue.S3AccessIamRoleArn;
             _region = awsOptions.CurrentValue.S3Region;
+            _bypassProxy = configuration.GetValue<bool>("BypassProxy");
         }
 
         /// <summary>
@@ -44,7 +47,7 @@ namespace COLID.AWS.Implementation
         /// <exception cref="NeptuneLoaderException">In case of errors</exception>
         public async Task<NeptuneLoaderResponse> LoadGraph(string s3Key, Uri graphName)
         {
-            using var client = _clientFactory.CreateClient();
+            using var client = (_bypassProxy ? _clientFactory.CreateClient("NoProxy") : _clientFactory.CreateClient());
             var loaderRequest = new NeptuneLoaderRequest()
             {
                 Source = s3Key,
@@ -56,7 +59,7 @@ namespace COLID.AWS.Implementation
                 ParserConfiguration = new Dictionary<string, string> { { "namedGraphUri", graphName.AbsoluteUri } }
             };
             var json = JsonConvert.SerializeObject(loaderRequest, new JsonSerializerSettings { ContractResolver = _contractResolver });
-            HttpContent content = new StringContent(json, Encoding.UTF8, MediaTypeNames.Application.Json);
+            using HttpContent content = new StringContent(json, Encoding.UTF8, MediaTypeNames.Application.Json);
 
             var response = await client.PostAsync(_loaderUrl, content);
             var responseContent = await response.Content.ReadAsStringAsync();
@@ -88,7 +91,7 @@ namespace COLID.AWS.Implementation
         /// <param name="loadId">the id to fetch the status for</param>
         public async Task<NeptuneLoaderStatusResponse> GetStatus(Guid loadId)
         {
-            using var client = _clientFactory.CreateClient();
+            using var client = (_bypassProxy ? _clientFactory.CreateClient("NoProxy") : _clientFactory.CreateClient());
             var path = $"{_loaderUrl}/{loadId}";
 
             var response = await client.GetAsync(path);

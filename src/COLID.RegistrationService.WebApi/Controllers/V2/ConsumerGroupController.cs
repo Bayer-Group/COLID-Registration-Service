@@ -22,7 +22,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V2
     [Route("api/v{version:apiVersion}")]
     [Produces(MediaTypeNames.Application.Json)]
     [TransformIdPropertyResponseFilter]
-    [Obsolete]
+    [Obsolete("A new version of this endpoint is available")]
     public class ConsumerGroupController : Controller
     {
         private readonly IConsumerGroupService _consumerGroupService;
@@ -116,7 +116,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V2
         /// If a colid entry references the consumer group, the status is set to deprecated,
         /// otherwise the consumer group will be deleted.
         /// </summary>
-        /// <param name="id">The Id of the consumer group to delete or deactivate.</param>
+        /// <param name="subject">The Id of the consumer group to delete or deactivate.</param>
         /// <returns>A status code</returns>
         /// <response code="200">Returns status code only</response>
         /// <response code="500">If an unexpected error occurs</response>

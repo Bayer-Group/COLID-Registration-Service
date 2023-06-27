@@ -23,6 +23,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
         private readonly ILogger<IronMountainRepository> _logger;
         private readonly IHttpClientFactory _clientFactory;
         private readonly IConfiguration _configuration;
+        private readonly bool _bypassProxy;
         private readonly CancellationToken _cancellationToken;
         private readonly ICorrelationContextAccessor _correlationContext;
         private readonly string _retentionScheduleEndpoint;
@@ -37,11 +38,12 @@ namespace COLID.RegistrationService.Repositories.Implementation
             _correlationContext = correlationContext;
             var serverUrl = _configuration.GetConnectionString("ironMountainConnectionUrl");
             _retentionScheduleEndpoint = $"{serverUrl}/api/5.4/retention-schedule";
+            _bypassProxy = configuration.GetValue<bool>("BypassProxy");
         }
 
         public async Task<IronMountainRentionScheduleDto> GetIronMountainData()
         {
-            using var httpClient = _clientFactory.CreateClient();
+            using var httpClient = (_bypassProxy ? _clientFactory.CreateClient("NoProxy") : _clientFactory.CreateClient());
             Dictionary<string, string> authenticationCredentials = _configuration.GetSection("IronMountainAuthentication").GetChildren().
                     Select(x => new KeyValuePair<string, string>(x.Key, x.Value)).ToDictionary(x => x.Key, x => x.Value);
 
@@ -79,9 +81,9 @@ namespace COLID.RegistrationService.Repositories.Implementation
         private async Task<IronMountainAuthenticationToken> GetToken(Uri authenticationUrl, Dictionary<string, string> authenticationCredentials)
         {
             IronMountainAuthenticationToken token = null;
-            using var httpClient = _clientFactory.CreateClient();
+            using var httpClient = (_bypassProxy ? _clientFactory.CreateClient("NoProxy") : _clientFactory.CreateClient());
 
-            FormUrlEncodedContent content = new FormUrlEncodedContent(authenticationCredentials);
+            using FormUrlEncodedContent content = new FormUrlEncodedContent(authenticationCredentials);
             try
             {
                 HttpResponseMessage response = await httpClient.PostAsync(authenticationUrl, content);
@@ -90,7 +92,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
                 {
                     string message = string.Format("Request failed while fetching IronMountain token. Received HTTP {0}", response.StatusCode);
                     _logger.LogError(message);
-                    throw new ApplicationException(message);
+                    throw new HttpRequestException(message);
                 }
 
                 string responseString = await response.Content.ReadAsStringAsync();

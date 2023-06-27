@@ -165,7 +165,7 @@ namespace COLID.RegistrationService.Services.Implementation.Comparison
         /// <param name="dataType">The data type of the property to compare.</param>
         /// <param name="resources">The two properties to compare.</param>
         /// <returns>The similarity result for a specific property.</returns>
-        private double CalculateLiteralSimilarity(string metadataKey, string dataType, params Entity[] resources)
+        private static double CalculateLiteralSimilarity(string metadataKey, string dataType, params Entity[] resources)
         {
             try
             {
@@ -198,7 +198,7 @@ namespace COLID.RegistrationService.Services.Implementation.Comparison
         /// <param name="firstResourceData">First list of literals to compare</param>
         /// <param name="secondResouceData">Second list of literals to compare</param>
         /// <returns>The similarity result for a specific property.</returns>
-        private double CalculateLiteralListSimilarity(string dataType, List<string> firstResourceData, List<string> secondResourceData)
+        private static double CalculateLiteralListSimilarity(string dataType, List<string> firstResourceData, List<string> secondResourceData)
         {
             double similarity = 0;
 
@@ -226,11 +226,11 @@ namespace COLID.RegistrationService.Services.Implementation.Comparison
         /// <param name="firstResourceData">First literal to compare</param>
         /// <param name="secondResouceData">Second literal to compare</param>
         /// <returns>The similarity result for a specific property.</returns>
-        private double CalculateLiteralSingleValueSimilarity(string dataType, string firstResourceData, string secondResourceData)
+        private static double CalculateLiteralSingleValueSimilarity(string dataType, string firstResourceData, string secondResourceData)
         {
             if (firstResourceData == null && secondResourceData == null)
             {
-                throw new ArgumentNullException();
+                throw new ArgumentNullException("firstResourceData");
             }
 
             if (firstResourceData == null || secondResourceData == null)

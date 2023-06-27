@@ -10,7 +10,10 @@ using Microsoft.AspNetCore.Mvc.Filters;
 
 namespace COLID.RegistrationService.WebApi.Filters
 {
-    public class ValidateActionParametersAttribute : ActionFilterAttribute
+    /// <summary>
+    /// 
+    /// </summary>
+    public sealed class ValidateActionParametersAttribute : ActionFilterAttribute
     {
         /// <inheritdoc />
        public override void OnActionExecuting(ActionExecutingContext context)

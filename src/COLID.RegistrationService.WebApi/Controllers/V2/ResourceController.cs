@@ -29,7 +29,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V2
     [Route("api/v{version:apiVersion}/resource")]
     [Produces(MediaTypeNames.Application.Json)]
     [TransformIdPropertyResponseFilter]
-    [Obsolete]
+    [Obsolete("A new version of this endpoint is available")]
     public class ResourceController : Controller
     {
         private readonly IResourceService _resourceService;
@@ -213,6 +213,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V2
         ///   <br><b>Note:</b> To physically delete a resource from COLID Admin rights are required!</br>
         /// </remarks>
         /// <param name="pidUri">The pidUri of the PID entry to delete</param>
+        /// <param name="requester">The email id of the requester</param>
         /// <returns>Returns a status message according to the result</returns>
         /// <response code="200">Returns status code only</response>
         /// <response code="400">If the given pidUri is null or empty, or the COLID entry could not be deleted (e.g. because it was not present in COLID)</response>
@@ -258,7 +259,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V2
         /// <response code="400">If the given pid uri is null or empty, or the COLID entry could not be deleted (e.g. because it was not present in COLID)</response>
         /// <response code="500">If an unexpected error occurs</response>
         [HttpPut]
-        [Obsolete]
+        [Obsolete("A new version of this endpoint is available")]
         [ValidateActionParameters]
         [Authorize(Policy = nameof(ResourceRequirement))]
         [Route("markForDeletion")]

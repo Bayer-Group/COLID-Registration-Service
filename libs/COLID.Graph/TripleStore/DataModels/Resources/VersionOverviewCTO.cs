@@ -9,5 +9,7 @@
         public string LifecycleStatus { get; set; }
         public string PublishedVersion { get; set; }
         public string LaterVersion { get; set; }
+        public bool HasDraft { get; set; }
+        public bool HasPublished { get; set; }
     }
 }

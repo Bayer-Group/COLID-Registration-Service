@@ -67,12 +67,12 @@ namespace COLID.RegistrationService.Services.Implementation
 
             if (templates.Any(t => t.Id != templateResult.Id && t.Name.Trim() == templateResult.Name.Trim()))
             {
-                throw new BusinessException(Common.Constants.Messages.PidUriTemplate.SameTemplateExists);
+                throw new BusinessException(Common.Constants.Messages.PidUriTemplateMsg.SameTemplateExists);
             }
 
             if (repoEntity != null && CheckTemplateHasStatus(repoEntity, COLID.Graph.Metadata.Constants.PidUriTemplate.LifecycleStatus.Deprecated))
             {
-                throw new BusinessException(Common.Constants.Messages.PidUriTemplate.DeprecatedTemplate);
+                throw new BusinessException(Common.Constants.Messages.PidUriTemplateMsg.DeprecatedTemplate);
             }
 
             entity.Properties.AddOrUpdate(COLID.Graph.Metadata.Constants.PidUriTemplate.HasLifecycleStatus, new List<dynamic> { COLID.Graph.Metadata.Constants.PidUriTemplate.LifecycleStatus.Active });
@@ -105,7 +105,7 @@ namespace COLID.RegistrationService.Services.Implementation
             // Throw error of reference exists
             if (consumerGroupReferenceForPidUriTemplate)
             {
-                throw new ReferenceException(Common.Constants.Messages.PidUriTemplate.DeleteUnsuccessfulConsumerGroupReference, referenceId);
+                throw new ReferenceException(Common.Constants.Messages.PidUriTemplateMsg.DeleteUnsuccessfulConsumerGroupReference, referenceId);
             }
 
             var colidEntryReferenceForPidURiTemplate = _repository.CheckPidUriTemplateHasColidEntryReference(id, pidUriTemplateGraph, resourceInstanceGraph, resourceDraftInstanceGraph, historicInstanceGraph);
@@ -123,7 +123,7 @@ namespace COLID.RegistrationService.Services.Implementation
 
             if (CheckTemplateHasStatus(pidUriTemplateResult, COLID.Graph.Metadata.Constants.PidUriTemplate.LifecycleStatus.Deprecated))
             {
-                throw new BusinessException(Common.Constants.Messages.PidUriTemplate.DeleteUnsuccessfulAlreadyDeprecated);
+                throw new BusinessException(Common.Constants.Messages.PidUriTemplateMsg.DeleteUnsuccessfulAlreadyDeprecated);
             }
 
             pidUriTemplateResult.Properties.AddOrUpdate(COLID.Graph.Metadata.Constants.PidUriTemplate.HasLifecycleStatus, new List<dynamic> { COLID.Graph.Metadata.Constants.PidUriTemplate.LifecycleStatus.Deprecated });
@@ -148,7 +148,7 @@ namespace COLID.RegistrationService.Services.Implementation
 
             if (CheckTemplateHasStatus(pidUriTemplateResult, COLID.Graph.Metadata.Constants.PidUriTemplate.LifecycleStatus.Active))
             {
-                throw new BusinessException(Common.Constants.Messages.PidUriTemplate.ReactivationUnsuccessfulAlreadyActive);
+                throw new BusinessException(Common.Constants.Messages.PidUriTemplateMsg.ReactivationUnsuccessfulAlreadyActive);
             }
 
             pidUriTemplateResult.Properties.AddOrUpdate(COLID.Graph.Metadata.Constants.PidUriTemplate.HasLifecycleStatus, new List<dynamic> { COLID.Graph.Metadata.Constants.PidUriTemplate.LifecycleStatus.Active });
@@ -162,7 +162,7 @@ namespace COLID.RegistrationService.Services.Implementation
             _auditTrailLogService.AuditTrail($"PID URI template with id {id} reactivated.");
         }
 
-        private bool CheckTemplateHasStatus(EntityBase pidUriTemplate, string status)
+        private static bool CheckTemplateHasStatus(EntityBase pidUriTemplate, string status)
         {
             return pidUriTemplate.Properties.TryGetValue(COLID.Graph.Metadata.Constants.PidUriTemplate.HasLifecycleStatus,
                        out var statusList) &&

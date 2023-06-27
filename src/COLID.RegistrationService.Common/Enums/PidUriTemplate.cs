@@ -7,7 +7,9 @@ namespace COLID.RegistrationService.Common.Enums.PidUriTemplate
     {
         [Description("https://example.com/kos/19050/taxonomies#Guid")]
         [EnumMember(Value = "GUID")]
+#pragma warning disable CA1720 // Identifier contains type name
         Guid,
+#pragma warning restore CA1720 // Identifier contains type name
 
         [Description("https://example.com/kos/19050/taxonomies#Number")]
         [EnumMember(Value = "Number")]

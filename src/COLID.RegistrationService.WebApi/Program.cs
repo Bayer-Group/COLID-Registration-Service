@@ -5,8 +5,15 @@ using Microsoft.Extensions.Hosting;
 
 namespace COLID.RegistrationService.WebApi
 {
-    public class Program
+    /// <summary>
+    /// 
+    /// </summary>
+    public static class Program
     {
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="args"></param>
         public static void Main(string[] args)
         {
             int minWorker, minIOC;
@@ -27,6 +34,11 @@ namespace COLID.RegistrationService.WebApi
         //            webBuilder.UseStartup<Startup>();
         //        });
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="args"></param>
+        /// <returns></returns>
         public static IWebHostBuilder CreateHostBuilder(string[] args) =>
         WebHost.CreateDefaultBuilder(args)
             .UseStartup<Startup>();

@@ -8,7 +8,9 @@ namespace COLID.RegistrationService.Common.Enums.Graph
     /// <summary>
     /// Describes the status of the named graph in the database
     /// </summary>
+#pragma warning disable CA1008 // Enums should have zero value
     public enum GraphStatus
+#pragma warning restore CA1008 // Enums should have zero value
     {
         /// <summary>
         /// Active means that the graph is referenced in the current metadata graph config 

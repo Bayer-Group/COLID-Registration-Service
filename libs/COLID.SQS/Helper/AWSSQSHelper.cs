@@ -32,22 +32,15 @@ namespace COLID.Helper.SQS
         /// <param name="userDetail"></param>
         /// <returns></returns>
         public async Task<bool> SendResourceMessageAsync(object messageBody)
-        {
-            try
-            {
-                string message = JsonSerializer.Serialize(messageBody);
-                var sendRequest = new SendMessageRequest(_settings.ResourceOutputQueueUrl, message);
-                sendRequest.MessageGroupId = Guid.NewGuid().ToString();
-                sendRequest.MessageDeduplicationId = Guid.NewGuid().ToString();
-                // Post message or payload to queue  
-                var sendResult = await _sqs.SendMessageAsync(sendRequest);
+        {            
+            string message = JsonSerializer.Serialize(messageBody);
+            var sendRequest = new SendMessageRequest(_settings.ResourceOutputQueueUrl, message);
+            sendRequest.MessageGroupId = Guid.NewGuid().ToString();
+            sendRequest.MessageDeduplicationId = Guid.NewGuid().ToString();
+            // Post message or payload to queue  
+            var sendResult = await _sqs.SendMessageAsync(sendRequest);
 
-                return sendResult.HttpStatusCode == System.Net.HttpStatusCode.OK;
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
+            return sendResult.HttpStatusCode == System.Net.HttpStatusCode.OK;            
         }
 
         /// <summary>
@@ -56,24 +49,17 @@ namespace COLID.Helper.SQS
         /// <returns></returns>
         public async Task<List<Message>> ReceiveResourceMessageAsync()
         {
-            try
+            //Create New instance  
+            var request = new ReceiveMessageRequest
             {
-                //Create New instance  
-                var request = new ReceiveMessageRequest
-                {
-                    QueueUrl = _settings.ResourceInputQueueUrl,
-                    MaxNumberOfMessages = 10,
-                    WaitTimeSeconds = 10
-                };
-                //CheckIs there any new message available to process  
-                var result = await _sqs.ReceiveMessageAsync(request);
+                QueueUrl = _settings.ResourceInputQueueUrl,
+                MaxNumberOfMessages = 10,
+                WaitTimeSeconds = 10
+            };
+            //CheckIs there any new message available to process  
+            var result = await _sqs.ReceiveMessageAsync(request);
 
-                return result.Messages.Any() ? result.Messages : new List<Message>();
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
+            return result.Messages.Any() ? result.Messages : new List<Message>();            
         }
 
         /// <summary>
@@ -83,15 +69,8 @@ namespace COLID.Helper.SQS
         /// <returns></returns>
         public async Task<bool> DeleteResourceMessageAsync(string messageReceiptHandle)
         {
-            try
-            {                 
-                var deleteResult = await _sqs.DeleteMessageAsync(_settings.ResourceInputQueueUrl, messageReceiptHandle);
-                return deleteResult.HttpStatusCode == System.Net.HttpStatusCode.OK;
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
+            var deleteResult = await _sqs.DeleteMessageAsync(_settings.ResourceInputQueueUrl, messageReceiptHandle);
+            return deleteResult.HttpStatusCode == System.Net.HttpStatusCode.OK;
         }
 
         /// <summary>
@@ -101,21 +80,14 @@ namespace COLID.Helper.SQS
         /// <returns></returns>
         public async Task<bool> SendLinkingMessageAsync(object messageBody)
         {
-            try
-            {
-                string message = JsonSerializer.Serialize(messageBody);
-                var sendRequest = new SendMessageRequest(_settings.LinkingOutputQueueUrl, message);
-                sendRequest.MessageGroupId = Guid.NewGuid().ToString();
-                sendRequest.MessageDeduplicationId = Guid.NewGuid().ToString();
-                // Post message or payload to queue  
-                var sendResult = await _sqs.SendMessageAsync(sendRequest);
+            string message = JsonSerializer.Serialize(messageBody);
+            var sendRequest = new SendMessageRequest(_settings.LinkingOutputQueueUrl, message);
+            sendRequest.MessageGroupId = Guid.NewGuid().ToString();
+            sendRequest.MessageDeduplicationId = Guid.NewGuid().ToString();
+            // Post message or payload to queue  
+            var sendResult = await _sqs.SendMessageAsync(sendRequest);
 
-                return sendResult.HttpStatusCode == System.Net.HttpStatusCode.OK;
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
+            return sendResult.HttpStatusCode == System.Net.HttpStatusCode.OK;
         }
 
         /// <summary>
@@ -124,24 +96,17 @@ namespace COLID.Helper.SQS
         /// <returns></returns>
         public async Task<List<Message>> ReceiveLinkingMessageAsync()
         {
-            try
+            //Create New instance  
+            var request = new ReceiveMessageRequest
             {
-                //Create New instance  
-                var request = new ReceiveMessageRequest
-                {
-                    QueueUrl = _settings.LinkingInputQueueUrl,
-                    MaxNumberOfMessages = 10,
-                    WaitTimeSeconds = 5
-                };
-                //CheckIs there any new message available to process  
-                var result = await _sqs.ReceiveMessageAsync(request);
+                QueueUrl = _settings.LinkingInputQueueUrl,
+                MaxNumberOfMessages = 10,
+                WaitTimeSeconds = 5
+            };
+            //CheckIs there any new message available to process  
+            var result = await _sqs.ReceiveMessageAsync(request);
 
-                return result.Messages.Any() ? result.Messages : new List<Message>();
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
+            return result.Messages.Any() ? result.Messages : new List<Message>();
         }
 
         /// <summary>
@@ -151,15 +116,8 @@ namespace COLID.Helper.SQS
         /// <returns></returns>
         public async Task<bool> DeleteLinkingMessageAsync(string messageReceiptHandle)
         {
-            try
-            {
-                var deleteResult = await _sqs.DeleteMessageAsync(_settings.LinkingInputQueueUrl, messageReceiptHandle);
-                return deleteResult.HttpStatusCode == System.Net.HttpStatusCode.OK;
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
+            var deleteResult = await _sqs.DeleteMessageAsync(_settings.LinkingInputQueueUrl, messageReceiptHandle);
+            return deleteResult.HttpStatusCode == System.Net.HttpStatusCode.OK;
         }
     }
 }

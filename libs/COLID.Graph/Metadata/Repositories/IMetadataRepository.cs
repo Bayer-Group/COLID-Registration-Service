@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using COLID.Graph.TripleStore.DataModels.Base;
 using COLID.Graph.Metadata.DataModels.Metadata;
 using VDS.RDF;
+using COLID.Graph.Metadata.DataModels.FilterGroup;
 
 namespace COLID.Graph.Metadata.Repositories
 {
@@ -79,8 +80,8 @@ namespace COLID.Graph.Metadata.Repositories
         /// <param name="entityType">the entity type to use</param>
         /// <returns>a List of properties, related to an entity type</returns>
         IList<MetadataProperty> GetMetadataForEntityTypeInConfig(string entityType, string configIdentifier = null);
-        List<CategoryFilterDTO> GetCategoryFilter();
-        List<CategoryFilterDTO> GetCategoryFilter(string categoryFilterName);
+        IList<CategoryFilterDTO> GetCategoryFilter();
+        IList<CategoryFilterDTO> GetCategoryFilter(string categoryFilterName);
         void AddCategoryFilter(CategoryFilterDTO categoryFilterDto);
         void DeleteCategoryFilter(string categoryFilterName);
 
@@ -94,5 +95,11 @@ namespace COLID.Graph.Metadata.Repositories
         /// Returns all the Link Types  present in metadata graphs.
         /// </summary>
         Dictionary<string, string> GetLinkTypes();
+
+        /// <summary>
+        /// Get Filter group and properties
+        /// </summary>
+        /// <returns></returns>
+        public IList<FilterGroup> GetFilterGroups();
     }
 }

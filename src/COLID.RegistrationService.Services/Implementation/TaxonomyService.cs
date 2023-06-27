@@ -193,8 +193,8 @@ namespace COLID.RegistrationService.Services.Implementation
                         {
                             parentTaxonomy.Children.Add(child);
                         }
-
-                        parentTaxonomy.Children.OrderBy(t => t.Properties.GetValueOrNull(RDFS.Label, true));
+                        // commented as the returned ordered list is not used anywehere
+                        //parentTaxonomy.Children.OrderBy(t => t.Properties.GetValueOrNull(RDFS.Label, true));
                     }
                 }
             }

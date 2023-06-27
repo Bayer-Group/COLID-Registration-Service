@@ -15,7 +15,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V2
     [ApiVersion(Constants.API.Version.V2)]
     [Route("api/v{version:apiVersion}/log")]
     [Produces(MediaTypeNames.Application.Json)]
-    [Obsolete]
+    [Obsolete("A new version of this endpoint is available")]
     public class LogController : Controller
     {
         private readonly IGeneralLogService _logService;

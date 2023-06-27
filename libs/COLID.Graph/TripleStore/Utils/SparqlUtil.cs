@@ -1,20 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using COLID.Graph.TripleStore.DataModels.Sparql;
+using COLID.Graph.Utils;
 using Microsoft.Extensions.Configuration;
 
 namespace COLID.Graph.TripleStore.Utils
 {
     internal static class SparqlUtil
     {
-        private static readonly string basePath = System.IO.Path.GetFullPath("appsettings.json");
-        private static readonly string filePath = basePath.Substring(0, basePath.Length - 16);
-        private static IConfigurationRoot configuration = new ConfigurationBuilder()
-                     .SetBasePath(filePath)
-                    .AddJsonFile("appsettings.json")
-                    .Build();
-        public static readonly string ServiceUrl = configuration.GetValue<string>("ServiceUrl");
-        public static readonly string HttpServiceUrl = configuration.GetValue<string>("HttpServiceUrl");
+        public static readonly string ServiceUrl = GraphUtils.CurrentRootConfiguration.GetValue<string>("ServiceUrl");
+        public static readonly string HttpServiceUrl = GraphUtils.CurrentRootConfiguration.GetValue<string>("HttpServiceUrl");
 
         internal static readonly IList<SparqlPrefix> SparqlPrefixes = new List<SparqlPrefix>
         {

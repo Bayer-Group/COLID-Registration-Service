@@ -23,7 +23,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V2
     [Route("api/v{version:apiVersion}/distributionEndpoint")]
     [Produces(MediaTypeNames.Application.Json)]
     [TransformIdPropertyResponseFilter]
-    [Obsolete]
+    [Obsolete("A new version of this endpoint is available")]
     public class DistributionEndpointController : Controller
     {
         private readonly IDistributionEndpointService _distributionEndpointService;

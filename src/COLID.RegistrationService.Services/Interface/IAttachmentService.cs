@@ -21,7 +21,7 @@ namespace COLID.RegistrationService.Services.Interface
         /// <param name="guid">the unique identifier for the file</param>
         /// <param name="fileName">the filename to use</param>
         /// <returns></returns>
-        public Task<AmazonS3FileDownloadDto> GetAttachment(Guid guid, string fileName);
+        public Task<AmazonS3FileDownloadDto> GetAttachment(Guid id, string fileName);
 
         /// <summary>
         /// Download the attachment from the configured file storage and returns the file as
@@ -54,7 +54,7 @@ namespace COLID.RegistrationService.Services.Interface
         /// <param name="guid">the unique identifier for the file</param>
         /// <param name="comment">(optional) comment for the attachment</param>
         /// <returns></returns>
-        public Task<AttachmentDto> UploadAttachment(IFormFile file, Guid guid, string comment);
+        public Task<AttachmentDto> UploadAttachment(IFormFile file, Guid id, string comment);
 
         /// <summary>
         /// Deletes an attachment from the configured file storage (file deletion!). In
@@ -62,7 +62,7 @@ namespace COLID.RegistrationService.Services.Interface
         /// </summary>
         /// <param name="guid">the unique identifier for the file</param>
         /// <param name="fileName">the filename to use</param>
-        public Task DeleteAttachment(Guid guid, string fileName);
+        public Task DeleteAttachment(Guid id, string fileName);
 
         /// <summary>
         /// Deletes an attachment from the configured file storage (file deletion!). In

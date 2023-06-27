@@ -43,6 +43,6 @@ namespace COLID.RegistrationService.Services.Interface
         /// </summary>
         /// <param name="pidUris"></param>
         /// <returns></returns>
-        List<RRMResource> GetLinksOfPublishedResource(List<Uri> pidUris);
+        IList<RRMResource> GetLinksOfPublishedResource(IList<Uri> pidUris);
     }
 }

@@ -19,7 +19,7 @@ namespace COLID.Cache.Exceptions
         {
         }
 
-        public RedisKeyNotFoundException(string message, BusinessException innerException) : base(message, innerException)
+        public RedisKeyNotFoundException(string message, System.Exception innerException) : base(message, innerException)
         {
         }
 

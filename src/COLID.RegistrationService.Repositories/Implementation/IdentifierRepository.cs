@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using COLID.Exception.Models.Business;
@@ -10,8 +10,8 @@ using COLID.RegistrationService.Repositories.Interface;
 using Microsoft.Extensions.Logging;
 using VDS.RDF.Query;
 using COLID.RegistrationService.Common.DataModel.Identifier;
-using Microsoft.Extensions.Configuration;
-
+using Microsoft.Extensions.Configuration;
+
 namespace COLID.RegistrationService.Repositories.Implementation
 {
     internal class IdentifierRepository : BaseRepository<Identifier>, IIdentifierRepository
@@ -123,12 +123,18 @@ namespace COLID.RegistrationService.Repositories.Implementation
         {
             var parameterizedString = new SparqlParameterizedString()
             {
-                CommandText = "SELECT * From @namedGraph From @draftNamedGraph From @historicNamedGraph WHERE { ?identifier a @permanentIdentifier. FILTER NOT EXISTS { ?resource ?pointsAt ?identifier } }"
+                CommandText = @"SELECT * From @namedGraph From @draftNamedGraph From @historicNamedGraph 
+                    WHERE { 
+                        ?identifier a @permanentIdentifier. 
+                        FILTER NOT EXISTS { ?resource @hasPidUri | @hasBaseUri ?identifier } 
+                    }"
             };
 
             parameterizedString.SetUri("namedGraph", namedGraph);
             parameterizedString.SetUri("draftNamedGraph", draftNamedGraph);
             parameterizedString.SetUri("historicNamedGraph", historicNamedGraph);
+            parameterizedString.SetUri("hasPidUri", new Uri(Graph.Metadata.Constants.EnterpriseCore.PidUri));
+            parameterizedString.SetUri("hasBaseUri", new Uri(Graph.Metadata.Constants.Resource.BaseUri));
             parameterizedString.SetUri("permanentIdentifier", new Uri(Graph.Metadata.Constants.Identifier.Type));
 
             var results = _tripleStoreRepository.QueryTripleStoreResultSet(parameterizedString);

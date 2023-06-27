@@ -1,4 +1,5 @@
-﻿using Microsoft.OpenApi.Models;
+﻿using System;
+using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
 namespace COLID.RegistrationService.WebApi.Swagger.Filters
@@ -11,7 +12,7 @@ namespace COLID.RegistrationService.WebApi.Swagger.Filters
 
             foreach (var path in swaggerDoc.Paths)
             {
-                newOpenApiPaths.Add(path.Key.Replace("v{version}", swaggerDoc.Info.Version), path.Value);
+                newOpenApiPaths.Add(path.Key.Replace("v{version}", swaggerDoc.Info.Version, StringComparison.Ordinal), path.Value);
             }
 
             swaggerDoc.Paths = newOpenApiPaths;

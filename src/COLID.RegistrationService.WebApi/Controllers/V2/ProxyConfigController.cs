@@ -14,7 +14,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V2
     [Route("api/v{version:apiVersion}/proxyConfig")]
     [Produces(MediaTypeNames.Text.Plain)]
     [ApiExplorerSettings(IgnoreApi = true)]
-    [Obsolete]
+    [Obsolete("A new version of this endpoint is available")]
     public class ProxyConfigController : Controller
     {
         private readonly IProxyConfigService _proxyConfigService;

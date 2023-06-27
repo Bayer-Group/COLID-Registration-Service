@@ -12,6 +12,6 @@ namespace COLID.Graph.Metadata.DataModels.Resources
         /// <summary>
         /// Property used to persist colid state while bulk upload
         /// </summary>
-        public List<IDictionary<string, string>> StateItems { get; set; }
+        public IList<IDictionary<string, string>> StateItems { get; set; }
     }
 }

@@ -4,7 +4,7 @@ using COLID.Graph.Metadata.Constants;
 namespace COLID.Graph.TripleStore.DataModels.Attributes
 {
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
-    public class TypeAttribute : Attribute
+    public sealed class TypeAttribute : Attribute
     {
         public string Type { get; private set; }
 

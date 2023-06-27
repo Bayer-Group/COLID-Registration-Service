@@ -149,7 +149,7 @@ namespace COLID.Graph.Metadata.Repositories
             cachedGraphs = _cacheService.GetValue<IEnumerable<string>>($"{_cachePrefix}:{graphType}:{latestConfig.Id}");
             if (cachedGraphs != null)
             {
-                CheckListForMaximumSizeOfOne(cachedGraphs); // TODO ck: ever heard of .Single() ? .. try catch and go
+                CheckListForMaximumSizeOfOne(cachedGraphs); // TODO ck: ever heard of .Single() ? .. try catch and go ?
                 return cachedGraphs.ToList().First();
             }
 
@@ -165,7 +165,7 @@ namespace COLID.Graph.Metadata.Repositories
             return graphs.First();
         }
 
-        private void CheckListForMaximumSizeOfOne(IEnumerable<string> graphList)
+        private static void CheckListForMaximumSizeOfOne(IEnumerable<string> graphList)
         {
             if (graphList.ToList().Count > 1)
             {

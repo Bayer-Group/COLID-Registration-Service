@@ -51,7 +51,7 @@ namespace COLID.Common.Utilities
         public static void IsValidEmail(string email)
         {
             if (string.IsNullOrWhiteSpace(email))
-                throw new ArgumentNullException($"The given argument is empty/null");
+                throw new ArgumentNullException("email");
 
             try
             {
@@ -79,8 +79,7 @@ namespace COLID.Common.Utilities
             try
             {
                 var matched = Regex.IsMatch(email,
-                    @"^(?("")("".+?(?<!\\)""@)|(([0-9a-z]((\.(?!\.))|[-!#\$%&'\*\+/=\?\^`\{\}\|~\w])*)(?<=[0-9a-z])@))" +
-                    @"(?(\[)(\[(\d{1,3}\.){3}\d{1,3}\])|(([0-9a-z][-0-9a-z]*[0-9a-z]*\.)+[a-z0-9][\-a-z0-9]{0,22}[a-z0-9]))$",
+                    @"^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$",
                     RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(250));
                 if (!matched)
                 {
@@ -96,7 +95,7 @@ namespace COLID.Common.Utilities
         public static void IsGreaterThanZero(long length)
         {
             if (length <= 0)
-                throw new ArgumentException(nameof(length), "Length must be greater than 0.");
+                throw new ArgumentException("Length must be greater than 0.", nameof(length));
         }
 
         public static void IsValidUri(Uri uri)

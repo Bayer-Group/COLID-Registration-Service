@@ -93,7 +93,7 @@ namespace COLID.RegistrationService.Services.Implementation
         /// Createa new resource ID
         /// </summary>
         /// <returns></returns>
-        private string CreateNewResourceId()
+        private static string CreateNewResourceId()
         {
             return Graph.Metadata.Constants.Entity.IdPrefix + Guid.NewGuid();
         }
@@ -168,7 +168,7 @@ namespace COLID.RegistrationService.Services.Implementation
                             Uri pidUri = null;
                             try
                             {
-                                if (hasPid != null && ((COLID.Graph.TripleStore.DataModels.Base.Entity)hasPid).Id != string.Empty)
+                                if (hasPid != null && !string.IsNullOrEmpty(((COLID.Graph.TripleStore.DataModels.Base.Entity)hasPid).Id))
                                     pidUri = new Uri(((COLID.Graph.TripleStore.DataModels.Base.Entity)hasPid).Id);
                             }
                             catch
@@ -272,7 +272,7 @@ namespace COLID.RegistrationService.Services.Implementation
                                         ActionDone = failed ? "Error" : "Validated",
                                         ErrorMessage = failed ? "Validation Failed while Adding the resource." : string.Empty,
                                         Results = validationResult.Results,
-                                        Triples = validationResult.Triples.Replace(ColidEntryLifecycleStatus.Draft, ColidEntryLifecycleStatus.Published),
+                                        Triples = validationResult.Triples.Replace(ColidEntryLifecycleStatus.Draft, ColidEntryLifecycleStatus.Published, StringComparison.Ordinal),
                                         InstanceGraph = resInstanceGraph.ToString(),
                                         TimeTaken = stpWatch.ElapsedMilliseconds.ToString(),
                                         pidUri = validationFacade.RequestResource.PidUri == null ? "" : validationFacade.RequestResource.PidUri.ToString(),
@@ -403,7 +403,7 @@ namespace COLID.RegistrationService.Services.Implementation
                                         new Uri(validationFacade.RequestResource.Id), draftInstanceGraph);
 
                                         if (resourcesCTO.HasDraft)
-                                            _identifierService.DeleteAllUnpublishedIdentifiers(resourcesCTO.Draft);
+                                            _identifierService.DeleteAllUnpublishedIdentifiers(resourcesCTO.Draft, resourcesCTO.Versions);
 
                                         if (resourcesCTO.HasPublished)
                                             // Try to delete published and all inbound edges are changed to the new entry.
@@ -623,7 +623,7 @@ namespace COLID.RegistrationService.Services.Implementation
 
         private async Task<bool> DeleteMessageFromSQS(string msgReceiptHandle)
         {
-            if (msgReceiptHandle == null || msgReceiptHandle == string.Empty)
+            if (string.IsNullOrEmpty(msgReceiptHandle))
                 return false;
             try
             {
@@ -637,7 +637,7 @@ namespace COLID.RegistrationService.Services.Implementation
             }
         }
 
-        private void UpdateStateItemsWithPidUri(ResourceRequestDTO resource, string assetPidUri)
+        private static void UpdateStateItemsWithPidUri(ResourceRequestDTO resource, string assetPidUri)
         {
             foreach (var stateItem in resource.StateItems)
             {

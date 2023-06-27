@@ -10,7 +10,9 @@ namespace COLID.Exception.Models
     public class GeneralException : System.Exception
     {
         [JsonProperty]
+#pragma warning disable CA1721 // Property names should not match get methods
         public string Type => GetType().Name;
+#pragma warning restore CA1721 // Property names should not match get methods
 
         [JsonProperty]
         public int Code => GetType().GetCustomAttribute<StatusCodeAttribute>(true).GetCode();

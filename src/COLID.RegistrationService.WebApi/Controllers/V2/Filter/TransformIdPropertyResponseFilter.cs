@@ -10,10 +10,16 @@ using Newtonsoft.Json;
 
 namespace COLID.RegistrationService.WebApi.Controllers.V2.Filter
 {
-    public class TransformIdPropertyResponseFilter : ActionFilterAttribute
+    /// <summary>
+    /// 
+    /// </summary>
+    public sealed class TransformIdPropertyResponseFilter : ActionFilterAttribute
     {
         private JsonSerializerSettings _serializerSettings;
 
+        /// <summary>
+        /// 
+        /// </summary>
         public TransformIdPropertyResponseFilter()
         {
             var propertyResolver = new PropertyRenameSerializerContractResolver();
@@ -28,21 +34,25 @@ namespace COLID.RegistrationService.WebApi.Controllers.V2.Filter
             _serializerSettings.ContractResolver = propertyResolver;
         }
 
-        public override void OnResultExecuting(ResultExecutingContext filterContext)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="context"></param>
+        public override void OnResultExecuting(ResultExecutingContext context)
         {
             // Detect that the result is of type JsonResult
-            if (filterContext.Result is OkObjectResult)
+            if (context.Result is OkObjectResult)
             {
-                var result = filterContext.Result as OkObjectResult;
+                var result = context.Result as OkObjectResult;
                 result.Value = TransformFilterContextValue(result.Value);
             }
-            else if (filterContext.Result is CreatedResult)
+            else if (context.Result is CreatedResult)
             {
-                var result = filterContext.Result as CreatedResult;
+                var result = context.Result as CreatedResult;
                 result.Value = TransformFilterContextValue(result.Value);
             }
 
-            base.OnResultExecuting(filterContext);
+            base.OnResultExecuting(context);
         }
 
         private object TransformFilterContextValue(object result)
@@ -70,7 +80,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V2.Filter
             }
         }
 
-        private bool IsTransformableEntityType(object value)
+        private static bool IsTransformableEntityType(object value)
         {
             return value is object ||
                    value is Entity ||

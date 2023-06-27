@@ -67,11 +67,11 @@ namespace COLID.RegistrationService.Services.Implementation
             return await GetAttachment(guid, fileName);
         }
 
-        public async Task<AmazonS3FileDownloadDto> GetAttachment(Guid guid, string fileName)
+        public async Task<AmazonS3FileDownloadDto> GetAttachment(Guid id, string fileName)
         {
             Guard.ArgumentNotNullOrWhiteSpace(fileName, "FileName is empty");
 
-            var key = $"{guid}/{fileName}";
+            var key = $"{id}/{fileName}";
             var fileDto = await _awsS3Service.GetFileAsync(_awsConfig.S3BucketForFiles, key);
 
             return fileDto;
@@ -79,13 +79,13 @@ namespace COLID.RegistrationService.Services.Implementation
 
         public async Task<AttachmentDto> UploadAttachment(IFormFile file, string comment) => await UploadAttachment(file, Guid.NewGuid(), comment);
 
-        public async Task<AttachmentDto> UploadAttachment(IFormFile file, Guid guid, string comment = "")
+        public async Task<AttachmentDto> UploadAttachment(IFormFile file, Guid id, string comment = "")
         {
             Guard.ArgumentNotNull(file, "File cannot be null");
             Guard.ArgumentNotNull(comment, "Comment can not be null but empty");
             Guard.IsGreaterThanZero(file.Length);
 
-            var s3FileInfo = await _awsS3Service.UploadFileAsync(_awsConfig.S3BucketForFiles, guid.ToString(), file);
+            var s3FileInfo = await _awsS3Service.UploadFileAsync(_awsConfig.S3BucketForFiles, id.ToString(), file);
             var attachmentId = CreateAttachmentProperties(s3FileInfo, comment);
             var attachmentDto = new AttachmentDto { Id = attachmentId, s3File = s3FileInfo };
             return attachmentDto;
@@ -129,16 +129,16 @@ namespace COLID.RegistrationService.Services.Implementation
             }
             else
             {
-                throw new ConflictException(Common.Constants.Messages.Attachment.Conflict);
+                throw new ConflictException(Common.Constants.Messages.AttachmentMsg.Conflict);
             }
         }
 
-        public async Task DeleteAttachment(Guid guid, string fileName)
+        public async Task DeleteAttachment(Guid id, string fileName)
         {
             Guard.ArgumentNotNullOrWhiteSpace(fileName, "FileName is empty");
 
-            var id = GetIdFromGuidAndFileName(guid, fileName);
-            await DeleteAttachment(id);
+            var delId = GetIdFromGuidAndFileName(id, fileName);
+            await DeleteAttachment(delId);
         }
 
         public async Task DeleteAttachments(ICollection<dynamic> ids)
@@ -167,7 +167,7 @@ namespace COLID.RegistrationService.Services.Implementation
             return _awsS3Service.GenerateS3ObjectUrl(_awsConfig.S3BucketForFiles, guid.ToString(), fileName);
         }
 
-        private Tuple<Guid, string> GetGuidAndFileNameFromId(string id)
+        private static Tuple<Guid, string> GetGuidAndFileNameFromId(string id)
         {
             Guard.IsValidUri(new Uri(id));
 

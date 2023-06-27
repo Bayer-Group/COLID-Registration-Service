@@ -5,6 +5,10 @@ namespace COLID.Exception.Models.Business
 {
     public class DeprecatedVersionException : BusinessException
     {
+        public DeprecatedVersionException()
+        { 
+        }
+
         public DeprecatedVersionException(string message) : base(message)
         {
         }

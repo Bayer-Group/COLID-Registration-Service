@@ -90,7 +90,7 @@ namespace COLID.RegistrationService.Services.Implementation
             }
         }
 
-        private void RemoveEndpointFromProperties(Entity resource, Uri distributionEndpointPidUri)
+        private static void RemoveEndpointFromProperties(Entity resource, Uri distributionEndpointPidUri)
         {
             // Remove distribution endpoint from pid entry
             if (resource.Properties.TryGetValue(Graph.Metadata.Constants.Resource.Distribution, out List<dynamic> endpoints))

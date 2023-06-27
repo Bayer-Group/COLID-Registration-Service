@@ -20,6 +20,10 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
     {
         private readonly IIronMountainApiService _ironMountainApiService;
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="ironMountainApiService"></param>
         public IronMountainController(IIronMountainApiService ironMountainApiService)
         {
             _ironMountainApiService = ironMountainApiService;

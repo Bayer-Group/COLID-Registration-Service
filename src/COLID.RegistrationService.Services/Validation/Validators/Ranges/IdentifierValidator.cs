@@ -89,7 +89,7 @@ namespace COLID.RegistrationService.Services.Validation.Validators.Ranges
             else if (uriEntity.Id.HasSpaces())
             {
                 uriEntity.Id = uriEntity.Id.RemoveBlankSpaces();
-                validationFacade.ValidationResults.Add(new ValidationResultProperty(validationFacade.RequestResource.Id, properties.Key, uriEntity.Id, Common.Constants.Messages.String.TruncateSpaces, ValidationResultSeverity.Violation));
+                validationFacade.ValidationResults.Add(new ValidationResultProperty(validationFacade.RequestResource.Id, properties.Key, uriEntity.Id, Common.Constants.Messages.StringMsg.TruncateSpaces, ValidationResultSeverity.Violation));
             }
 
             validationFacade.RequestResource.Properties[properties.Key] = new List<dynamic>() { uriEntity };
@@ -127,13 +127,13 @@ namespace COLID.RegistrationService.Services.Validation.Validators.Ranges
                     {
                         if (pidUriTemplateFlattend == null)
                         {
-                            validationFacade.ValidationResults.Add(new ValidationResultProperty(validationFacade.RequestResource.Id, identifierType, pidUriTemplateId, Common.Constants.Messages.PidUriTemplate.NotExists, ValidationResultSeverity.Violation));
+                            validationFacade.ValidationResults.Add(new ValidationResultProperty(validationFacade.RequestResource.Id, identifierType, pidUriTemplateId, Common.Constants.Messages.PidUriTemplateMsg.NotExists, ValidationResultSeverity.Violation));
 
                             return;
                         }
                         else if (!CheckIfPidUriTemplateIsAllowed(validationFacade, pidUriTemplateFlattend))
                         {
-                            validationFacade.ValidationResults.Add(new ValidationResultProperty(validationFacade.RequestResource.Id, identifierType, pidUriTemplateId, Common.Constants.Messages.PidUriTemplate.ForbiddenTemplate, ValidationResultSeverity.Violation));
+                            validationFacade.ValidationResults.Add(new ValidationResultProperty(validationFacade.RequestResource.Id, identifierType, pidUriTemplateId, Common.Constants.Messages.PidUriTemplateMsg.ForbiddenTemplate, ValidationResultSeverity.Violation));
 
                             return;
                         }
@@ -143,18 +143,18 @@ namespace COLID.RegistrationService.Services.Validation.Validators.Ranges
                     }
                     else if (!pidUriTemplateFlattend.IsMatch(uriEntity.Id))
                     {
-                        validationFacade.ValidationResults.Add(new ValidationResultProperty(validationFacade.RequestResource.Id, identifierType, uriEntity.Id, Common.Constants.Messages.PidUriTemplate.MatchedFailed, ValidationResultSeverity.Violation));
+                        validationFacade.ValidationResults.Add(new ValidationResultProperty(validationFacade.RequestResource.Id, identifierType, uriEntity.Id, Common.Constants.Messages.PidUriTemplateMsg.MatchedFailed, ValidationResultSeverity.Violation));
                         return;
                     }
                 }
                 catch (InvalidFormatException)
                 {
-                    validationFacade.ValidationResults.Add(new ValidationResultProperty(validationFacade.RequestResource.Id, identifierType, pidUriTemplateId, Common.Constants.Messages.PidUriTemplate.InvalidFormat, ValidationResultSeverity.Violation));
+                    validationFacade.ValidationResults.Add(new ValidationResultProperty(validationFacade.RequestResource.Id, identifierType, pidUriTemplateId, Common.Constants.Messages.PidUriTemplateMsg.InvalidFormat, ValidationResultSeverity.Violation));
                     return;
                 }
                 catch (EntityNotFoundException)
                 {
-                    validationFacade.ValidationResults.Add(new ValidationResultProperty(validationFacade.RequestResource.Id, identifierType, pidUriTemplateId, Common.Constants.Messages.PidUriTemplate.NotExists, ValidationResultSeverity.Violation));
+                    validationFacade.ValidationResults.Add(new ValidationResultProperty(validationFacade.RequestResource.Id, identifierType, pidUriTemplateId, Common.Constants.Messages.PidUriTemplateMsg.NotExists, ValidationResultSeverity.Violation));
                     return;
                 }
                 catch (System.Exception ex)

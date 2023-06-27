@@ -9,6 +9,9 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace COLID.RegistrationService.WebApi.Controllers.V2
 {
+    /// <summary>
+    /// 
+    /// </summary>
     [ApiController]
     [Authorize]
     [ApiVersion(Constants.API.Version.V1)]
@@ -16,7 +19,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V2
     [Route("api/v{version:apiVersion}")]
     [Produces(MediaTypeNames.Application.Json)]
     [TransformIdPropertyResponseFilter]
-    [Obsolete]
+    [Obsolete("A new version of this endpoint is available")]
     public class EntityController : Controller
     {
         private readonly IEntityService _entityService;

@@ -1,6 +1,6 @@
 ﻿namespace COLID.Graph.Metadata.Constants
 {
-    public class Messages
+    public static class Messages
     {
         public static class Entity
         {

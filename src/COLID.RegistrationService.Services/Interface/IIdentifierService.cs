@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using COLID.Graph.TripleStore.DataModels.Base;
 using COLID.RegistrationService.Common.DataModel.Validation;
 using COLID.RegistrationService.Common.DataModel.Identifier;
+using COLID.Graph.Metadata.DataModels.Resources;
 
 namespace COLID.RegistrationService.Services.Interface
 {
@@ -23,7 +24,8 @@ namespace COLID.RegistrationService.Services.Interface
         /// Deletes all identifiers to a given resource entity.
         /// </summary>
         /// <param name="resource">the resource to delete identifiers from</param>
-        void DeleteAllUnpublishedIdentifiers(Entity resource);
+        /// <param name="versions">all available versions of the resource</param>
+        void DeleteAllUnpublishedIdentifiers(Entity resource, IList<VersionOverviewCTO> versions);
 
         /// <summary>
         /// Determine all oprhaned identifiers and returns them in a list. An Identifier is an orphaned one,
@@ -52,6 +54,6 @@ namespace COLID.RegistrationService.Services.Interface
         ///
         /// <exception cref="ArgumentNullException">if the param is null</exception>
         /// <exception cref="UriFormatException">if the param is not an uri</exception>
-        Task<List<OrphanResultDto>> DeleteOrphanedIdentifierList(List<string> identifierUris);
+        Task<List<OrphanResultDto>> DeleteOrphanedIdentifierList(IList<string> identifierUris);
     }
 }

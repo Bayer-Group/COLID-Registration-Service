@@ -24,7 +24,7 @@ namespace COLID.RegistrationService.Services.Extensions
             }
             else
             {
-                throw new System.Exception($"Unrecognized id type {pidUriTemplateFlattened.IdType}.");
+                throw new System.FormatException($"Unrecognized id type {pidUriTemplateFlattened.IdType}.");
             }
         }
 

@@ -6,13 +6,16 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace COLID.RegistrationService.WebApi.Controllers.V2
 {
+    /// <summary>
+    /// 
+    /// </summary>
     [ApiController]
     [Authorize]
     [ApiVersion(Constants.API.Version.V1)]
     [ApiVersion(Constants.API.Version.V2)]
     [Route("api/v{version:apiVersion}/status")]
     [Produces(MediaTypeNames.Application.Json)]
-    [Obsolete]
+    [Obsolete("A new version of this endpoint is available")]
     public class StatusController : Controller
     {
         private readonly IStatusService _statusService;

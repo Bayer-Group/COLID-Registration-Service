@@ -8,6 +8,9 @@ using COLID.RegistrationService.WebApi.Constants;
 
 namespace COLID.Maintenance.Controller
 {
+    /// <summary>
+    /// 
+    /// </summary>
     [ApiController]
     [Authorize]
     [ApiVersion(API.Version.V1)]
@@ -18,11 +21,20 @@ namespace COLID.Maintenance.Controller
     {
         private readonly IMaintenanceService _maintenanceService;
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="maintenanceService"></param>
         public MaintenanceController(IMaintenanceService maintenanceService)
         {
             _maintenanceService = maintenanceService;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="inMaintenanceModeValue"></param>
+        /// <returns></returns>
         [HttpPut]
         [Log(LogType.AuditTrail)]
         [AllowMaintenance]

@@ -53,6 +53,8 @@ namespace COLID.RegistrationService.Services.Implementation
         private readonly string _s3AccessLinkPrefix;
         private readonly string _appDataServiceEndpoint;
         private readonly IWebHostEnvironment _hostEnvironment;
+        private readonly IHttpClientFactory _clientFactory;
+        private readonly bool _bypassProxy;
 
         // Constants
         private readonly int _searchSizePerLoop = 20;
@@ -80,7 +82,8 @@ namespace COLID.RegistrationService.Services.Implementation
             ILogger<ExportService> logger,
             ITokenService<ColidSearchServiceTokenOptions> searchTokenService,
             ITokenService<ColidAppDataServiceTokenOptions> adsTokenService,
-            IWebHostEnvironment hostEnvironment)
+            IWebHostEnvironment hostEnvironment,
+            IHttpClientFactory clientFactory)
         {
             _configuration = configuration;
             _resourceService = resourceService;
@@ -97,6 +100,8 @@ namespace COLID.RegistrationService.Services.Implementation
             _metaDataService = metadataService;
             _taxonomyService = taxonomyService;
             _hostEnvironment = hostEnvironment;
+            _clientFactory = clientFactory;
+            _bypassProxy = _configuration.GetValue<bool>("BypassProxy");
         }
 
         /// <summary>
@@ -238,13 +243,13 @@ namespace COLID.RegistrationService.Services.Implementation
         {
             //var handler = new HttpClientHandler();
             //handler.DefaultProxyCredentials = CredentialCache.DefaultCredentials;
-            HttpClient client = new HttpClient();
+            using HttpClient client = (_bypassProxy ? _clientFactory.CreateClient("NoProxy") : _clientFactory.CreateClient());
             try
             {
 
                 // Encode the searchRequest into a JSON object for sending
                 string jsonobject = JsonConvert.SerializeObject(searchRequest);
-                StringContent content = new StringContent(jsonobject, Encoding.UTF8, "application/json");
+                using StringContent content = new StringContent(jsonobject, Encoding.UTF8, "application/json");
 
                 //Fetch token for search service
                 var accessToken = await _searchTokenService.GetAccessTokenForWebApiAsync();                  
@@ -258,7 +263,9 @@ namespace COLID.RegistrationService.Services.Implementation
             catch (System.Exception ex)
             {
                 _logger.LogError("ExcelExport: An error occurred while passing the search request to the search service.", ex.Message);
+#pragma warning disable CA2200 // Rethrow to preserve stack details
                 throw ex;
+#pragma warning restore CA2200 // Rethrow to preserve stack details
             }
         }
 
@@ -497,7 +504,7 @@ namespace COLID.RegistrationService.Services.Implementation
         /// </summary>
         /// <param name="props"></param>
         /// <returns></returns>
-        private List<string> removeUnwantedColumnsAndOrder(List<string> props)
+        private static List<string> removeUnwantedColumnsAndOrder(List<string> props)
         {
             //list of unwanted properties
             List<string> _unwantedPops = new List<string>()
@@ -589,11 +596,11 @@ namespace COLID.RegistrationService.Services.Implementation
             _labelList.AddRange(
                 resources.SelectMany(field => field.Keys)
                 .Where(key => key.IsValidBaseUri() && !_labelList.Any(y => y.key == key))
-                .Where(key => labels.Any(x => x.Item1.Equals(key)))
+                .Where(key => labels.Any(x => x.Item1.Equals(key,StringComparison.Ordinal)))
                 .Select(key =>
                     (
                         key,
-                        labels.FirstOrDefault(taxonomy => taxonomy.Item1.Equals(key)).Item2 ?? key
+                        labels.FirstOrDefault(taxonomy => taxonomy.Item1.Equals(key, StringComparison.Ordinal)).Item2 ?? key
                     )
                 ));
 
@@ -604,17 +611,17 @@ namespace COLID.RegistrationService.Services.Implementation
                  .Select(values =>
                     (
                         values,
-                        string.Join(",", values.Split(",").Select(value => taxonomies.FirstOrDefault(taxonomy => taxonomy.Id.Equals(value)) == null? value : taxonomies.FirstOrDefault(taxonomy => taxonomy.Id.Equals(value)).Label))
+                        string.Join(",", values.Split(",").Select(value => taxonomies.FirstOrDefault(taxonomy => taxonomy.Id.Equals(value, StringComparison.Ordinal)) == null? value : taxonomies.FirstOrDefault(taxonomy => taxonomy.Id.Equals(value, StringComparison.Ordinal)).Label))
                     )));
 
             _labelList.AddRange(
                 resources.SelectMany(field => field.Keys)
                 .Where(key => key.IsValidBaseUri() && !_labelList.Any(y => y.key == key))
-                .Where(key => taxonomies.Any(x => x.Id.Equals(key)))
+                .Where(key => taxonomies.Any(x => x.Id.Equals(key, StringComparison.Ordinal)))
                 .Select(key =>
                 (
                         key,
-                        taxonomies.FirstOrDefault(taxonomy => taxonomy.Id.Equals(key)) == null? key : taxonomies.FirstOrDefault(taxonomy => taxonomy.Id.Equals(key)).Label
+                        taxonomies.FirstOrDefault(taxonomy => taxonomy.Id.Equals(key, StringComparison.Ordinal)) == null? key : taxonomies.FirstOrDefault(taxonomy => taxonomy.Id.Equals(key, StringComparison.Ordinal)).Label
                 )));
 
             return _labelList;
@@ -626,7 +633,7 @@ namespace COLID.RegistrationService.Services.Implementation
         /// <param name="uri"></param>
         /// <param name="labelList"></param>
         /// <returns></returns>
-        private string resolveUri(string uri, List<(string key, string value)> labelList)
+        private static string resolveUri(string uri, List<(string key, string value)> labelList)
         {
             string label = labelList.FirstOrDefault(x => x.key == uri).value ?? uri;
 
@@ -714,7 +721,7 @@ namespace COLID.RegistrationService.Services.Implementation
 
                         if (_value.IsJson())
                         {
-                            if (_value.Contains(COLID.Graph.Metadata.Constants.AttachmentConstants.Type)) //Attachment
+                            if (_value.Contains(COLID.Graph.Metadata.Constants.AttachmentConstants.Type, StringComparison.Ordinal)) //Attachment
                             {
                                 var _attachments = JsonConvert.DeserializeObject<List<Entity>>($"[{_value}]");
                                 var _images = _attachments.Select(x => new { Id = x.Id, Label = x.Properties.GetValueOrNull(RDFS.Label, true) });
@@ -725,7 +732,7 @@ namespace COLID.RegistrationService.Services.Implementation
                                     cell = createHyperlink(cell, $"=HYPERLINK(\"{_images.First().Id}\", \"{_value}\")", _value);
                                 }
                             }
-                            if (_value.Contains(COLID.Graph.Metadata.Constants.Identifier.Type)) //BaseUri
+                            if (_value.Contains(COLID.Graph.Metadata.Constants.Identifier.Type, StringComparison.Ordinal)) //BaseUri
                             {
                                 _value = JsonConvert.DeserializeObject<Entity>(_value)?.Id;
                                 _value = resolveUri(_value, _labelList);
@@ -794,7 +801,7 @@ namespace COLID.RegistrationService.Services.Implementation
             return memoryStream;
         }
 
-        private Cell createHyperlink(Cell oldCell, string link, string value)
+        private static Cell createHyperlink(Cell oldCell, string link, string value)
         {
             if (link.Length >= 255)
             {
@@ -811,7 +818,7 @@ namespace COLID.RegistrationService.Services.Implementation
             return cell;
         }
 
-        private void getAdditionalInfo(ref List<Dictionary<string, List<dynamic>>> resources)
+        private static void getAdditionalInfo(ref List<Dictionary<string, List<dynamic>>> resources)
         {
             foreach (var resource in resources)
             {
@@ -929,7 +936,9 @@ namespace COLID.RegistrationService.Services.Implementation
 
             // Stream that will be returned
             MemoryStream memoryStream = new MemoryStream();
+#pragma warning disable CA2000 // Dispose objects before losing scope
             using (SpreadsheetDocument doc = (SpreadsheetDocument)SpreadsheetDocument.Open(excelFilePath, true).Clone(memoryStream))
+#pragma warning restore CA2000 // Dispose objects before losing scope
             {
                 //extract the important inner parts of the worksheet
                 WorkbookPart workbookPart = doc.WorkbookPart;
@@ -1056,9 +1065,9 @@ namespace COLID.RegistrationService.Services.Implementation
                 Row pidUriTypeRow = rowContainer.Elements<Row>().ElementAt(2);
                 Row uriHeaderRow = rowContainer.Elements<Row>().ElementAt(1);
 
-                List<string> pidUris = this.getRowValues(pidUriRow, doc);
-                List<string> pidUriTypes = this.getRowValues(pidUriTypeRow, doc);
-                List<string> uriHeader = this.getRowValues(uriHeaderRow, doc);
+                List<string> pidUris = getRowValues(pidUriRow, doc);
+                List<string> pidUriTypes = getRowValues(pidUriTypeRow, doc);
+                List<string> uriHeader = getRowValues(uriHeaderRow, doc);
                 uriHeader.RemoveRange(0, Math.Min(3, uriHeader.Count)); //remove first three items in this list, because they have no PID URI. This way, the indizes from the two lists here match
 
                 //Check Whether all Metadata Properties are there in the Excel Template if not Add
@@ -1225,7 +1234,7 @@ namespace COLID.RegistrationService.Services.Implementation
             return memoryStream;
         }
 
-        private List<string> getRowValues(Row valueRow, SpreadsheetDocument doc)
+        private static List<string> getRowValues(Row valueRow, SpreadsheetDocument doc)
         {
             List<string> pidUris = new List<string>();
             foreach (Cell cell in valueRow)
@@ -1246,7 +1255,7 @@ namespace COLID.RegistrationService.Services.Implementation
             return pidUris;
         }
 
-        private Row generateRow(int index, IDictionary<string, List<dynamic>> pResource, List<string> templateProperties, List<string> templatePropertyLabels,
+        private static Row generateRow(int index, IDictionary<string, List<dynamic>> pResource, List<string> templateProperties, List<string> templatePropertyLabels,
             List<string> displayedColumns, string type = "RE")
         {
             //prepare resource
@@ -1361,7 +1370,7 @@ namespace COLID.RegistrationService.Services.Implementation
 
             return currentResource;
         }
-        private Row generateLinkRow (string sourcePidUri, string targetPidUri, string linkType)
+        private static Row generateLinkRow (string sourcePidUri, string targetPidUri, string linkType)
         {
             Row linkRow = new Row();
             //Add First 3 blank Columns for technical response & marking Action with "x" (Create/Delete)
@@ -1377,7 +1386,7 @@ namespace COLID.RegistrationService.Services.Implementation
             return linkRow;
         }
 
-        public List<dynamic> CheckJson(List<dynamic> props)
+        public static IList<dynamic> CheckJson(IList<dynamic> props)
         {
             List<dynamic> output = new List<dynamic>();
             foreach (var item in props)
@@ -1385,7 +1394,7 @@ namespace COLID.RegistrationService.Services.Implementation
                 string value = string.Join(",", new List<dynamic>() { item });
                 if (value.IsJson())
                 {
-                    if (value.Contains(COLID.Graph.Metadata.Constants.AttachmentConstants.Type)) //Attachment
+                    if (value.Contains(COLID.Graph.Metadata.Constants.AttachmentConstants.Type, StringComparison.Ordinal)) //Attachment
                         output.Add(((COLID.Graph.TripleStore.DataModels.Base.Entity)item).Id);
                     else
                     {
@@ -1457,7 +1466,7 @@ namespace COLID.RegistrationService.Services.Implementation
         /// <param name="uploadInfoDto"></param>
         private async void SendNotification(AmazonS3FileUploadInfoDto uploadInfoDto)
         {
-            HttpClient client = new HttpClient();
+            using HttpClient client = (_bypassProxy ? _clientFactory.CreateClient("NoProxy") : _clientFactory.CreateClient());
             try
             {
                 // Get user info
@@ -1474,7 +1483,7 @@ namespace COLID.RegistrationService.Services.Implementation
 
                 // Convert Message to JSON-Object
                 string jsonobject = JsonConvert.SerializeObject(message);
-                StringContent content = new StringContent(jsonobject, Encoding.UTF8, "application/json");
+                using StringContent content = new StringContent(jsonobject, Encoding.UTF8, "application/json");
 
                 //Set AAD token
                 var accessToken = await _adsTokenService.GetAccessTokenForWebApiAsync();
@@ -1526,19 +1535,19 @@ namespace COLID.RegistrationService.Services.Implementation
                  && uri.Split(",")?.Count() == 1
                  && uri.Length < 255; //Excel has limit to 255 character
         }
-        public static string HtmlEncode(this string _htmlCode)
+        public static string HtmlEncode(this string htmlCode)
         {
-            string _decodedHtml = _htmlCode;
-            if (!_htmlCode.IsJson() && !_htmlCode.IsHyperLink())
-                _decodedHtml = Regex.Replace(_htmlCode, "<[a-zA-Z/].*?>", String.Empty);
+            string _decodedHtml = htmlCode;
+            if (!htmlCode.IsJson() && !htmlCode.IsHyperLink())
+                _decodedHtml = Regex.Replace(htmlCode, "<[a-zA-Z/].*?>", String.Empty);
 
             return _decodedHtml;
         }
-        public static string FormatDate(this string _date, string prop)
+        public static string FormatDate(this string date, string prop)
         {
-            string _formattedDate = _date;
+            string _formattedDate = date;
             if (prop.Contains("date", StringComparison.OrdinalIgnoreCase)
-                && DateTime.TryParse(_date, out DateTime result))
+                && DateTime.TryParse(date, out DateTime result))
             {
                 _formattedDate = result.ToString("dd/MM/yyyy HH:mm:ss");
             }

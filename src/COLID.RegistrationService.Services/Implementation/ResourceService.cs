@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -38,7 +38,9 @@ using COLID.MessageQueue.Configuration;
 using Microsoft.Extensions.Options;
 using COLID.MessageQueue.Datamodel;
 using COLID.Identity.Constants;
-
+using COLID.RegistrationService.Common.DataModels.Contacts;
+using ColidConstants = COLID.RegistrationService.Common.Constants;
+
 namespace COLID.RegistrationService.Services.Implementation
 {
     public class ResourceService : IResourceService, IMessageQueuePublisher, IMessageQueueReceiver
@@ -149,7 +151,7 @@ namespace COLID.RegistrationService.Services.Implementation
             return resource;
         }
 
-        public IList<Resource> GetByPidUris(List<Uri> pidUris)
+        public IList<Resource> GetByPidUris(IList<Uri> pidUris)
         {
             var resourceTypes = _metadataService.GetInstantiableEntityTypes(Graph.Metadata.Constants.Resource.Type.FirstResouceType);
             Uri instanceGraphUri = GetResourceInstanceGraph();
@@ -173,7 +175,7 @@ namespace COLID.RegistrationService.Services.Implementation
             return dueResourceList;
         }
 
-        public void GetLinksOfPublishedResources(List<Resource> resources, IList<Uri> pidUris, Uri namedGraph, ISet<string> LinkTypeList)
+        public void GetLinksOfPublishedResources(IList<Resource> resources, IList<Uri> pidUris, Uri namedGraph, ISet<string> LinkTypeList)
         {
             _resourceRepository.GetLinksOfPublishedResources(resources, pidUris, namedGraph, LinkTypeList);
         }
@@ -533,8 +535,9 @@ namespace COLID.RegistrationService.Services.Implementation
 
        public Resource GetByPidUriAndLifecycleStatus(Uri pidUri, Uri lifecycleStatus)
        {
-           if (!lifecycleStatus.ToString().Equals(COLID.Graph.Metadata.Constants.Resource.ColidEntryLifecycleStatus.Draft) && !lifecycleStatus.ToString().Equals(COLID.Graph.Metadata.Constants.Resource.ColidEntryLifecycleStatus.Published) && !lifecycleStatus.ToString().Equals(COLID.Graph.Metadata.Constants.Resource.ColidEntryLifecycleStatus.MarkedForDeletion))
-
+           if (!lifecycleStatus.ToString().Equals(COLID.Graph.Metadata.Constants.Resource.ColidEntryLifecycleStatus.Draft, StringComparison.Ordinal) && 
+                !lifecycleStatus.ToString().Equals(COLID.Graph.Metadata.Constants.Resource.ColidEntryLifecycleStatus.Published, StringComparison.Ordinal) && 
+                !lifecycleStatus.ToString().Equals(COLID.Graph.Metadata.Constants.Resource.ColidEntryLifecycleStatus.MarkedForDeletion, StringComparison.Ordinal))
            {
                throw new BusinessException($"EntryLifecycleStatus '{lifecycleStatus}' is not allowed");
            }
@@ -613,7 +616,7 @@ namespace COLID.RegistrationService.Services.Implementation
                 if (laterversionDraft != null)
                 {
                     string oldValueDraft = laterversionDraft.FirstOrDefault();
-                    var newLaterVersionD = oldValueDraft.Contains(COLID.Graph.Metadata.Constants.Entity.IdPrefix) ? _resourceRepository.GetPidUriById(new Uri(oldValueDraft), draftGraphUri, instanceGraphUri).ToString() : oldValueDraft;
+                    var newLaterVersionD = oldValueDraft.Contains(COLID.Graph.Metadata.Constants.Entity.IdPrefix, StringComparison.Ordinal) ? _resourceRepository.GetPidUriById(new Uri(oldValueDraft), draftGraphUri, instanceGraphUri).ToString() : oldValueDraft;
                     laterversionDraft[0] = newLaterVersionD;
                 }
             }
@@ -623,7 +626,7 @@ namespace COLID.RegistrationService.Services.Implementation
                 if (laterversionPublished != null)
                 {
                     string oldValuePublished = laterversionPublished.FirstOrDefault();
-                    var newLaterVersion = oldValuePublished.Contains(COLID.Graph.Metadata.Constants.Entity.IdPrefix) ? _resourceRepository.GetPidUriById(new Uri(oldValuePublished), draftGraphUri, instanceGraphUri).ToString() : oldValuePublished;
+                    var newLaterVersion = oldValuePublished.Contains(COLID.Graph.Metadata.Constants.Entity.IdPrefix, StringComparison.Ordinal) ? _resourceRepository.GetPidUriById(new Uri(oldValuePublished), draftGraphUri, instanceGraphUri).ToString() : oldValuePublished;
                     laterversionPublished[0] = newLaterVersion;
                 }
             }
@@ -656,22 +659,27 @@ namespace COLID.RegistrationService.Services.Implementation
            return _resourceRepository.GetDistributionEndpoints(pidUri, types, GetResourceInstanceGraph());
        }
 
-        public IList<DistributionEndpointsTest> GetDistributionEndpoints(string resourceType)
+        public IList<DistributionEndpointsTest> GetDistributionEndpoints(IList<string> resourceTypes, Uri? distributionPidUri)
         {
-            return _resourceRepository.GetDistributionEndpoints(resourceType, GetResourceInstanceGraph());
+            return _resourceRepository.GetDistributionEndpoints(resourceTypes, GetResourceInstanceGraph(), GetConsumerGroupInstanceGraph(), distributionPidUri);
         }
-        public void MarkDistributionEndpointAsDeprecated(Uri DistributionEndpointPidUri)
+
+        public IList<DistributionEndpointsTest> GetBrokenEndpoint(IList<string> resourceTypes)
+        {
+            return _resourceRepository.GetBrokenEndpoints(resourceTypes, GetResourceInstanceGraph(), GetConsumerGroupInstanceGraph());
+        }
+        public void MarkDistributionEndpointAsDeprecated(Uri distributionEndpoint)
         {
             using (var trans = _resourceRepository.CreateTransaction())
             {
                 _resourceRepository.DeleteProperty(
-                    DistributionEndpointPidUri,
+                    distributionEndpoint,
                     new Uri(Graph.Metadata.Constants.Resource.DistributionEndpoints.DistributionEndpointLifecycleStatus),
                     new Uri(Common.Constants.DistributionEndpoint.LifeCycleStatus.Active),
                     GetResourceInstanceGraph());
 
                 _resourceRepository.CreateProperty(
-                    DistributionEndpointPidUri,
+                    distributionEndpoint,
                     new Uri(Graph.Metadata.Constants.Resource.DistributionEndpoints.DistributionEndpointLifecycleStatus),
                     new Uri(Common.Constants.DistributionEndpoint.LifeCycleStatus.Deprecated),
                     GetResourceInstanceGraph());
@@ -752,7 +760,7 @@ namespace COLID.RegistrationService.Services.Implementation
                     _resourceRepository.DeletePublished(validationFacade.RequestResource.PidUri,
                         new Uri(validationFacade.RequestResource.Id), GetResourceInstanceGraph());
                 }
-                _identifierService.DeleteAllUnpublishedIdentifiers(resourcesCTO.Draft);
+                _identifierService.DeleteAllUnpublishedIdentifiers(resourcesCTO.Draft, resourcesCTO.Versions);
 
                 Resource resourceToBeIndexed = null;
                 if (resourcesCTO.HasPublished)
@@ -781,12 +789,12 @@ namespace COLID.RegistrationService.Services.Implementation
             return true;
         }
 
-       public async Task<ResourceWriteResultCTO> CreateResource(ResourceRequestDTO resourceRequest)
+       public async Task<ResourceWriteResultCTO> CreateResource(ResourceRequestDTO resource)
        {
-            string entityType = resourceRequest.Properties.GetValueOrNull(Graph.Metadata.Constants.RDF.Type, true);
+            string entityType = resource.Properties.GetValueOrNull(Graph.Metadata.Constants.RDF.Type, true);
             if (entityType == COLID.Graph.Metadata.Constants.Resource.Type.CropScience)
             {
-                var payload = JsonConvert.SerializeObject(resourceRequest.Properties);
+                var payload = JsonConvert.SerializeObject(resource.Properties);
                 _logger.LogInformation("Create: Incoming Payload for CropScience ");
                 _logger.LogInformation(payload);
 
@@ -796,10 +804,10 @@ namespace COLID.RegistrationService.Services.Implementation
            _logger.LogInformation("Create resource with id={id}", newResourceId);
 
            // Check whether the correct entity type is specified -> throw exception
-           _validationService.CheckInstantiableEntityType(resourceRequest);
+           _validationService.CheckInstantiableEntityType(resource);
 
            var (validationResult, failed, validationFacade) =
-               await _resourcePreprocessService.ValidateAndPreProcessResource(newResourceId, resourceRequest,
+               await _resourcePreprocessService.ValidateAndPreProcessResource(newResourceId, resource,
                    new ResourcesCTO(), ResourceCrudAction.Create,false,null);
 
            validationFacade.RequestResource.Id = newResourceId;
@@ -819,10 +827,10 @@ namespace COLID.RegistrationService.Services.Implementation
                transaction.Commit();
 
                // TODO: Handle error if linking failed
-               if (!string.IsNullOrWhiteSpace(resourceRequest.HasPreviousVersion))  // Wenn ich eine resource erstelle die eine verlinkug zu einer anderen resource hat, muss die versions verlinkung erstellt werden
+               if (!string.IsNullOrWhiteSpace(resource.HasPreviousVersion))  // Wenn ich eine resource erstelle die eine verlinkug zu einer anderen resource hat, muss die versions verlinkung erstellt werden
                {
                    _resourceLinkingService.LinkResourceIntoList(validationFacade.RequestResource.PidUri,
-                       new Uri(resourceRequest.HasPreviousVersion), out resourceVersions);
+                       new Uri(resource.HasPreviousVersion), out resourceVersions);
                }
            }
 
@@ -852,18 +860,11 @@ namespace COLID.RegistrationService.Services.Implementation
             return true;
         }
 
-        public async Task<ResourceWriteResultCTO> EditResource(Uri pidUri, ResourceRequestDTO resourceRequest, bool typeChange = false)
+        public async Task<ResourceWriteResultCTO> EditResource(Uri pidUri, ResourceRequestDTO resource, bool changeType = false)
        {
-           _validationService.CheckInstantiableEntityType(resourceRequest);
+           _validationService.CheckInstantiableEntityType(resource);
             
-            string entityType = resourceRequest.Properties.GetValueOrNull(Graph.Metadata.Constants.RDF.Type, true);
-            if (entityType == COLID.Graph.Metadata.Constants.Resource.Type.CropScience)
-            {
-                var payload = JsonConvert.SerializeObject(resourceRequest.Properties); 
-                _logger.LogInformation("Edit: Incoming Payload for CropScience ");
-                _logger.LogInformation(payload);
-
-            }
+            string entityType = resource.Properties.GetValueOrNull(Graph.Metadata.Constants.RDF.Type, true);
             using (var lockService = _lockServiceFactory.CreateLockService())
            {
                await lockService.CreateLockAsync(pidUri.ToString());
@@ -872,8 +873,8 @@ namespace COLID.RegistrationService.Services.Implementation
                var id = resourcesCTO.GetDraftOrPublishedVersion().Id; // Draft und Published resource getrennt behandeln.
 
             var (validationResult, failed, validationFacade) =
-                    await _resourcePreprocessService.ValidateAndPreProcessResource(id, resourceRequest, resourcesCTO,
-                        ResourceCrudAction.Update,false, null, typeChange);
+                    await _resourcePreprocessService.ValidateAndPreProcessResource(id, resource, resourcesCTO,
+                        ResourceCrudAction.Update,false, null, changeType);
 
                 HandleValidationFailures(resourcesCTO.GetDraftOrPublishedVersion(), id, validationResult, failed,
                     validationFacade);
@@ -907,7 +908,7 @@ namespace COLID.RegistrationService.Services.Implementation
 
                     if (resourcesCTO.HasDraft)
                     {
-                        _identifierService.DeleteAllUnpublishedIdentifiers(resourcesCTO.Draft);
+                        _identifierService.DeleteAllUnpublishedIdentifiers(resourcesCTO.Draft, resourcesCTO.Versions);
                     }
 
                     _resourceRepository.Create(resourcetoCreate, validationFacade.MetadataProperties, GetResourceDraftInstanceGraph());
@@ -1222,7 +1223,7 @@ namespace COLID.RegistrationService.Services.Implementation
 
         public async Task<ResourceWriteResultCTO> PublishResource(Uri pidUri)
         {
-                    CheckIfResourceExist(pidUri);
+                CheckIfResourceExist(pidUri);
 
                 using (var lockService = _lockServiceFactory.CreateLockService())  // verhindert dass 2 user gleichzeitig publishen
                 {
@@ -1243,13 +1244,13 @@ namespace COLID.RegistrationService.Services.Implementation
                         {
                             resourcesCTO.Draft.Properties.Add(Graph.Metadata.Constants.Resource.HasNextReviewDueDate, nextReviewDate);
                         }
-                     }
-
+                     }
+
                     if (resourcesCTO.HasPublishedAndNoDraft)
-                    {
-                        throw new BusinessException("The resource has already been published");
-                    }
-
+                        {
+                            throw new BusinessException("The resource has already been published");
+                        }
+
                     var requestResource = _mapper.Map<ResourceRequestDTO>(resourcesCTO.Draft);
                     var draftId = resourcesCTO.Draft.Id;  //da selbe id , nur in unterschiedlichen graphen
 
@@ -1276,7 +1277,7 @@ namespace COLID.RegistrationService.Services.Implementation
                         _resourceRepository.DeletePublished(validationFacade.RequestResource.PidUri,
                             new Uri(validationFacade.RequestResource.Id), GetResourceInstanceGraph());
 
-                        _identifierService.DeleteAllUnpublishedIdentifiers(resourcesCTO.Draft);     // Sicherstellen dass alle links ausgehend von dieser draft resource gelöscht werden.
+                        _identifierService.DeleteAllUnpublishedIdentifiers(resourcesCTO.Draft, resourcesCTO.Versions);     // Sicherstellen dass alle links ausgehend von dieser draft resource gelöscht werden.
 
 
                         Resource resourceToBeIndexed = null;
@@ -1293,14 +1294,15 @@ namespace COLID.RegistrationService.Services.Implementation
                                 List<KeyValuePair<string, List<string>>> incompatibleLinks = oldLinks.Where(x => !newLinkMetadata.Contains(x.Key)).Select(x => new KeyValuePair<string, List<string>>(x.Key, x.Value.Select(y => y.PidUri).ToList())).ToList();
                                 var tasks = incompatibleLinks.SelectMany(link => link.Value.Select(targetURI => SetLinkHistoryEntryStatusToDeleted(new Uri(resourcesCTO.Published.Id), new Uri(link.Key), new Uri(targetURI), changeRequester)));
                                 await Task.WhenAll(tasks);
-                            }
-
-                       
-                            //Füge die neue resource mit den aktualisierten werten in den resource graphen
-                            //Füge additionals und removals in seperate graphen --> Verlinke die resource zu der Änderungstabelle
+                            }
+
+                            //Füge die neue resource mit den aktualisierten werten in den resource graphen
+                            //Füge additionals und removals in seperate graphen --> Verlinke die resource zu der Änderungstabelle
                             Resource updatedResource = await _revisionService.AddAdditionalsAndRemovals(resourcesCTO.Published, resourcesCTO.Draft);
                             resourceToBeIndexed = getResourceToBeIndexedBySettingLinks(updatedResource, metadata, null);  // mitPidUri
-                            
+                            // remove invalidDataStewardContact flag on publishing resource
+                            resourceToBeIndexed.Properties.Remove(ColidConstants.ContactValidityCheck.BrokenDataStewards);   
+
                             Resource LatVersionIdResources = (Resource) SetHasLaterVersionResourceId(resourceToBeIndexed);
 
                             _resourceRepository.Create(LatVersionIdResources, metadata, GetResourceInstanceGraph());
@@ -1343,7 +1345,7 @@ namespace COLID.RegistrationService.Services.Implementation
                     return new ResourceWriteResultCTO(validationFacade.RequestResource, validationResult);
                 }
         }
-        private List<dynamic> calculateNextReviewDate(dynamic reviewPolicy)
+        private static List<dynamic> calculateNextReviewDate(dynamic reviewPolicy)
         {
             List<dynamic> nextReviewDate = new List<dynamic>();
             var nextDate = DateTime.Now.AddMonths(Int32.Parse(reviewPolicy)).ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'Z'");
@@ -1382,7 +1384,7 @@ namespace COLID.RegistrationService.Services.Implementation
                 Graph.Metadata.Constants.Resource.ColidEntryLifecycleStatus.Draft, GetResourceInstanceGraph());
         }*/
 
-        private void HandleValidationFailures(Entity draftOrPublishedResource, string id,
+        private static void HandleValidationFailures(Entity draftOrPublishedResource, string id,
             ValidationResult validationResult, bool failed, EntityValidationFacade validationFacade)
         {
             // The validation failed, if the results are cricital errors.
@@ -1442,7 +1444,7 @@ namespace COLID.RegistrationService.Services.Implementation
             return resourceExists;
         }
 
-        private string CreateNewResourceId()
+        private static string CreateNewResourceId()
         {
             return Graph.Metadata.Constants.Entity.IdPrefix + Guid.NewGuid();
         }
@@ -1513,7 +1515,7 @@ namespace COLID.RegistrationService.Services.Implementation
                 //_historyResourceService.DeleteDraftResourceLinks(pidUri); // fällt weg
                 _resourceRepository.DeleteDraft(pidUri, null, GetResourceDraftInstanceGraph());
 
-                _identifierService.DeleteAllUnpublishedIdentifiers(resource);
+                _identifierService.DeleteAllUnpublishedIdentifiers(resource, resources.Versions);
 
                 transaction.Commit();
             }
@@ -1535,6 +1537,12 @@ namespace COLID.RegistrationService.Services.Implementation
                 y => y.Key,
                 y => y.Value.Select(x => x.PidUri).ToList<dynamic>());
             _resourceLinkingService.UnlinkResourceFromList(pidUri, true, out message);  // Bleibt gleich
+            // add outbound links to resource properties so that the indexing crawler service can find the correspoding resources and adjust the inbound links
+            foreach (var links in outboundlinks)
+            {
+                var linksOfALinkType = outboundlinks[links.Key].Select(x => x.PidUri).Cast<dynamic>().ToList();
+                resource.Properties.Add(links.Key, linksOfALinkType);
+            }
             string entityType = resource.Properties.GetValueOrNull(Graph.Metadata.Constants.RDF.Type, true).ToString();
             var metadata = _metadataService.GetMetadataForEntityType(entityType);
             using (var transaction = _resourceRepository.CreateTransaction())
@@ -1577,7 +1585,7 @@ namespace COLID.RegistrationService.Services.Implementation
                 }
                 catch (System.Exception ex)
                 {
-                    _logger.LogWarning("Addtional Graph name not found while deleting {additionalGraphName}", additionalGraphName, ex.Message);
+                    _logger.LogWarning("Addtional Graph name not found while deleting {additionalGraphName} - {Message}", additionalGraphName, ex.Message);
                 }
 
                 if (i == 0)
@@ -1592,7 +1600,7 @@ namespace COLID.RegistrationService.Services.Implementation
                 }
                 catch (System.Exception ex)
                 {
-                    _logger.LogWarning("Removal Graph name not found while deleting {removalGraphName}", removalGraphName, ex.Message);
+                    _logger.LogWarning("Removal Graph name not found while deleting {removalGraphName} - {Message}", removalGraphName, ex.Message);
                 }
             }
         }
@@ -1657,7 +1665,7 @@ namespace COLID.RegistrationService.Services.Implementation
             }
         }
 
-        public async Task<List<ResourceMarkedOrDeletedResult>> MarkResourceAsDeletedListAsync(List<Uri> pidUris, string requester)
+        public async Task<List<ResourceMarkedOrDeletedResult>> MarkResourceAsDeletedListAsync(IList<Uri> pidUris, string requester)
         {
             CheckDeletionResourcesCount(pidUris);
             var markResourceDeletionFailedUris = new List<ResourceMarkedOrDeletedResult>();
@@ -1791,7 +1799,7 @@ namespace COLID.RegistrationService.Services.Implementation
                     }
                     else
                     {
-                        _logger.LogWarning("Multiple Delete error {pidUri}", pidUri, ex.Message);
+                        _logger.LogWarning("Multiple Delete error {pidUri} - {Message}", pidUri, ex.Message);
                     }
                 }
             }
@@ -1799,7 +1807,7 @@ namespace COLID.RegistrationService.Services.Implementation
             return deletionFailedUris;
         }
         //check list is more than 100 or empty
-        private void CheckDeletionResourcesCount(IList<Uri> pidUris)
+        private static void CheckDeletionResourcesCount(IList<Uri> pidUris)
         {
             if (pidUris == null || pidUris.Count == 0)
             {
@@ -1848,7 +1856,7 @@ namespace COLID.RegistrationService.Services.Implementation
             _resourceRepository.DeleteAllProperties(new Uri(pidUri), new Uri(AttachmentConstants.HasAttachment), GetResourceInstanceGraph());
         }*/
 
-        private Uri GetResourceInstanceGraph()
+        public Uri GetResourceInstanceGraph()
         {
             return _metadataService.GetInstanceGraph(PIDO.PidConcept);
         }
@@ -1866,7 +1874,7 @@ namespace COLID.RegistrationService.Services.Implementation
             return _metadataService.GetHistoricInstanceGraph();
         }
 
-        private Uri GetConsumerGroupInstanceGraph()
+        public Uri GetConsumerGroupInstanceGraph()
         {
             return _metadataService.GetInstanceGraph(ConsumerGroup.Type);
         }
@@ -1894,7 +1902,7 @@ namespace COLID.RegistrationService.Services.Implementation
                     }
                     catch (System.Exception ex)
                     {
-                        _logger.LogWarning("Problem while fetching additonal graph data {additionalGraphName}", additionalGraphName, ex.Message);
+                        _logger.LogWarning("Problem while fetching additonal graph data {additionalGraphName} - {Message}", additionalGraphName, ex.Message);
                     }
                     try
                     {
@@ -1903,7 +1911,7 @@ namespace COLID.RegistrationService.Services.Implementation
                     }
                     catch (System.Exception ex)
                     {
-                        _logger.LogWarning("Problem while fetching removal graph data {removalGraphName}", removalGraphName, ex.Message);
+                        _logger.LogWarning("Problem while fetching removal graph data {removalGraphName} - {Message}", removalGraphName, ex.Message);
                     }
                     revisionHistoryResponse.Add(resourceRevision);
                 }
@@ -1923,7 +1931,26 @@ namespace COLID.RegistrationService.Services.Implementation
 
         }
 
-        public async Task<Dictionary<string, List<string>>> GetResourceHierarchy(List<string> resourceType)
+        public async Task<List<DisplayTableAndColumnByPidUri>> GetTableAndColumnByPidUris(IList<Uri> pidUris)
+        {
+            //Get Pid Ontology
+            var Hierarchy = _metadataService.GetResourceTypeHierarchy(Graph.Metadata.Constants.Resource.Type.FirstResouceType);
+            var dataSet = Hierarchy.SubClasses.Where(x => x.Label == "Resources").SelectMany(x => x.SubClasses).
+                Where(x => x.Label == "Dataset").SelectMany(x => x.SubClasses).Select(x => x.Id).ToList();
+            var returnList = new List<DisplayTableAndColumnByPidUri>();
+            foreach (Uri pidUri in pidUris)
+            {
+                returnList.Add(new DisplayTableAndColumnByPidUri
+                {
+                    pidURI = pidUri.ToString(),
+                    TableAndColumn = _resourceRepository.GetTableAndColumnById(pidUri, dataSet, GetResourceInstanceGraph())
+                });
+            }
+            return returnList;
+
+        }
+
+        public async Task<Dictionary<string, List<string>>> GetResourceHierarchy(IList<string> resourceType)
         {
             resourceType = resourceType.Distinct().ToList();
             Dictionary<string, List<string>> resourceLinkTypes = new Dictionary<string, List<string>>();
@@ -2028,20 +2055,20 @@ namespace COLID.RegistrationService.Services.Implementation
                 var consumerGroup = resource.Properties.GetValueOrNull(Graph.Metadata.Constants.Resource.HasConsumerGroup, true);
                 var label = resource.Properties.GetValueOrNull(Graph.Metadata.Constants.Resource.HasLabel, true);
                 var consumergroup_object = consumerGroupList.First(x => x.Id == consumerGroup);
-                var consumergroup_DefaultDeprecatedValue = consumerGroupList.First(x => x.Id == consumerGroup).Properties.GetValueOrNull(Graph.Metadata.Constants.ConsumerGroup.DefaultDeprecationTime, true);
-                int deprecationTime = consumergroup_DefaultDeprecatedValue != null ? Int32.Parse(consumergroup_DefaultDeprecatedValue) : 90;
+                var consumerGroupDeprecatedValue = consumerGroupList.First(x => x.Id == consumerGroup).Properties.GetValueOrNull(Graph.Metadata.Constants.ConsumerGroup.DefaultDeprecationTime, true);
                 Dictionary<bool, string> messageType = new Dictionary<bool, string>()
                 {
                     { false,  duewarningTemplate.Body.Replace("%COLID_LABEL%", label).Replace("%COLID_PID_URI%", pidUri.ToString())},
-                    { true, deprecatedNotificationTemplate.Body.Replace("%COLID_LABEL%", label).Replace("%COLID_PID_URI%", pidUri.ToString()).Replace("%DEPRECATION_TIME%", deprecationTime.ToString())}
+                    { true, deprecatedNotificationTemplate.Body.Replace("%COLID_LABEL%", label).Replace("%COLID_PID_URI%", pidUri.ToString()).Replace("%DEPRECATION_TIME%", consumerGroupDeprecatedValue?.ToString() ?? "")}
                 };
 
                 bool deprecated = false;
-                if (resource.Properties.ContainsKey(COLID.Graph.Metadata.Constants.Resource.HasNextReviewDueDate)){
+                if (resource.Properties.ContainsKey(COLID.Graph.Metadata.Constants.Resource.HasNextReviewDueDate) && consumerGroupDeprecatedValue!=null && consumerGroupDeprecatedValue != 0)
+                {
                     var HasNextReviewDueDate = resource.Properties.GetValueOrNull(Graph.Metadata.Constants.Resource.HasNextReviewDueDate, true);
                     var date = DateTime.Parse(HasNextReviewDueDate);
 
-                    if (date < DateTime.Today.AddDays(deprecationTime*(-1))) // GET DEFAULT DEPRECATED TIME due date is in the past according to consumer group default depreation time
+                    if (date < DateTime.Today.AddDays(Int32.Parse(consumerGroupDeprecatedValue) * (-1))) 
                     {
                         deprecated = true;
                         await SetPublishedResourceToDeprecated(pidUri);
@@ -2089,7 +2116,7 @@ namespace COLID.RegistrationService.Services.Implementation
             return emailList;
         }
 
-        public List<LinkHistoryDto> GetLinkHistory(Uri startPidUri, Uri endPidUri)
+        public IList<LinkHistoryDto> GetLinkHistory(Uri startPidUri, Uri endPidUri)
         {
             var metadataGraphs = _metadataService.GetMetadataGraphs();            
             Uri linkHistoryGraphUri = GetLinkHistoryGraph(); 
@@ -2099,6 +2126,20 @@ namespace COLID.RegistrationService.Services.Implementation
             else
                 return _resourceRepository.GetLinkHistory(startPidUri, endPidUri, linkHistoryGraphUri, instanceGraphUri, metadataGraphs);
             
+        }
+
+        public IList<LinkHistoryDto> SearchLinkHistory(LinkHistorySearchParamDto searchParam)
+        {
+            var metadataGraphs = _metadataService.GetMetadataGraphs();
+            Uri linkHistoryGraphUri = GetLinkHistoryGraph();
+            Uri instanceGraphUri = GetResourceInstanceGraph();
+            
+            return _resourceRepository.SearchLinkHistory(searchParam, linkHistoryGraphUri, instanceGraphUri, metadataGraphs);            
+        }
+
+        public void CreateProperty(Uri subject, Uri predicate, string literal, Uri namedGraph)
+        {
+            _resourceRepository.CreateProperty(subject, predicate, literal, namedGraph);
         }
     }
 }

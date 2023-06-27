@@ -13,6 +13,7 @@ using Entity = COLID.Graph.TripleStore.DataModels.Base.Entity;
 using Microsoft.Extensions.Logging;
 using COLID.RegistrationService.Common.DataModel.Identifier;
 using System.Threading.Tasks;
+using COLID.Graph.Metadata.DataModels.Resources;
 
 namespace COLID.RegistrationService.Services.Implementation
 {
@@ -46,7 +47,7 @@ namespace COLID.RegistrationService.Services.Implementation
             }
         }
 
-        public async Task<List<OrphanResultDto>> DeleteOrphanedIdentifierList(List<string> identifierUris)
+        public async Task<List<OrphanResultDto>> DeleteOrphanedIdentifierList(IList<string> identifierUris)
         {
             CheckDeletionidentityCount(identifierUris);
             var orphanedDeletionFailedUris = new List<OrphanResultDto>();
@@ -71,7 +72,7 @@ namespace COLID.RegistrationService.Services.Implementation
         }
 
         //check list is more than 500 or empty
-        private void CheckDeletionidentityCount(IList<string> pidUris)
+        private static void CheckDeletionidentityCount(IList<string> pidUris)
         {
             if (pidUris == null || pidUris.Count == 0)
             {
@@ -103,14 +104,14 @@ namespace COLID.RegistrationService.Services.Implementation
         /// Delete all Identifiers, that belong to a resource.
         /// </summary>
         /// <param name="resource">The resource to delete from</param>
-        public void DeleteAllUnpublishedIdentifiers(Entity resource)
+        public void DeleteAllUnpublishedIdentifiers(Entity resource, IList<VersionOverviewCTO> versions)
         {
             if (null == resource)
             {
                 throw new ArgumentNullException(nameof(resource), Common.Constants.Messages.Resource.NullResource);
             }
 
-            var actualPidUris = GetAllIdentifiersOfResource(resource);
+            var actualPidUris = GetAllIdentifiersOfResource(resource, versions);
 
             foreach (var uri in actualPidUris)
             {
@@ -118,18 +119,40 @@ namespace COLID.RegistrationService.Services.Implementation
             }
         }
 
-        private IList<string> GetAllIdentifiersOfResource(Entity entity)
+        private IList<string> GetAllIdentifiersOfResource(Entity entity, IList<VersionOverviewCTO> versions)
         {
             IList<string> pidUris = new List<string>();
-
+            
             if (entity != null)
             {
                 foreach (var property in entity.Properties)
                 {
-                    if (property.Key == Graph.Metadata.Constants.EnterpriseCore.PidUri ||
-                        property.Key == Graph.Metadata.Constants.Resource.BaseUri)
+                    if (property.Key == Graph.Metadata.Constants.EnterpriseCore.PidUri)
                     {
                         pidUris.Add(property.Value?.FirstOrDefault()?.Id);
+                    }
+                    else if (property.Key == Graph.Metadata.Constants.Resource.BaseUri)
+                    {
+                        //Check same base Uri is used in other draft versions if yes then dont delete the Identifier from draft graph
+                        var curVersion = entity.Properties.Where(x => x.Key == Graph.Metadata.Constants.Resource.HasVersion).FirstOrDefault().Value.FirstOrDefault();
+                        bool otherVersionWithSameBaseUriExists = false;
+                        
+                        foreach ( var version in versions)
+                        {
+                            //Ignore the Version which is being processed
+                            if (version.Version == curVersion)
+                                continue;
+                            
+                            if (property.Value?.FirstOrDefault()?.Id == version.BaseUri && version.HasDraft)
+                            {
+                                otherVersionWithSameBaseUriExists = true;
+                                break;
+                            }
+                        }
+
+                        if(!otherVersionWithSameBaseUriExists)
+                            pidUris.Add(property.Value?.FirstOrDefault()?.Id);
+
                     }
                     else if (property.Key == Graph.Metadata.Constants.Resource.Distribution ||
                              property.Key == Graph.Metadata.Constants.Resource.MainDistribution)
@@ -138,7 +161,7 @@ namespace COLID.RegistrationService.Services.Implementation
                         {
                             if (DynamicExtension.IsType<Entity>(prop, out Entity parsedProp))
                             {
-                                IList<string> nestedUris = GetAllIdentifiersOfResource(parsedProp);
+                                IList<string> nestedUris = GetAllIdentifiersOfResource(parsedProp, versions);
                                 pidUris.AddRange(nestedUris);
                             }
                         }

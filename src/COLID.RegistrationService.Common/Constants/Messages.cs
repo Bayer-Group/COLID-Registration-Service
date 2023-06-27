@@ -2,18 +2,18 @@
 {
     public static class Messages
     {
-        public static class Attachment
+        public static class AttachmentMsg
         {
             public const string Conflict = "The attachment cannot be deleted because it is attached to undeletable resources.";
-            public const string NotExists = "Please make sure that all selected files have already been uploaded before saving the resource.";
+            public const string NotExists = "Please make sure that all selected files have already been uploaded before saving the resource {0}.";
         }
 
-        public static class Attribute
+        public static class AttributeMsg
         {
             public const string NotExists = "The given attribute does not exist in the database";
         }
 
-        public static class Exception
+        public static class ExceptionMsg
         {
             public const string ForbiddenEntityType = "The given entity type is not allowed.";
             public const string MissingProperty = "The following property is missing: {0}.";
@@ -43,12 +43,12 @@
             public const string InvalidLifecycleStatus = "This lifecycle status is only allowed for endpoints that are not marked as main distribution endpoints.";
         }
 
-        public static class Datetime
+        public static class DatetimeMsg
         {
             public const string InvalidFormat = "Given string is not in a correct format: MM/dd/yyyy or MM/dd/yyyy hh:mm:ss.";
         }
 
-        public static class Graph
+        public static class GraphMsg
         {
             public const string InvalidFormat = "An invalid graph name was given";
             public const string NotExists = "The given graph does not exist in the database";
@@ -68,7 +68,7 @@
             public const string PersonNotFound = "The person for the given email address {0} does not exist.";
         }
 
-        public static class PidUriTemplate
+        public static class PidUriTemplateMsg
         {
             public const string DeleteSuccessful = "The PID URI Template has been deleted successfully.";
             public const string DeleteUnsuccessfulConsumerGroupReference = "The PID URI Template cannot be deleted, because it is used from a consumer group.";
@@ -135,7 +135,7 @@
                 public const string UnlinkSuccessful = "Unlinking the resource was successful.";
             }
 
-            public static class Comparison
+            public static class ComparisonMsg
             {
                 public const string EqualIdentifiersNotAllowed = "Given identifiers are equal.";
                 public const string MinimumNumberOfResourcesNotReached = "Minimum number of two resources to compare not reached.";
@@ -151,7 +151,7 @@
             public const string InvalidUrlParameter = "The paramater is not a valid url.";
         }
 
-        public static class String
+        public static class StringMsg
         {
             public const string TruncateSpaces = "The blank spaces between the string have been truncated.";
         }

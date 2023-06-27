@@ -7,6 +7,9 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace COLID.RegistrationService.WebApi.Controllers.V3
 {
+    /// <summary>
+    /// 
+    /// </summary>
     [ApiController]
     [Authorize]
     [ApiVersion(Constants.API.Version.V3)]

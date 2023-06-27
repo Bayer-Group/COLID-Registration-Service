@@ -25,6 +25,6 @@ namespace COLID.RegistrationService.Common.DataModels.LinkHistory
         public string LinkEndResourceLabel { get; set; }
         public Uri LinkEndResourceType { get; set; }
         public string LinkEndResourceTypeLabel { get; set; }
-        public DateTime LastModifiedOn { get; set; }
+        public string LastModifiedOn { get; set; }
     }
 }

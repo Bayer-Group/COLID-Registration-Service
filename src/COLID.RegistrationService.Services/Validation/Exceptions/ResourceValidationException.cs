@@ -6,7 +6,9 @@ using Newtonsoft.Json;
 
 namespace COLID.RegistrationService.Services.Validation.Exceptions
 {
+#pragma warning disable CA1032 // Implement standard exception constructors
     public class ResourceValidationException : ValidationException
+#pragma warning restore CA1032 // Implement standard exception constructors
     {
         [JsonProperty]
         public virtual Resource Resource { get; }
@@ -24,6 +26,6 @@ namespace COLID.RegistrationService.Services.Validation.Exceptions
         public ResourceValidationException(string message, ValidationResult validationResult, Resource resource, System.Exception innerException) : base(message, validationResult, innerException)
         {
             Resource = resource;
-        }
+        }        
     }
 }

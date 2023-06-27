@@ -19,9 +19,9 @@ namespace COLID.Cache.Exceptions
             {
             }
 
-            public ColidCacheException(string message, BusinessException innerException) : base(message, innerException)
+            public ColidCacheException(string message, System.Exception innerException) : base(message, innerException)
             {
             }
-
+            
         }
     }

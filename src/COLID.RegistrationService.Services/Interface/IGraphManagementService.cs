@@ -50,6 +50,6 @@ namespace COLID.RegistrationService.Services.Interface
         /// Download the graph with the given name in ttl format.
         /// </summary>
         /// <param name="graph">Graph name to be downloaded</param>
-        public Task<Stream> DownloadGraph(Uri graphName);
+        public byte[] DownloadGraph(Uri graphName);
     }
 }

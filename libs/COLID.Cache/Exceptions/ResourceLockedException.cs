@@ -18,18 +18,16 @@ namespace COLID.Cache.Exceptions
         {
         }
 
-        public ResourceLockedException(string message, IRedLock redLock)
-            : base(message)
+        public ResourceLockedException(string message, IRedLock redLock) : base(message)
         {
             RedLock = redLock;
         }
 
-        public ResourceLockedException(string message, BusinessException innerException) : base(message, innerException)
+        public ResourceLockedException(string message, System.Exception innerException) : base(message, innerException)
         {
         }
 
-        public ResourceLockedException(string message, BusinessException innerException, IRedLock redLock)
-            : base(message, innerException)
+        public ResourceLockedException(string message, System.Exception innerException, IRedLock redLock) : base(message, innerException)
         {
             RedLock = redLock;
         }

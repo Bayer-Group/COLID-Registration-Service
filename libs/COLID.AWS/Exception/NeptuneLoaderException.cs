@@ -10,21 +10,30 @@ namespace COLID.AWS.Exceptions
     {
         [JsonProperty]
         public virtual NeptuneLoaderErrorResponse NeptuneLoaderErrorResponse { get; }
+        public NeptuneLoaderException() : base()
+        {
+            
+        }
+        public NeptuneLoaderException(string message) : base(message)
+        {
 
+        }
+        public NeptuneLoaderException(string message, System.Exception innerException) : base(message, innerException)
+        {
+
+        }
         public NeptuneLoaderException(NeptuneLoaderErrorResponse errorResponse) : base(AWSConstants.ExceptionMessages.TurtleFileLoadingFailed)
         {
             NeptuneLoaderErrorResponse = errorResponse;
         }
 
-        public NeptuneLoaderException(string message, NeptuneLoaderErrorResponse errorResponse)
-            : base(message)
+        public NeptuneLoaderException(string message, NeptuneLoaderErrorResponse errorResponse)  : base(message)
         {
             NeptuneLoaderErrorResponse = errorResponse;
         }
 
 
-        public NeptuneLoaderException(string message, NeptuneLoaderErrorResponse errorResponse, System.Exception inner)
-            : base(message, inner)
+        public NeptuneLoaderException(string message, NeptuneLoaderErrorResponse errorResponse, System.Exception inner) : base(message, inner)
         {
             NeptuneLoaderErrorResponse = errorResponse;
         }

@@ -4,8 +4,8 @@ namespace COLID.RegistrationService.Common
 {
     public static class Settings
     {
-        public static string _serviceUrl;
-        public static string _httpServiceUrl;
+        private static string _serviceUrl;
+        private static string _httpServiceUrl;
 
         public static void InitializeServiceUrl(IConfiguration Configuration)
         {
@@ -14,12 +14,16 @@ namespace COLID.RegistrationService.Common
 
         }
 
+#pragma warning disable CA1024 // Use properties where appropriate
         public static string GetServiceUrl()
+#pragma warning restore CA1024 // Use properties where appropriate
         {
             return _serviceUrl;
         }
 
+#pragma warning disable CA1024 // Use properties where appropriate
         public static string GetHttpServiceUrl(){
+#pragma warning restore CA1024 // Use properties where appropriate
             return _httpServiceUrl;
         }
 

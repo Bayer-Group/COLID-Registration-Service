@@ -1,20 +1,14 @@
 ﻿using System.Collections.Generic;
 using System.IO;
+using COLID.Graph.Utils;
 using Microsoft.Extensions.Configuration;
 
 namespace COLID.Graph.Metadata.Constants
 {
-    public class Resource
+    public static class Resource
     {
-
-        private static readonly string basePath = Path.GetFullPath("appsettings.json");
-        private static readonly string filePath = basePath.Substring(0, basePath.Length - 16);
-        private static IConfigurationRoot configuration = new ConfigurationBuilder()
-                     .SetBasePath(filePath)
-                    .AddJsonFile("appsettings.json")
-                    .Build();
-        public static readonly string ServiceUrl = configuration.GetValue<string>("ServiceUrl");
-        public static readonly string HttpServiceUrl = configuration.GetValue<string>("HttpServiceUrl");
+        public static readonly string ServiceUrl = GraphUtils.CurrentRootConfiguration.GetValue<string>("ServiceUrl");
+        public static readonly string HttpServiceUrl = GraphUtils.CurrentRootConfiguration.GetValue<string>("HttpServiceUrl");
         public static readonly string PidUrlPrefix = ServiceUrl;
 
         public static readonly string HasConsumerGroup = ServiceUrl + "kos/19050#hasConsumerGroup";
@@ -60,7 +54,7 @@ namespace COLID.Graph.Metadata.Constants
             public static readonly string Open = ServiceUrl + "kos/19050/Open";
             public static readonly string Internal = ServiceUrl + "kos/19050/Internal";
         }
-        public class DistributionEndpoints
+        public static class DistributionEndpoints
         {
             public static readonly string HasNetworkedResourceLabel = ServiceUrl + "kos/19050/hasNetworkedResourceLabel";
             public static readonly string HasNetworkAddress = HttpServiceUrl + "kos/19014/hasNetworkAddress";
@@ -68,7 +62,7 @@ namespace COLID.Graph.Metadata.Constants
             public static readonly string HasContactPerson = ServiceUrl + "kos/19050/hasContactPerson";
         }
 
-        public class LinkTypes
+        public static class LinkTypes
         {
             public static readonly string IsCopyOfDataset = ServiceUrl + "kos/19050/isCopyOfDataset";
             public static readonly string IncludesOntology = ServiceUrl + "kos/19050/includesOntology";

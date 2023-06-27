@@ -60,10 +60,10 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         /// Metadata are grouped under the same key and metadata of different types are stored in a list.
         /// </summary>
         /// <remarks>
-        ///    Get api/metadata/comparison?entityType=Ontology&entityType=Dataset
+        ///    Get api/metadata/comparison?entityType=OntologyentityType=Dataset
         /// </remarks>
-        /// <param name="entityType">The name of the entity type</param>
-        /// <param name="metadataConfig">(Optional) The identifier of the metadata config to use</param>
+        /// <param name="metadataComparisonConfigTypes">Metadata Comparison Config Types</param>
+
         /// <returns>A list of merged metadata properties of given types</returns>
         /// <response code="200">Returns a list of metadata properties of given types</response>
         /// <response code="500">If an unexpected error occurs</response>
@@ -114,7 +114,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         /// <response code="500">If an unexpected error occurs</response>
         [HttpPost]
         [Route("instantiableResources")]
-        public IActionResult GetInstantiableResourceTypes(List<Entity> entityTypes)
+        public IActionResult GetInstantiableResourceTypes(IList<Entity> entityTypes)
         {
             var linkedEntityTypes = _metadataService.GetLinkedEntityTypes(entityTypes);
             return Ok(linkedEntityTypes);
@@ -202,5 +202,16 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
             return Ok();
         }
 
+        /// <summary>
+        /// Get Filter Group and Properties
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet]
+        [Route("filterGroup")]
+        public IActionResult FilterGroupAndProperties()
+        {
+            var result = _metadataService.GetFilterGroupAndProperties();
+            return Ok(result);
+        }
     }
 }

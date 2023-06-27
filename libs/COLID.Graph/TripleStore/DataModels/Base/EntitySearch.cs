@@ -24,7 +24,7 @@ namespace COLID.Graph.TripleStore.DataModels.Base
             Identifiers = new List<string>();
         }
 
-        public EntitySearch(string type, string offset, string limit, string searchText = null, List<string> identifiers = null)
+        public EntitySearch(string type, string offset, string limit, string searchText = null, IList<string> identifiers = null)
         {
             Type = type;
             Offset = offset;

@@ -9,10 +9,12 @@ using COLID.Exception.Models.Business;
 using COLID.Graph.Metadata.DataModels.Resources;
 using COLID.Graph.TripleStore.Extensions;
 using COLID.Graph.TripleStore.Repositories;
+using ColidConstants = COLID.RegistrationService.Common.Constants;
 using COLID.RegistrationService.Common.DataModel.DistributionEndpoints;
 using COLID.RegistrationService.Common.DataModel.Resources;
 using COLID.RegistrationService.Common.DataModel.Search;
 using COLID.RegistrationService.Common.DataModel.Validation;
+using COLID.RegistrationService.Common.DataModels.Contacts;
 using COLID.RegistrationService.Common.DataModels.LinkHistory;
 using COLID.RegistrationService.Common.DataModels.Resources;
 using COLID.RegistrationService.Repositories.Interface;
@@ -21,6 +23,7 @@ using Microsoft.Extensions.Logging;
 using VDS.RDF.Query;
 using DistributionEndpoint = COLID.RegistrationService.Common.DataModel.DistributionEndpoints.DistributionEndpoint;
 using Entity = COLID.Graph.TripleStore.DataModels.Base.Entity;
+using Newtonsoft.Json;
 
 namespace COLID.RegistrationService.Repositories.Implementation
 {
@@ -75,13 +78,14 @@ namespace COLID.RegistrationService.Repositories.Implementation
             parameterizedString.SetPlainLiteral("resourceTypes", resourceTypes.JoinAsGraphsList());
             parameterizedString.SetPlainLiteral("linkTypes", COLID.Graph.Metadata.Constants.Resource.LinkTypes.AllLinkTypes.JoinAsGraphsList());
 
-            Dictionary<Uri, bool> graphList = new Dictionary<Uri, bool>();
-            graphList.Add(namedGraph, true);
-            var entities = BuildResourceFromQuery(parameterizedString, null, graphList);
+            //Dictionary<Uri, bool> graphList = new Dictionary<Uri, bool>();
+            //graphList.Add(namedGraph, true);
+            //var entities = BuildResourceFromQuery(parameterizedString, null, graphList);
+            var entities = BuildResourceFromQuery(parameterizedString, namedGraph);
 
             return entities.FirstOrDefault();
         }
-        public IList<Resource> GetByPidUris(List<Uri> pidUris, IList<string> resourceTypes, Uri namedGraph)
+        public IList<Resource> GetByPidUris(IList<Uri> pidUris, IList<string> resourceTypes, Uri namedGraph)
         {
             /*RETODO
               * Federated Query ?
@@ -151,6 +155,8 @@ namespace COLID.RegistrationService.Repositories.Implementation
                     ?subject @hasConsumerGroup @consumerGroup.
                       ?subject @hasNextReviewDate ?date
                     FILTER( xsd:dateTime(?date)<= @endDate^^xsd:dateTime). 
+                    ?object rdf:type ?objectType.
+                    FILTER (?objectType NOT IN (@resourceTypes))
                     ?subject (rdf:| !rdf:)+ ?object.
                     ?object ?predicate ?object_.
                     FILTER NOT EXISTS { ?subject ?lifecyclestatus @deprecated . }
@@ -162,6 +168,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
             parameterizedString.SetUri("hasNextReviewDate", new Uri(Graph.Metadata.Constants.Resource.HasNextReviewDueDate));
             parameterizedString.SetUri("hasLifescyclestatus", new Uri(Graph.Metadata.Constants.Resource.LifecycleStatus));
             parameterizedString.SetUri("deprecated", new Uri(Graph.Metadata.Constants.ConsumerGroup.LifecycleStatus.Deprecated));
+            parameterizedString.SetPlainLiteral("resourceTypes", resourceTypes.JoinAsGraphsList());
             if (consumerGroup is null)
             {
                 parameterizedString.SetPlainLiteral("consumerGroup", "?consumerGroup");
@@ -489,10 +496,10 @@ namespace COLID.RegistrationService.Repositories.Implementation
             Resource resourcePublished = new Resource();
             Resource resourceDraft = new Resource();
 
-            if (graphName == "")
+            if (string.IsNullOrEmpty(graphName))
             {
-                var draftUri = namedGraphs.Where(x => x.Key.ToString().ToUpper().Contains("DRAFT")).Select(x => x.Key).FirstOrDefault();
-                var publishedUri = namedGraphs.Where(x => !x.Key.ToString().ToUpper().Contains("DRAFT")).Select(x => x.Key).FirstOrDefault();
+                var draftUri = namedGraphs.Where(x => x.Key.ToString().ToUpper().Contains("DRAFT", StringComparison.Ordinal)).Select(x => x.Key).FirstOrDefault();
+                var publishedUri = namedGraphs.Where(x => !x.Key.ToString().ToUpper().Contains("DRAFT", StringComparison.Ordinal)).Select(x => x.Key).FirstOrDefault();
 
                 parameterizedString.SetUri("resourceNamedGraph", publishedUri); // Sowohl aus draft als auch aus publish
 
@@ -515,7 +522,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
                 namedGraphs.Add(draftUri, true);
                 resourceDraft = BuildResourceFromQuery(parameterizedString, pidUri, namedGraphs).FirstOrDefault(); // PREVIOUSVERSIONS AUS DER PUBLIC RESOURCE WERDEN RAUSGEHOLT -> TODO : LINKS SEPERAT RAUSHOLEN
             }
-            else if (graphName.ToUpper().Contains("DRAFT"))
+            else if (graphName.ToUpper().Contains("DRAFT", StringComparison.Ordinal))
             {
                 parameterizedString.SetUri("resourceNamedGraph", new Uri(graphName));
                 resourceDraft = BuildResourceFromQuery(parameterizedString, pidUri, namedGraphs).FirstOrDefault(); // PREVIOUSVERSIONS AUS DER PUBLIC RESOURCE WERDEN RAUSGEHOLT -> TODO : LINKS SEPERAT RAUSHOLEN
@@ -584,7 +591,6 @@ namespace COLID.RegistrationService.Repositories.Implementation
             WaitAllTasks(cancellationTokenSource, resultsTask, versionsTask);
             SparqlResultSet results = resultsTask.Result;
             IList<VersionOverviewCTO> versions = versionsTask.Result;
-
             if (!results.Any())
             {
                 throw new EntityNotFoundException(Common.Constants.Messages.Resource.NoResourceForEndpointPidUri, pidUri.ToString());
@@ -678,7 +684,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
             return link;
         }
 
-        public void GetLinksOfPublishedResources(List<Resource> resources, IList<Uri> pidUris, Uri namedGraph, ISet<string> LinkTypeList)
+        public void GetLinksOfPublishedResources(IList<Resource> resources, IList<Uri> pidUris, Uri namedGraph, ISet<string> LinkTypeList)
         {
             ValidateUriFormat(namedGraph);
 
@@ -720,7 +726,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
 
             var results = _tripleStoreRepository.QueryTripleStoreResultSet(parameterizedString);
 
-            resources.ForEach(x =>
+            resources.ToList().ForEach(x =>
             {
                 x.Links = results.Where(y => y.GetNodeValuesFromSparqlResult("pidUri").Value == x.PidUri.AbsoluteUri)
                 .GroupBy(result => result.GetNodeValuesFromSparqlResult("links").Value)
@@ -777,28 +783,39 @@ namespace COLID.RegistrationService.Repositories.Implementation
             return TransformQueryResultsToDistributionEndpoint(results, pidUri?.ToString());
         }
 
-        public IList<DistributionEndpointsTest> GetDistributionEndpoints(string resourceType, Uri namedGraph)
+        //here it gets the Endpoints depending on the type of resource we have. It brings all the endpoint at one time
+        public IList<DistributionEndpointsTest> GetDistributionEndpoints(IList<string> resourceTypes, Uri namedGraph, Uri consumerGroupGraph, Uri? distributionPidUri)
         {
             // The main distribution endpoint is a special distribution endpoint, to which the Base URI of the resource resolves to.
             SparqlParameterizedString parameterizedString = new SparqlParameterizedString
             {
                 CommandText =
-                    @"PREFIX : <> SELECT DISTINCT ?author ?networkAddress ?pidUri ?label ?subject 
+                    @"PREFIX : <> SELECT DISTINCT ?author ?networkAddress ?pidUri ?label ?subject ?consumerGroupContactPerson ?LastChangedUser
                         FROM @resourceNamedGraph 
+FROM @consumerGroupGraph
                         WHERE { 
                             ?resource @hasPid ?pidUri. 
                             ?resource @hasAuthor ?author. 
                             ?resource @hasLabel ?label. 
-                            ?resource rdf:type|rdfs:subClassOf @resourceType. 
-                            ?resource @distribution | @mainDistribution ?subject. 
+VALUES ?resourceTypes {@resourceTypes}.
+                            ?resource rdf:type ?resourceTypes. 
+                            ?resource @distribution | @mainDistribution ?subject.
+                            ?subject @hasPid @distributionPidUri .
                             ?subject @hasEndpointLifecycleStatus @endpointLifecycleStatusActive. 
-                            ?subject @hasNetworkAddress ?networkAddress. 
+                            ?subject @hasNetworkAddress ?networkAddress.
+                               ?resource @hasConsumerGroup ?consumerGroupURI.
+  							?consumerGroupURI rdf:type @consumerGroup .
+              ?consumerGroupURI @hasConsumerGroupContactPerson ?consumerGroupContactPerson.
+                            ?resource @hasLastChangedUser ?LastChangedUser
+
                             FILTER NOT EXISTS { ?resource  @hasPidEntryDraft ?draftSubject } 
                       }"
             };
 
             parameterizedString.SetUri("resourceNamedGraph", namedGraph);
-            parameterizedString.SetUri("resourceType", new Uri(resourceType));
+            parameterizedString.SetUri("consumerGroupGraph", consumerGroupGraph);
+            parameterizedString.SetPlainLiteral("resourceTypes", resourceTypes.JoinAsValuesList());
+            //parameterizedString.SetUri("resourceType", new Uri(resourceType));
             parameterizedString.SetUri("hasLabel", new Uri(Graph.Metadata.Constants.Resource.HasLabel));
             parameterizedString.SetUri("hasPidEntryDraft", new Uri(Graph.Metadata.Constants.Resource.HasPidEntryDraft));
             parameterizedString.SetUri("hasPid", new Uri(Graph.Metadata.Constants.EnterpriseCore.PidUri));
@@ -808,6 +825,20 @@ namespace COLID.RegistrationService.Repositories.Implementation
             parameterizedString.SetUri("distribution", new Uri(Graph.Metadata.Constants.Resource.Distribution));
             parameterizedString.SetUri("mainDistribution", new Uri(Graph.Metadata.Constants.Resource.MainDistribution));
             parameterizedString.SetUri("endpointLifecycleStatusActive", new Uri(Common.Constants.DistributionEndpoint.LifeCycleStatus.Active));
+            parameterizedString.SetUri("hasConsumerGroupContactPerson", new Uri(Graph.Metadata.Constants.ConsumerGroup.HasContactPerson));
+            parameterizedString.SetUri("consumerGroup", new Uri(Graph.Metadata.Constants.ConsumerGroup.Type));
+            parameterizedString.SetUri("hasConsumerGroup", new Uri(Graph.Metadata.Constants.Resource.HasConsumerGroup));
+            parameterizedString.SetUri("hasLastChangedUser", new Uri(Graph.Metadata.Constants.Resource.LastChangeUser));
+
+            if (distributionPidUri != null)
+            {
+                parameterizedString.SetUri("distributionPidUri", distributionPidUri);
+            }
+            else
+            {
+                parameterizedString.SetPlainLiteral("distributionPidUri", "?distributionPidUri");
+            }
+
 
             var results = _tripleStoreRepository.QueryTripleStoreResultSet(parameterizedString);
             var distributionEndpoints = results.Select(result => new DistributionEndpointsTest
@@ -817,8 +848,81 @@ namespace COLID.RegistrationService.Repositories.Implementation
                 Author = result.GetNodeValuesFromSparqlResult("author").Value,
                 NetworkAddress = result.GetNodeValuesFromSparqlResult("networkAddress").Value,
                 ResourceLabel = result.GetNodeValuesFromSparqlResult("label").Value,
-                DistributionEndpointPidUri = result.GetNodeValuesFromSparqlResult("subject").Value
+                DistributionEndpointSubject = result.GetNodeValuesFromSparqlResult("subject").Value,
+                ConsumerGroupContactPerson = result.GetNodeValuesFromSparqlResult("consumerGroupContactPerson").Value,
+                LastChangeUser = result.GetNodeValuesFromSparqlResult("LastChangedUser").Value,
+            }).ToList();
 
+            //Console.WriteLine("distributionEndpointPidURIs: " + distributionEndpoints);
+            for (int i = 0; distributionEndpoints.Count > i; i++)
+            {
+                _logger.LogInformation("GetDistributionEndpoints: gets now: ", distributionEndpoints[i].NetworkAddress);
+                Console.WriteLine("this is the endpointUris: " + distributionEndpoints[i].NetworkAddress);
+            }
+
+
+
+            return distributionEndpoints;
+        }
+
+        public IList<DistributionEndpointsTest> GetBrokenEndpoints(IList<string> resourceTypes, Uri namedGraph, Uri consumerGroupGraph)
+        {
+            // The main distribution endpoint is a special distribution endpoint, to which the Base URI of the resource resolves to.
+            SparqlParameterizedString parameterizedString = new SparqlParameterizedString
+            {
+                CommandText =
+                    @"PREFIX : <> SELECT DISTINCT ?author ?networkAddress ?pidUri ?label ?subject ?lastChangedUser ?consumerGroupContactPerson
+                        FROM @resourceNamedGraph 
+                        FROM @consumerGroupGraph
+                        WHERE { 
+                            ?resource @hasPid ?pidUri. 
+                            ?resource @hasAuthor ?author. 
+                            ?resource @hasLabel ?label. 
+                            VALUES ?resourceTypes {@resourceTypes}.
+                            ?resource rdf:type ?resourceTypes. 
+                            ?resource rdf:type|rdfs:subClassOf ?resourceTypes. 
+                            ?resource @distribution | @mainDistribution ?subject. 
+                            ?subject @hasEndpointLifecycleStatus @endpointLifecycleStatusActive. 
+                            ?subject @hasNetworkAddress ?networkAddress.
+                            ?subject @hasEndpointURLStatus @broken.
+                            ?resource @hasLastChangedUser ?lastChangedUser.
+                            ?resource @hasConsumerGroup ?consumerGroupURI.
+                            ?consumerGroupURI rdf:type @consumerGroup .
+                            ?consumerGroupURI @hasConsumerGroupContactPerson ?consumerGroupContactPerson.
+                            FILTER NOT EXISTS { ?resource  @hasPidEntryDraft ?draftSubject } 
+                      }"
+            };
+
+            parameterizedString.SetUri("resourceNamedGraph", namedGraph);
+            parameterizedString.SetUri("consumerGroupGraph", consumerGroupGraph);
+            parameterizedString.SetPlainLiteral("resourceTypes", resourceTypes.JoinAsValuesList());
+            parameterizedString.SetUri("hasLabel", new Uri(Graph.Metadata.Constants.Resource.HasLabel));
+            parameterizedString.SetUri("hasPidEntryDraft", new Uri(Graph.Metadata.Constants.Resource.HasPidEntryDraft));
+            parameterizedString.SetUri("hasPid", new Uri(Graph.Metadata.Constants.EnterpriseCore.PidUri));
+            parameterizedString.SetUri("hasAuthor", new Uri(Graph.Metadata.Constants.Resource.Author));
+            parameterizedString.SetUri("hasEndpointLifecycleStatus", new Uri(Graph.Metadata.Constants.Resource.DistributionEndpoints.DistributionEndpointLifecycleStatus));
+            parameterizedString.SetUri("hasNetworkAddress", new Uri(Graph.Metadata.Constants.Resource.DistributionEndpoints.HasNetworkAddress));
+            parameterizedString.SetUri("distribution", new Uri(Graph.Metadata.Constants.Resource.Distribution));
+            parameterizedString.SetUri("mainDistribution", new Uri(Graph.Metadata.Constants.Resource.MainDistribution));
+            parameterizedString.SetUri("endpointLifecycleStatusActive", new Uri(Common.Constants.DistributionEndpoint.LifeCycleStatus.Active));
+            parameterizedString.SetUri("hasEndpointURLStatus", new Uri(Common.Constants.DistributionEndpoint.DistributionEndpointsTest.EndpointLifecycleStatus));
+            parameterizedString.SetLiteral("broken", Common.Constants.DistributionEndpoint.DistributionEndpointsTest.Broken);
+            parameterizedString.SetUri("hasLastChangedUser", new Uri(Graph.Metadata.Constants.Resource.LastChangeUser));
+            parameterizedString.SetUri("hasConsumerGroup", new Uri(Graph.Metadata.Constants.Resource.HasConsumerGroup));
+            parameterizedString.SetUri("consumerGroup", new Uri(Graph.Metadata.Constants.ConsumerGroup.Type));
+            parameterizedString.SetUri("hasConsumerGroupContactPerson", new Uri(Graph.Metadata.Constants.ConsumerGroup.HasContactPerson));
+
+            var results = _tripleStoreRepository.QueryTripleStoreResultSet(parameterizedString);
+            var distributionEndpoints = results.Select(result => new DistributionEndpointsTest
+            {
+
+                PidUri = result.GetNodeValuesFromSparqlResult("pidUri").Value,
+                Author = result.GetNodeValuesFromSparqlResult("author").Value,
+                NetworkAddress = result.GetNodeValuesFromSparqlResult("networkAddress").Value,
+                ResourceLabel = result.GetNodeValuesFromSparqlResult("label").Value,
+                DistributionEndpointSubject = result.GetNodeValuesFromSparqlResult("subject").Value,
+                LastChangeUser = result.GetNodeValuesFromSparqlResult("lastChangedUser").Value,
+                ConsumerGroupContactPerson = result.GetNodeValuesFromSparqlResult("consumerGroupContactPerson").Value,
             }).ToList();
 
             return distributionEndpoints;
@@ -1007,36 +1111,36 @@ namespace COLID.RegistrationService.Repositories.Implementation
             var groupedFilteredResults = filteredResults.GroupBy(t => t.GetNodeValuesFromSparqlResult("predicate").Value);
 
             return groupedFilteredResults.ToDictionary(
-                res => res?.Key,
-                res =>
+            res => res?.Key,
+            res =>
+            {
+                return res?.Select(subRes =>
                 {
-                    return res?.Select(subRes =>
+                    var key = res?.Key;
+                    var valueProperty = subRes.GetNodeValuesFromSparqlResult("object_");
+                    var valuePropertyPidUri = subRes.GetNodeValuesFromSparqlResult("objectPidUri");
+                    dynamic value = null;
+
+                    if (valueProperty.Type == Graph.Metadata.Constants.Shacl.NodeKinds.IRI && sparqlResults.Any(t => t.GetNodeValuesFromSparqlResult("object").Value == valueProperty.Value) && counter <= 4)
                     {
-                        var key = res?.Key;
-                        var valueProperty = subRes.GetNodeValuesFromSparqlResult("object_");
-                        var valuePropertyPidUri = subRes.GetNodeValuesFromSparqlResult("objectPidUri");
-                        dynamic value = null;
-
-                        if (valueProperty.Type == Graph.Metadata.Constants.Shacl.NodeKinds.IRI && sparqlResults.Any(t => t.GetNodeValuesFromSparqlResult("object").Value == valueProperty.Value) && counter <= 4)
+                        value = new Entity()
                         {
-                            value = new Entity()
-                            {
-                                Id = valueProperty.Value,
-                                Properties = GetEntityPropertiesFromSparqlResultByList(sparqlResults, valueProperty.Value, counter)
-                            };
-                        }
-                        else
-                        {
-                            value = string.IsNullOrWhiteSpace(valuePropertyPidUri.Value) ? valueProperty.Value : valuePropertyPidUri.Value;
-                        }
+                            Id = valueProperty.Value,
+                            Properties = GetEntityPropertiesFromSparqlResultByList(sparqlResults, valueProperty.Value, counter)
+                        };
+                    }
+                    else
+                    {
+                        value = string.IsNullOrWhiteSpace(valuePropertyPidUri.Value) ? valueProperty.Value : valuePropertyPidUri.Value;
+                    }
 
-                        return value;
+                    return value;
 
-                    }).Distinct().ToList();
-                });
+                }).Distinct().ToList();
+            });
         }
 
-        private IDictionary<string, List<dynamic>> GetInboundEntityPropertiesFromSparqlResultByList(IGrouping<string, SparqlResult> sparqlResults, int counter)
+        private static IDictionary<string, List<dynamic>> GetInboundEntityPropertiesFromSparqlResultByList(IGrouping<string, SparqlResult> sparqlResults, int counter)
         {
             // sparqlResults are a list of all properties of one resource inkl. subentites
             counter++;
@@ -1081,7 +1185,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
             return result.Any();
         }
 
-        private void ValidateUriFormat(Uri identifier)
+        private static void ValidateUriFormat(Uri identifier)
         {
             if (!identifier.IsValidBaseUri())
             {
@@ -1219,7 +1323,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
                       }
                 ";
 
-            var orderProperty = "hasLabel";
+            //var orderProperty = "hasLabel";
             parameterizedString.CommandText = queryStringRaw;
             parameterizedString.SetUri("definition", new Uri(Graph.Metadata.Constants.Resource.HasResourceDefintion));
             parameterizedString.SetUri("hasBaseUri", new Uri(Graph.Metadata.Constants.Resource.BaseUri));
@@ -1293,13 +1397,13 @@ namespace COLID.RegistrationService.Repositories.Implementation
             return new ResourceOverviewCTO(countResult.FirstOrDefault().GetNodeValuesFromSparqlResult("resources").Value, resources);
         }
 
-        private void WaitAllTasks(CancellationTokenSource cancellationTokenSource, params Task[] tasks)
+        private static void WaitAllTasks(CancellationTokenSource cancellationTokenSource, params Task[] tasks)
         {
             // OperationCanceledException will be thrown if time of token expired
             Task.WaitAll(tasks, cancellationTokenSource.Token);
         }
 
-        private SparqlParameterizedString BuildResourceSidebarDTOQuery(ResourceSearchCriteriaDTO resourceSearchObject, IList<string> resourceTypes, bool countBuilder, ISet<Uri> namedGraph, IEnumerable<string> excludedPidUris = null)
+        private static SparqlParameterizedString BuildResourceSidebarDTOQuery(ResourceSearchCriteriaDTO resourceSearchObject, IList<string> resourceTypes, bool countBuilder, ISet<Uri> namedGraph, IEnumerable<string> excludedPidUris = null)
         {
             /* RETODO
              * Draft seperieren,....
@@ -1490,7 +1594,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
 
             var parameterizedString = new SparqlParameterizedString
             {
-                CommandText = @"SELECT DISTINCT ?resource ?pidUri ?version ?laterVersion ?baseUri
+                CommandText = @"SELECT DISTINCT ?resource ?pidUri ?version ?hasEntryLifecycleStatus ?laterVersion ?baseUri
                   @resourceNamedGraph
                   WHERE {
                   ?subject @hasPid @hasPidUri
@@ -1499,12 +1603,14 @@ namespace COLID.RegistrationService.Repositories.Implementation
                       ?resource @hasLaterVersion* ?subject.
                       ?resource pid3:hasVersion ?version .
                       ?resource @hasPid ?pidUri .
+                      ?resource @hasEntryLifecycleStatus ?hasEntryLifecycleStatus .
                       OPTIONAL { ?resource @hasBaseUri ?baseUri }.
                       OPTIONAL { ?resource pid3:hasLaterVersion ?laterVersion } .
                   } UNION {
                       ?subject  @hasLaterVersion* ?resource.
                       ?resource pid3:hasVersion ?version .
                       ?resource @hasPid ?pidUri .
+                      ?resource @hasEntryLifecycleStatus ?hasEntryLifecycleStatus .
                       OPTIONAL { ?resource @hasBaseUri ?baseUri }.
                       OPTIONAL { ?resource pid3:hasLaterVersion ?laterVersion } .
                   }
@@ -1520,6 +1626,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
             parameterizedString.SetUri("hasBaseUri", new Uri(Graph.Metadata.Constants.Resource.BaseUri));
             parameterizedString.SetUri("hasPidEntryDraft", new Uri(Graph.Metadata.Constants.Resource.HasPidEntryDraft));
             parameterizedString.SetUri("hasLaterVersion", new Uri(Graph.Metadata.Constants.Resource.HasLaterVersion));
+            parameterizedString.SetUri("hasEntryLifecycleStatus", new Uri(Graph.Metadata.Constants.Resource.HasEntryLifecycleStatus));
 
             var results = _tripleStoreRepository.QueryTripleStoreResultSet(parameterizedString);
 
@@ -1528,13 +1635,17 @@ namespace COLID.RegistrationService.Repositories.Implementation
                 return new List<VersionOverviewCTO>();
             }
 
-            var resourceVersions = results.Select(result => new VersionOverviewCTO()
+            var groupedResults = results.GroupBy(result => result.GetNodeValuesFromSparqlResult("resource").Value);
+
+            var resourceVersions = groupedResults.Select(result => new VersionOverviewCTO
             {
-                Id = result.GetNodeValuesFromSparqlResult("resource").Value,
-                Version = result.GetNodeValuesFromSparqlResult("version").Value,
-                PidUri = result.GetNodeValuesFromSparqlResult("pidUri").Value,
-                BaseUri = result.GetNodeValuesFromSparqlResult("baseUri").Value,
-                LaterVersion = result.GetNodeValuesFromSparqlResult("laterVersion").Value
+                Id = result.FirstOrDefault().GetNodeValuesFromSparqlResult("resource").Value,
+                Version = result.FirstOrDefault().GetNodeValuesFromSparqlResult("version").Value,
+                PidUri = result.FirstOrDefault().GetNodeValuesFromSparqlResult("pidUri").Value,
+                BaseUri = result.FirstOrDefault().GetNodeValuesFromSparqlResult("baseUri").Value,
+                LaterVersion = result.FirstOrDefault().GetNodeValuesFromSparqlResult("laterVersion").Value,
+                HasDraft = result.Where(grpRes => grpRes.GetNodeValuesFromSparqlResult("hasEntryLifecycleStatus").Value == Graph.Metadata.Constants.Resource.ColidEntryLifecycleStatus.Draft).ToList().Count() > 0 ? true :false,
+                HasPublished = result.Where(grpRes => grpRes.GetNodeValuesFromSparqlResult("hasEntryLifecycleStatus").Value == Graph.Metadata.Constants.Resource.ColidEntryLifecycleStatus.Published).ToList().Count() > 0 ? true : false
             }).ToList();
 
             //Sort Version ,considering laterVersion info
@@ -1642,43 +1753,43 @@ namespace COLID.RegistrationService.Repositories.Implementation
                 // PID URI to link to UI
                 var resourcePidUri = result.First().GetNodeValuesFromSparqlResult("resourcePidUri")?.Value;
                 var resourceLaterVersion = result.First().GetNodeValuesFromSparqlResult("resourceLaterVersion")?.Value;
-                
+
                 //Generate subProxy only if resource is of Current Version
                 //if (resourceLaterVersion == null)
                 //{
-                    // Proxies for all distribution endpoints
-                    var groupedDistributionEndpoints = result.GroupBy(res => res.GetNodeValuesFromSparqlResult("distributionPidUri")?.Value);
-                    var subProxies = groupedDistributionEndpoints.Select(distPoint =>
+                // Proxies for all distribution endpoints
+                var groupedDistributionEndpoints = result.GroupBy(res => res.GetNodeValuesFromSparqlResult("distributionPidUri")?.Value);
+                var subProxies = groupedDistributionEndpoints.Select(distPoint =>
+                {
+                    try
                     {
-                        try
+                        var distributionPidUri = distPoint.First().GetNodeValuesFromSparqlResult("distributionPidUri")?.Value;
+                        var distributionNetworkAddress = distPoint.First().GetNodeValuesFromSparqlResult("distributionNetworkAddress")?.Value;
+                        var isDistributionEndpointDeprecated = distPoint.First().GetNodeValuesFromSparqlResult("endpointLifecycleStatus")?.Value == Common.Constants.DistributionEndpoint.LifeCycleStatus.Deprecated;
+                        var distBaseUri = distPoint.First().GetNodeValuesFromSparqlResult("baseUri")?.Value;
+
+                        // Only accept distribution endpoints for proxy configuration, which have valid URIs as network address
+                        if (!Uri.TryCreate(distributionNetworkAddress, UriKind.Absolute, out _))
                         {
-                            var distributionPidUri = distPoint.First().GetNodeValuesFromSparqlResult("distributionPidUri")?.Value;
-                            var distributionNetworkAddress = distPoint.First().GetNodeValuesFromSparqlResult("distributionNetworkAddress")?.Value;
-                            var isDistributionEndpointDeprecated = distPoint.First().GetNodeValuesFromSparqlResult("endpointLifecycleStatus")?.Value == Common.Constants.DistributionEndpoint.LifeCycleStatus.Deprecated;
-                            var distBaseUri = distPoint.First().GetNodeValuesFromSparqlResult("baseUri")?.Value;
-
-                            // Only accept distribution endpoints for proxy configuration, which have valid URIs as network address
-                            if (!Uri.TryCreate(distributionNetworkAddress, UriKind.Absolute, out _))
-                            {
-                                throw new UriFormatException($"{distributionNetworkAddress} is not a valid URI.");
-                            }
-
-
-                            return new ResourceProxyDTO
-                            {
-                                PidUrl = distributionPidUri,
-                                TargetUrl = isDistributionEndpointDeprecated ? resourcePidUri : distributionNetworkAddress,
-                                ResourceVersion = null,
-                                BaseUrl = distBaseUri
-                            };
+                            throw new UriFormatException($"{distributionNetworkAddress} is not a valid URI.");
                         }
-                        catch (UriFormatException ex)
+
+
+                        return new ResourceProxyDTO
                         {
-                            determinedInvalidPidUris.Add((resourcePidUri));
-                            catchedUriFormatException = ex;
-                            return null;
-                        }
-                    }).Where(x => x != null).ToList();
+                            PidUrl = distributionPidUri,
+                            TargetUrl = isDistributionEndpointDeprecated ? resourcePidUri : distributionNetworkAddress,
+                            ResourceVersion = null,
+                            BaseUrl = distBaseUri
+                        };
+                    }
+                    catch (UriFormatException ex)
+                    {
+                        determinedInvalidPidUris.Add((resourcePidUri));
+                        catchedUriFormatException = ex;
+                        return null;
+                    }
+                }).Where(x => x != null).ToList();
                 if (resourceLaterVersion == null)
                 {
                     // Proxy for base URI
@@ -1710,13 +1821,13 @@ namespace COLID.RegistrationService.Repositories.Implementation
                     }
                 }
 
-                    return new ResourceProxyDTO
-                    {
-                        PidUrl = resourcePidUri,
-                        TargetUrl = null,
-                        ResourceVersion = null,
-                        NestedProxies = subProxies
-                    };
+                return new ResourceProxyDTO
+                {
+                    PidUrl = resourcePidUri,
+                    TargetUrl = null,
+                    ResourceVersion = null,
+                    NestedProxies = subProxies
+                };
                 //}
                 //else
                 //{
@@ -1728,7 +1839,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
                 //        NestedProxies = null
                 //    };
                 //}
-                
+
             }).ToList();
 
             // summarize all invalid pidUris to one log/error message
@@ -1818,7 +1929,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
         }
 
 
-        public List<LinkHistoryCreateDto> GetLinkHistoryRecords(Uri linkHistoryGraph)
+        public IList<LinkHistoryCreateDto> GetLinkHistoryRecords(Uri linkHistoryGraph)
         {
 
             var parametrizedSparql = new SparqlParameterizedString
@@ -1858,7 +1969,238 @@ namespace COLID.RegistrationService.Repositories.Implementation
                 Author = result.GetNodeValuesFromSparqlResult("linkCreator").Value
             });
 
-            return linkhistories.ToList(); 
+            return linkhistories.ToList();
+        }
+
+        public ContactsToCheckDto GetContactsToCheck(Uri resourceGraph)
+        {
+            var parametrizedSparql = new SparqlParameterizedString
+            {
+                CommandText =
+                    @"SELECT DISTINCT ?dataSteward ?contactPerson
+                    FROM @resourceGraph
+                    WHERE {
+                        { ?s @hasDataSteward ?dataSteward }
+                        UNION
+                        { ?s @distribution ?d .
+                          ?d @hasContactPerson ?contactPerson .
+                        }
+                    }"
+            };
+
+            parametrizedSparql.SetUri("resourceGraph", resourceGraph);
+            parametrizedSparql.SetUri("hasDataSteward", new Uri(Graph.Metadata.Constants.Resource.HasDataSteward));
+            parametrizedSparql.SetUri("distribution", new Uri(Graph.Metadata.Constants.Resource.Distribution));
+            parametrizedSparql.SetUri("hasContactPerson", new Uri(Graph.Metadata.Constants.Resource.DistributionEndpoints.HasContactPerson));
+
+            var results = _tripleStoreRepository.QueryTripleStoreResultSet(parametrizedSparql);
+
+            var contactsToCheck = new ContactsToCheckDto();
+
+            foreach (var result in results)
+            {
+                var dataSteward = result.GetNodeValuesFromSparqlResult("dataSteward").Value;
+                if (dataSteward != null && dataSteward != "colid@bayer.com")
+                {
+                    contactsToCheck.DataStewards.Add(dataSteward);
+                }
+                var distributionEndpointContact = result.GetNodeValuesFromSparqlResult("contactPerson").Value;
+                if (distributionEndpointContact != null && distributionEndpointContact != "colid@bayer.com")
+                {
+                    contactsToCheck.DistributionEndpointContactPersons.Add(distributionEndpointContact);
+                }
+            }
+
+            return contactsToCheck;
+        }
+        public Dictionary<string, InvalidDataStewardResourceInformation> GetResourcesForInvalidDataStewards(IList<string> invalidDataStewards, Uri resourceGraph, Uri consumerGroupGraph)
+        {
+            var parametrizedSparql = new SparqlParameterizedString
+            {
+                CommandText =
+                    @"SELECT DISTINCT ?resourceId ?validDataSteward ?invalidDataSteward ?lastReviewer ?lastChangeUser ?author ?pidUri ?label ?consumerGroupContactPerson
+                    FROM @resourceGraph
+                    FROM @consumerGroupGraph
+                    WHERE {
+                        ?resourceId @hasDataSteward ?invalidDataSteward ;
+                                    @hasAuthor ?author ;
+                                    @hasLastChangeUser ?lastChangeUser ;
+                                    @hasPid ?pidUri ;
+                                    @hasLabel ?label ;
+                                    @hasConsumerGroup ?consumerGroup .
+                        ?consumerGroup @hasConsumerGroupContactPerson ?consumerGroupContactPerson .
+                        OPTIONAL {
+                            ?resourceId @hasLastReviewer ?lastReviewer .
+                        }
+                        OPTIONAL { 
+                            ?resourceId @hasDataSteward ?validDataSteward .
+                            FILTER (?validDataSteward NOT IN (@invalidContacts)) }
+                        FILTER (?invalidDataSteward IN (@invalidContacts))
+                    }"
+            };
+
+            parametrizedSparql.SetUri("resourceGraph", resourceGraph);
+            parametrizedSparql.SetUri("consumerGroupGraph", consumerGroupGraph);
+            parametrizedSparql.SetUri("hasDataSteward", new Uri(Graph.Metadata.Constants.Resource.HasDataSteward));
+            parametrizedSparql.SetUri("hasLastReviewer", new Uri(Graph.Metadata.Constants.Resource.HasLastReviewer));
+            parametrizedSparql.SetUri("hasLastChangeUser", new Uri(Graph.Metadata.Constants.Resource.LastChangeUser));
+            parametrizedSparql.SetUri("hasAuthor", new Uri(Graph.Metadata.Constants.Resource.Author));
+            parametrizedSparql.SetUri("hasPid", new Uri(Graph.Metadata.Constants.Resource.hasPID));
+            parametrizedSparql.SetUri("hasLabel", new Uri(Graph.Metadata.Constants.Resource.HasLabel));
+            parametrizedSparql.SetUri("hasConsumerGroup", new Uri(Graph.Metadata.Constants.Resource.HasConsumerGroup));
+            parametrizedSparql.SetUri("hasConsumerGroupContactPerson", new Uri(Graph.Metadata.Constants.ConsumerGroup.HasContactPerson));
+            parametrizedSparql.SetPlainLiteral("invalidContacts", invalidDataStewards.JoinAsLiteralList());
+
+            var results = _tripleStoreRepository.QueryTripleStoreResultSet(parametrizedSparql);
+
+            Dictionary<string, InvalidDataStewardResourceInformation> resourcesWithInvalidContacts = new Dictionary<string, InvalidDataStewardResourceInformation>();
+            foreach (var result in results)
+            {
+                var resourceId = result.GetNodeValuesFromSparqlResult("resourceId").Value;
+                if (!resourcesWithInvalidContacts.ContainsKey(resourceId))
+                {
+                    resourcesWithInvalidContacts.Add(resourceId, new InvalidDataStewardResourceInformation()
+                    {
+                        PidUri = new Uri(result.GetNodeValuesFromSparqlResult("pidUri").Value),
+                        Label = result.GetNodeValuesFromSparqlResult("label").Value,
+                        LastReviewer = result.GetNodeValuesFromSparqlResult("lastReviewer").Value,
+                        LastChangeUser = result.GetNodeValuesFromSparqlResult("lastChangeUser").Value,
+                        Author = result.GetNodeValuesFromSparqlResult("author").Value,
+                        ConsumerGroupContactPerson = result.GetNodeValuesFromSparqlResult("consumerGroupContactPerson").Value,
+                    });
+
+                    resourcesWithInvalidContacts.TryGetValue(resourceId, out var resourceInformation);
+                    var invalidContact = result.GetNodeValuesFromSparqlResult("invalidDataSteward").Value;
+                    resourceInformation.InvalidDataStewards.Add(invalidContact);
+                    var validContact = result.GetNodeValuesFromSparqlResult("validDataSteward").Value;
+                    if (validContact != null)
+                    {
+                        resourceInformation.ValidDataStewards.Add(validContact);
+                    }
+                }
+                else
+                {
+                    resourcesWithInvalidContacts.TryGetValue(resourceId, out var resourceInformation);
+                    var invalidContact = result.GetNodeValuesFromSparqlResult("invalidDataSteward").Value;
+                    resourceInformation.InvalidDataStewards.Add(invalidContact);
+                    var validContact = result.GetNodeValuesFromSparqlResult("validDataSteward").Value;
+                    if (validContact != null)
+                    {
+                        resourceInformation.ValidDataStewards.Add(validContact);
+                    }
+                }
+            }
+
+            return resourcesWithInvalidContacts;
+        }
+
+        public IList<InvalidDistributionEndpointContactResourceInformation> GetResourcesForInvalidDistributionEndpointContacts(IList<string> invalidDistributionEndpointContacts, Uri resourceGraph, Uri consumerGroupGraph)
+        {
+            var parametrizedSparql = new SparqlParameterizedString
+            {
+                CommandText =
+                    @"SELECT DISTINCT ?resourceId ?pidUri ?label ?distributionEndpointId ?distributionEndpointLabel ?lastReviewer ?lastChangeUser ?author ?consumerGroupContactPerson ?invalidDistributionEndpointContact
+                    FROM @resourceGraph
+                    FROM @consumerGroupGraph
+                    WHERE {
+                        ?resourceId @distribution ?distributionEndpointId ;
+                                    @hasAuthor ?author ;
+                                    @hasLastChangeUser ?lastChangeUser ;
+                                    @hasPid ?pidUri ;
+                                    @hasLabel ?label ;
+                                    @hasConsumerGroup ?consumerGroup .
+                        ?consumerGroup @hasConsumerGroupContactPerson ?consumerGroupContactPerson .
+                        ?distributionEndpointId @hasContactPerson ?invalidDistributionEndpointContact ;
+                                                @hasHasNetworkedResourceLabel ?distributionEndpointLabel .
+                        OPTIONAL {
+                            ?resourceId @hasLastReviewer ?lastReviewer .
+                        }
+                        FILTER (?invalidDistributionEndpointContact IN (@invalidContacts))
+                    }"
+            };
+
+            parametrizedSparql.SetUri("resourceGraph", resourceGraph);
+            parametrizedSparql.SetUri("consumerGroupGraph", consumerGroupGraph);
+            parametrizedSparql.SetUri("distribution", new Uri(Graph.Metadata.Constants.Resource.Distribution));
+            parametrizedSparql.SetUri("hasContactPerson", new Uri(Graph.Metadata.Constants.Resource.DistributionEndpoints.HasContactPerson));
+            parametrizedSparql.SetUri("hasLastReviewer", new Uri(Graph.Metadata.Constants.Resource.HasLastReviewer));
+            parametrizedSparql.SetUri("hasLastChangeUser", new Uri(Graph.Metadata.Constants.Resource.LastChangeUser));
+            parametrizedSparql.SetUri("hasAuthor", new Uri(Graph.Metadata.Constants.Resource.Author));
+            parametrizedSparql.SetUri("hasPid", new Uri(Graph.Metadata.Constants.Resource.hasPID));
+            parametrizedSparql.SetUri("hasLabel", new Uri(Graph.Metadata.Constants.Resource.HasLabel));
+            parametrizedSparql.SetUri("hasHasNetworkedResourceLabel", new Uri(Graph.Metadata.Constants.Resource.DistributionEndpoints.HasNetworkedResourceLabel));
+            parametrizedSparql.SetUri("hasConsumerGroup", new Uri(Graph.Metadata.Constants.Resource.HasConsumerGroup));
+            parametrizedSparql.SetUri("hasConsumerGroupContactPerson", new Uri(Graph.Metadata.Constants.ConsumerGroup.HasContactPerson));
+            parametrizedSparql.SetPlainLiteral("invalidContacts", invalidDistributionEndpointContacts.JoinAsLiteralList());
+
+            var results = _tripleStoreRepository.QueryTripleStoreResultSet(parametrizedSparql);
+
+            IList<InvalidDistributionEndpointContactResourceInformation> resourcesWithInvalidContacts = new List<InvalidDistributionEndpointContactResourceInformation>();
+
+            foreach (var result in results)
+            {
+                resourcesWithInvalidContacts.Add(new InvalidDistributionEndpointContactResourceInformation()
+                {
+                    PidUri = new Uri(result.GetNodeValuesFromSparqlResult("pidUri").Value),
+                    Label = result.GetNodeValuesFromSparqlResult("label").Value,
+                    DistributionId = result.GetNodeValuesFromSparqlResult("distributionEndpointId").Value,
+                    DistributionLabel = result.GetNodeValuesFromSparqlResult("distributionEndpointLabel").Value,
+                    LastReviewer = result.GetNodeValuesFromSparqlResult("lastReviewer").Value,
+                    LastChangeUser = result.GetNodeValuesFromSparqlResult("lastChangeUser").Value,
+                    Author = result.GetNodeValuesFromSparqlResult("author").Value,
+                    ConsumerGroupContactPerson = result.GetNodeValuesFromSparqlResult("consumerGroupContactPerson").Value,
+                    InvalidDistributionEndpointContact = result.GetNodeValuesFromSparqlResult("invalidDistributionEndpointContact").Value
+                });
+
+            }
+
+            return resourcesWithInvalidContacts;
+        }
+
+        public IList<Uri> GetResourcePidUrisWithBrokenEndpointsOrBrokenContacts(Uri resourceGraph)
+        {
+            var parametrizedSparql = new SparqlParameterizedString
+            {
+                CommandText =
+                    @"SELECT DISTINCT ?pidUri 
+                    FROM @resourceGraph
+                    WHERE {
+                        {
+                            ?resourceId @hasInvalidDataSteward ?invalidDataSteward ;
+                                @hasPid ?pidUri .
+                        }
+                        UNION
+                        {
+                            ?resourceId @hasDistribution ?distributionEndpointId ;
+                                @hasPid ?pidUri .
+                            ?distributionEndpointId @hasInvalidEndpointContact ?invalidEndpointContact .
+                        }
+                        UNION
+                        {
+                            ?resourceId @hasDistribution ?distributionEndpointId ;
+                                @hasPid ?pidUri .
+                            ?distributionEndpointId @hasBrokenLink ?broken .
+                        }        
+                    }"
+            };
+
+            parametrizedSparql.SetUri("resourceGraph", resourceGraph);
+            parametrizedSparql.SetUri("hasInvalidDataSteward", new Uri(ColidConstants.ContactValidityCheck.BrokenDataStewards));
+            parametrizedSparql.SetUri("hasPid", new Uri(Graph.Metadata.Constants.Resource.hasPID));
+            parametrizedSparql.SetUri("hasDistribution", new Uri(Graph.Metadata.Constants.Resource.Distribution));
+            parametrizedSparql.SetUri("hasInvalidEndpointContact", new Uri(ColidConstants.ContactValidityCheck.BrokenEndpointContacts));
+            parametrizedSparql.SetUri("hasBrokenLink", new Uri(ColidConstants.DistributionEndpoint.DistributionEndpointsTest.EndpointLifecycleStatus));
+
+            var results = _tripleStoreRepository.QueryTripleStoreResultSet(parametrizedSparql);
+
+            IList<Uri> invalidResourcePidUris = new List<Uri>();
+
+            foreach (var result in results)
+            {
+                invalidResourcePidUris.Add(new Uri(result.GetNodeValuesFromSparqlResult("pidUri").Value));
+            }
+
+            return invalidResourcePidUris;
         }
 
         public void Create(Resource newResource, IList<Graph.Metadata.DataModels.Metadata.MetadataProperty> metadataProperties, Uri namedGraph)
@@ -2033,7 +2375,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
             return results.Select(result => new DuplicateResult(result.GetNodeValuesFromSparqlResult("pidEntry").Value, result.GetNodeValuesFromSparqlResult("draft").Value, result.GetNodeValuesFromSparqlResult("type").Value, null)).ToList();
         }
 
-        public void CreateLinkingProperty(Uri pidUri, Uri propertyUri, Uri linkToPidUri, Uri namedGraph)
+        public void CreateLinkingProperty(Uri pidUri, Uri propertyUri, Uri linkToResourceId, Uri namedGraph)
         {
             var createQuery = new SparqlParameterizedString
             {
@@ -2046,7 +2388,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
             createQuery.SetUri("namedGraph", namedGraph);
             createQuery.SetUri("hasPid", new Uri(Graph.Metadata.Constants.EnterpriseCore.PidUri));
             createQuery.SetUri("pidUri", pidUri);
-            createQuery.SetUri("linkToSubject", linkToPidUri);
+            createQuery.SetUri("linkToSubject", linkToResourceId);
             createQuery.SetUri("predicate", propertyUri);
 
             _tripleStoreRepository.UpdateTripleStore(createQuery);
@@ -2078,7 +2420,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
             _tripleStoreRepository.UpdateTripleStore(createQuery);
         }
 
-        public void DeleteLinkingProperty(Uri pidUri, Uri propertyUri, Uri linkToPidUri, Uri namedGraph)
+        public void DeleteLinkingProperty(Uri pidUri, Uri propertyUri, Uri linkToResourceId, Uri namedGraph)
         {
             var deleteQuery = new SparqlParameterizedString
             {
@@ -2091,7 +2433,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
             deleteQuery.SetUri("namedGraph", namedGraph);
             deleteQuery.SetUri("hasPid", new Uri(Graph.Metadata.Constants.EnterpriseCore.PidUri));
             deleteQuery.SetUri("pidUri", pidUri);
-            deleteQuery.SetUri("linkToSubject", linkToPidUri);
+            deleteQuery.SetUri("linkToSubject", linkToResourceId);
             deleteQuery.SetUri("predicate", propertyUri);
 
             _tripleStoreRepository.UpdateTripleStore(deleteQuery);
@@ -2445,7 +2787,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
                     };
 
                     var resultList = linkedTables.Find(x => x.pidURI == inPiduri).linkedTableFiled;
-                    var columnLinked = resultList.Find(x => x.pidURI == columnDict.pidURI);
+                    var columnLinked = resultList.ToList().Find(x => x.pidURI == columnDict.pidURI);
 
                     if (resultList != null && columnLinked == null)
                     {
@@ -2464,7 +2806,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
                     };
 
                     var resultList = linkedTables.Find(x => x.pidURI == outPiduri).linkedTableFiled;
-                    var columnLinked = resultList.Find(x => x.pidURI == columnDict.pidURI);
+                    var columnLinked = resultList.ToList().Find(x => x.pidURI == columnDict.pidURI);
 
                     if (resultList != null && columnLinked == null)
                     {
@@ -2683,7 +3025,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
                     };
 
                     var resultList = linkedTables.Find(x => x.pidURI == inPiduri).linkedTableFiled;
-                    var columnLinked = resultList.Find(x => x.pidURI == columnDict.pidURI);
+                    var columnLinked = resultList.ToList().Find(x => x.pidURI == columnDict.pidURI);
 
                     if (resultList != null && columnLinked == null)
                     {
@@ -2703,7 +3045,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
                     };
 
                     var resultList = linkedTables.Find(x => x.pidURI == outPiduri).linkedTableFiled;
-                    var columnLinked = resultList.Find(x => x.pidURI == columnDict.pidURI);
+                    var columnLinked = resultList.ToList().Find(x => x.pidURI == columnDict.pidURI);
 
                     if (resultList != null && columnLinked == null)
                     {
@@ -2747,12 +3089,12 @@ namespace COLID.RegistrationService.Repositories.Implementation
             return displayTableAndColumn;
         }
 
-        public List<LinkHistoryDto> GetLinkHistory(Uri pidUri, Uri linkHistoryGraph, Uri resourceGraph, ISet<Uri> metadataGraph)
+        public IList<LinkHistoryDto> GetLinkHistory(Uri pidUri, Uri linkHistoryGraph, Uri resourceGraph, ISet<Uri> metadataGraph)
         {
             var parametrizedSparql = new SparqlParameterizedString
             {
                 CommandText =
-                     @"SELECT ?linkHistory ?isInBound ?hasLinkStatus ?hasLinkType ?linkTypeLabel ?hasDateCreated ?hasDateDeleted ?hasAuthor ?hasDeletedBy 
+                     @"SELECT ?linkHistory ?isInBound ?hasLinkStatus ?hasLinkType ?linkTypeLabel ?hasDateCreated ?hasDateDeleted ?lastModifiedDate ?hasAuthor ?hasDeletedBy 
                               ?hasLinkStart ?linkStartPid ?linkStartLabel ?linkStartType ?linkStartTypeLabel 
                                ?hasLinkEnd ?linkEndPid ?linkEndLabel ?linkEndType ?linkEndTypeLabel
                         FROM @linkHistoryGraph
@@ -2783,6 +3125,8 @@ namespace COLID.RegistrationService.Repositories.Implementation
                               ?hasLinkEnd @hasRdfType ?linkEndType .
                               ?linkEndType @hasRdfsLabel ?linkEndTypeLabel .
                               BIND ('true' as ?isInBound) .
+                              BIND (exists{ ?linkHistory @hasLinkDeletedOn ?hasDateDeleted } AS ?existsDateDeleted ) .    
+                              BIND (IF(?existsDateDeleted , ?hasDateDeleted ,?hasDateCreated) AS ?lastModifiedDate) . 
                           }
                           UNION
                          {
@@ -2807,10 +3151,14 @@ namespace COLID.RegistrationService.Repositories.Implementation
                               ?hasLinkEnd @hasRdfType ?linkEndType .
                               ?linkEndType @hasRdfsLabel ?linkEndTypeLabel .
                               BIND ('false' as ?isInBound) .
-                          }
-                        FILTER langMatches(lang(?linkStartTypeLabel), @language) 
-                        FILTER langMatches(lang(?linkEndTypeLabel), @language)                        
-                        } "
+                              BIND (exists{ ?linkHistory @hasLinkDeletedOn ?hasDateDeleted } AS ?existsDateDeleted ) .    
+                              BIND (IF(?existsDateDeleted , ?hasDateDeleted ,?hasDateCreated) AS ?lastModifiedDate) .
+                          }                        
+                        FILTER (lang(?linkTypeLabel) IN (@language , """"))
+                        FILTER (lang(?linkStartTypeLabel) IN (@language , """")) 
+                        FILTER (lang(?linkEndTypeLabel) IN (@language , """")) 
+                        } 
+                       ORDER BY DESC (?lastModifiedDate)"
             };
 
             parametrizedSparql.SetUri("linkHistoryGraph", linkHistoryGraph);
@@ -2860,18 +3208,18 @@ namespace COLID.RegistrationService.Repositories.Implementation
                 LinkEndResourceLabel = result.GetNodeValuesFromSparqlResult("linkEndLabel").Value,
                 LinkEndResourceType = new Uri(result.GetNodeValuesFromSparqlResult("linkEndType").Value),
                 LinkEndResourceTypeLabel = result.GetNodeValuesFromSparqlResult("linkEndTypeLabel").Value,
-                LastModifiedOn = result.GetNodeValuesFromSparqlResult("hasDateDeleted").Value != null ? DateTime.Parse(result.GetNodeValuesFromSparqlResult("hasDateDeleted").Value) : DateTime.Parse(result.GetNodeValuesFromSparqlResult("hasDateCreated").Value)
+                LastModifiedOn = result.GetNodeValuesFromSparqlResult("lastModifiedDate").Value
             });
 
-            return linkhistories.OrderByDescending(o => o.LastModifiedOn).ToList();
+            return linkhistories.ToList();
         }
 
-        public List<LinkHistoryDto> GetLinkHistory(Uri startPidUri, Uri endPidUri, Uri linkHistoryGraph, Uri resourceGraph, ISet<Uri> metadataGraph)
+        public IList<LinkHistoryDto> GetLinkHistory(Uri startPidUri, Uri endPidUri, Uri linkHistoryGraph, Uri resourceGraph, ISet<Uri> metadataGraph)
         {
             var parametrizedSparql = new SparqlParameterizedString
             {
                 CommandText =
-                     @"SELECT ?linkHistory ?isInBound ?hasLinkStatus ?hasLinkType ?linkTypeLabel ?hasDateCreated ?hasDateDeleted ?hasAuthor ?hasDeletedBy 
+                     @"SELECT ?linkHistory ?isInBound ?hasLinkStatus ?hasLinkType ?linkTypeLabel ?hasDateCreated ?hasDateDeleted ?lastModifiedDate ?hasAuthor ?hasDeletedBy 
                               ?hasLinkStart ?linkStartPid ?linkStartLabel ?linkStartType ?linkStartTypeLabel 
                                ?hasLinkEnd ?linkEndPid ?linkEndLabel ?linkEndType ?linkEndTypeLabel
                         FROM @linkHistoryGraph
@@ -2904,10 +3252,14 @@ namespace COLID.RegistrationService.Repositories.Implementation
                               ?hasLinkEnd @hasRdfType ?linkEndType .
                               ?linkEndType @hasRdfsLabel ?linkEndTypeLabel .
                               BIND ('false' as ?isInBound) .
-                          }                          
-                        FILTER langMatches(lang(?linkStartTypeLabel), @language) 
-                        FILTER langMatches(lang(?linkEndTypeLabel), @language)                        
-                        } "
+                              BIND (exists{ ?linkHistory @hasLinkDeletedOn ?hasDateDeleted } AS ?existsDateDeleted ) .    
+                              BIND (IF(?existsDateDeleted , ?hasDateDeleted ,?hasDateCreated) AS ?lastModifiedDate) .
+                          }                                                  
+                        FILTER (lang(?linkTypeLabel) IN (@language , """"))
+                        FILTER (lang(?linkStartTypeLabel) IN (@language , """")) 
+                        FILTER (lang(?linkEndTypeLabel) IN (@language , """")) 
+                        } 
+                        ORDER BY DESC (?lastModifiedDate) "
             };
 
             parametrizedSparql.SetUri("linkHistoryGraph", linkHistoryGraph);
@@ -2958,10 +3310,142 @@ namespace COLID.RegistrationService.Repositories.Implementation
                 LinkEndResourceLabel = result.GetNodeValuesFromSparqlResult("linkEndLabel").Value,
                 LinkEndResourceType = new Uri(result.GetNodeValuesFromSparqlResult("linkEndType").Value),
                 LinkEndResourceTypeLabel = result.GetNodeValuesFromSparqlResult("linkEndTypeLabel").Value,
-                LastModifiedOn = result.GetNodeValuesFromSparqlResult("hasDateDeleted").Value != null ? DateTime.Parse(result.GetNodeValuesFromSparqlResult("hasDateDeleted").Value) : DateTime.Parse(result.GetNodeValuesFromSparqlResult("hasDateCreated").Value)
+                LastModifiedOn = result.GetNodeValuesFromSparqlResult("lastModifiedDate").Value
             });
 
-            return linkhistories.OrderByDescending(o => o.LastModifiedOn).ToList();
+            return linkhistories.ToList();
+        }
+
+        public IList<LinkHistoryDto> SearchLinkHistory(LinkHistorySearchParamDto searchParam, Uri linkHistoryGraph, Uri resourceGraph, ISet<Uri> metadataGraph)
+        {
+            //order by column names 
+            const string createdDate = "createddate";
+            const string createdBy = "createdby";
+            const string deletionDate = "deletiondate";
+            const string deletedBy = "deletedby";
+            const string status = "status";
+
+            //Handle null 
+            if (searchParam.OrderByColumn == null)
+                searchParam.OrderByColumn = "";
+
+            var parametrizedSparql = new SparqlParameterizedString
+            {
+                CommandText =
+                     @"SELECT ?linkHistory ?isInBound ?hasLinkStatus ?hasLinkType ?linkTypeLabel ?hasDateCreated ?hasDateDeleted ?hasDateDeletedToSort ?lastModifiedDate ?hasAuthor ?hasDeletedBy 
+                              ?hasLinkStart ?linkStartPid ?linkStartLabel ?linkStartType ?linkStartTypeLabel 
+                               ?hasLinkEnd ?linkEndPid ?linkEndLabel ?linkEndType ?linkEndTypeLabel
+                        FROM @linkHistoryGraph
+                        FROM @resourceGraph
+                        @metadataGraph
+                        WHERE
+                        {                                            
+                          {
+                              ?linkHistory @hasLinkStart ?startResource.
+                              ?linkHistory @hasLinkEnd ?endResource.  
+                              OPTIONAL {
+                                  ?linkHistory @hasLinkDeletedOn ?hasDateDeleted .
+                                  ?linkHistory @hasLinkDeletedBy ?hasDeletedBy .
+                              }
+                              ?linkHistory @hasLinkEnd ?hasLinkEnd .
+                              ?linkHistory @hasLinkStatus ?hasLinkStatus .
+                              ?linkHistory @hasLinkType ?hasLinkType .
+                              ?hasLinkType @hasRdfsLabel ?linkTypeLabel .
+                              ?linkHistory @hasLinkStart ?hasLinkStart .
+                              ?linkHistory @hasLinkCreator ?hasAuthor .
+                              ?linkHistory @hasLinkCreatedOn ?hasDateCreated .    
+                              ?hasLinkStart @hasPid ?linkStartPid .
+                              ?hasLinkStart @hasLabel ?linkStartLabel .
+                              ?hasLinkStart @hasRdfType ?linkStartType .
+                              ?linkStartType @hasRdfsLabel ?linkStartTypeLabel .
+                              ?hasLinkEnd  @hasPid ?linkEndPid .
+                              ?hasLinkEnd @hasLabel ?linkEndLabel .
+                              ?hasLinkEnd @hasRdfType ?linkEndType .
+                              ?linkEndType @hasRdfsLabel ?linkEndTypeLabel .
+                              BIND ('false' as ?isInBound) .
+                              BIND (exists{ ?linkHistory @hasLinkDeletedOn ?hasDateDeleted } AS ?existsDateDeleted ) .    
+                              BIND (IF(?existsDateDeleted , ?hasDateDeleted ,?hasDateCreated) AS ?lastModifiedDate) .
+                              BIND (IF(?existsDateDeleted , ?hasDateDeleted ,now() ) AS ?hasDateDeletedToSort ) .
+                              BIND (IF(?existsDateDeleted , ?hasDeletedBy ,'xxxxxxxxxxxxxxxxxx@xxxxxxxx.xxxx' ) AS ?hasDeletedByToSort ) .
+            }                          
+                        FILTER (lang(?linkTypeLabel) IN (@language , """")) 
+                        FILTER (lang(?linkStartTypeLabel) IN (@language , """")) 
+                        FILTER (lang(?linkEndTypeLabel) IN (@language , """")) 
+                        FILTER (?lastModifiedDate >= @startDate)
+                        FILTER (?lastModifiedDate <= @endDate) 
+                        " +
+                        (searchParam.linkType == null ? "" : @" FILTER (?hasLinkType = @linkTypeValue) ") + @"
+                         " +
+                        (string.IsNullOrEmpty(searchParam.Email) ? "" : @" FILTER (?hasAuthor = @emailValue || ?hasDeletedBy = @emailValue) ") +
+                        @" } 
+                        ORDER BY " + (searchParam.OrderDescending ? "DESC " : "") + @" " +
+                        (string.IsNullOrEmpty(searchParam.OrderByColumn) ? "(?lastModifiedDate)  " : "") +
+                        (searchParam.OrderByColumn.ToLower() == createdDate ? "(?hasDateCreated) " : "") +
+                        (searchParam.OrderByColumn.ToLower() == createdBy ? "(?hasAuthor) " : "") +
+                        (searchParam.OrderByColumn.ToLower() == deletionDate ? (searchParam.OrderDescending ? "(?hasDateDeleted) " : "(?hasDateDeletedToSort) ") : "") +
+                        (searchParam.OrderByColumn.ToLower() == deletedBy ? (searchParam.OrderDescending ? "(?hasDeletedBy) " : "(?hasDeletedByToSort) ") : "") +
+                        (searchParam.OrderByColumn.ToLower() == status ? "(?hasLinkStatus) " : "") +
+            @"LIMIT " + searchParam.Size + " OFFSET " + searchParam.Size * searchParam.From
+            };
+
+            parametrizedSparql.SetUri("linkHistoryGraph", linkHistoryGraph);
+            parametrizedSparql.SetUri("resourceGraph", resourceGraph);
+            parametrizedSparql.SetPlainLiteral("metadataGraph", metadataGraph.JoinAsFromNamedGraphs());
+
+            parametrizedSparql.SetUri("hasLinkStart", new Uri(Graph.Metadata.Constants.LinkHistory.HasLinkStart));
+            parametrizedSparql.SetUri("hasLinkEnd", new Uri(Graph.Metadata.Constants.LinkHistory.HasLinkEnd));
+            parametrizedSparql.SetUri("hasLinkType", new Uri(Graph.Metadata.Constants.LinkHistory.HasLinkType));
+            parametrizedSparql.SetUri("hasLinkStatus", new Uri(Graph.Metadata.Constants.LinkHistory.HasLinkStatus));
+            parametrizedSparql.SetUri("hasLinkDeletedOn", new Uri(Graph.Metadata.Constants.LinkHistory.DateDeleted));
+            parametrizedSparql.SetUri("hasLinkDeletedBy", new Uri(Graph.Metadata.Constants.LinkHistory.DeletedBy));
+            parametrizedSparql.SetUri("hasLinkStatusDeleted", new Uri(Graph.Metadata.Constants.LinkHistory.LinkStatus.Deleted));
+            parametrizedSparql.SetUri("hasLinkCreator", new Uri(Graph.Metadata.Constants.Resource.Author));
+            parametrizedSparql.SetUri("hasLinkCreatedOn", new Uri(Graph.Metadata.Constants.Resource.DateCreated));
+            parametrizedSparql.SetUri("hasLabel", new Uri(Graph.Metadata.Constants.Resource.HasLabel));
+            parametrizedSparql.SetUri("hasRdfsLabel", new Uri(Graph.Metadata.Constants.RDFS.Label));
+            parametrizedSparql.SetUri("hasRdfType", new Uri(Graph.Metadata.Constants.RDF.Type));
+            parametrizedSparql.SetUri("hasPid", new Uri(Graph.Metadata.Constants.Resource.hasPID));
+            parametrizedSparql.SetLiteral("language", Graph.Metadata.Constants.I18n.DefaultLanguage);
+
+            parametrizedSparql.SetLiteral("startDate", searchParam.StartDate);
+            parametrizedSparql.SetLiteral("endDate", searchParam.EndDate);
+            if (searchParam.linkType != null)
+                parametrizedSparql.SetUri("linkTypeValue", searchParam.linkType);
+            if (searchParam.Email != null)
+                parametrizedSparql.SetLiteral("emailValue", searchParam.Email);
+
+            var result = _tripleStoreRepository.QueryTripleStoreResultSet(parametrizedSparql).ToList();
+
+            if (!result.Any())
+            {
+                return new List<LinkHistoryDto>();
+            }
+
+            var linkhistories = result.Select(result => new LinkHistoryDto()
+            {
+                LinkHistoryId = new Uri(result.GetNodeValuesFromSparqlResult("linkHistory").Value),
+                InBound = Boolean.Parse(result.GetNodeValuesFromSparqlResult("isInBound").Value),
+                LinkStatus = new Uri(result.GetNodeValuesFromSparqlResult("hasLinkStatus").Value),
+                LinkType = new Uri(result.GetNodeValuesFromSparqlResult("hasLinkType").Value),
+                LinkTypeLabel = result.GetNodeValuesFromSparqlResult("linkTypeLabel").Value,
+                DateCreated = result.GetNodeValuesFromSparqlResult("hasDateCreated").Value,
+                DateDeleted = result.GetNodeValuesFromSparqlResult("hasDateDeleted").Value,
+                Author = result.GetNodeValuesFromSparqlResult("hasAuthor").Value,
+                DeletedBy = result.GetNodeValuesFromSparqlResult("hasDeletedBy").Value,
+                LinkStartResourcetId = new Uri(result.GetNodeValuesFromSparqlResult("hasLinkStart").Value),
+                LinkStartResourcePidUri = new Uri(result.GetNodeValuesFromSparqlResult("linkStartPid").Value),
+                LinkStartResourceLabel = result.GetNodeValuesFromSparqlResult("linkStartLabel").Value,
+                LinkStartResourceType = new Uri(result.GetNodeValuesFromSparqlResult("linkStartType").Value),
+                LinkStartResourceTypeLabel = result.GetNodeValuesFromSparqlResult("linkStartTypeLabel").Value,
+                LinkEndResourcetId = new Uri(result.GetNodeValuesFromSparqlResult("hasLinkEnd").Value),
+                LinkEndResourcePidUri = new Uri(result.GetNodeValuesFromSparqlResult("linkEndPid").Value),
+                LinkEndResourceLabel = result.GetNodeValuesFromSparqlResult("linkEndLabel").Value,
+                LinkEndResourceType = new Uri(result.GetNodeValuesFromSparqlResult("linkEndType").Value),
+                LinkEndResourceTypeLabel = result.GetNodeValuesFromSparqlResult("linkEndTypeLabel").Value,
+                LastModifiedOn = result.GetNodeValuesFromSparqlResult("lastModifiedDate").Value
+            });
+
+            return linkhistories.ToList();
         }
     }
 }

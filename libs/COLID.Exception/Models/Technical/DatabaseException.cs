@@ -4,6 +4,9 @@ namespace COLID.Exception.Models.Technical
 {
     public class DatabaseException : TechnicalException
     {
+        public DatabaseException() : base()
+        {
+        }
         public DatabaseException(string message) : base(message)
         {
         }

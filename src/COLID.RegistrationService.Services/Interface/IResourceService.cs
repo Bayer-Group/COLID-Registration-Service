@@ -4,7 +4,8 @@ using System.Threading.Tasks;
 using COLID.Graph.Metadata.DataModels.Resources;using COLID.Graph.TripleStore.DataModels.Base;
 using COLID.RegistrationService.Common.DataModel.DistributionEndpoints;
 using COLID.RegistrationService.Common.DataModel.Resources;
-using COLID.RegistrationService.Common.DataModel.Search;using COLID.RegistrationService.Common.DataModels.LinkHistory;
+using COLID.RegistrationService.Common.DataModel.Search;using COLID.RegistrationService.Common.DataModels.Contacts;
+using COLID.RegistrationService.Common.DataModels.LinkHistory;
 using COLID.RegistrationService.Common.DataModels.Resources;
 
 namespace COLID.RegistrationService.Services.Interface
@@ -14,6 +15,7 @@ namespace COLID.RegistrationService.Services.Interface
     /// </summary>
     public interface IResourceService
     {
+        void CreateProperty(Uri subject, Uri predicate, string literal, Uri namedGraph);
         /// <summary>
         /// Gets the single resource with its properties and nested objects. References to other resources (linked resources) will be ignored.
         /// </summary>
@@ -34,7 +36,10 @@ namespace COLID.RegistrationService.Services.Interface
         /// </summary>
         /// <param name="pidUris">The unique PID URIs of the resources</param>
         /// <returns>The resource containing the given PID URI</returns>
-        IList<Resource> GetByPidUris(List<Uri> pidUris);
+        IList<Resource> GetByPidUris(IList<Uri> pidUris);
+
+
+        public IList<DistributionEndpointsTest> GetBrokenEndpoint(IList<string> resourceTypes);
 
         /// <summary>
         /// Gets all resource links of the published Graph 
@@ -43,7 +48,7 @@ namespace COLID.RegistrationService.Services.Interface
         /// <param name="pidUris"></param>
         /// <param name="namedGraph"></param>
         /// <param name="LinkTypeList"></param>
-        public void GetLinksOfPublishedResources(List<Resource> resources, IList<Uri> pidUris, Uri namedGraph, ISet<string> LinkTypeList);
+        public void GetLinksOfPublishedResources(IList<Resource> resources, IList<Uri> pidUris, Uri namedGraph, ISet<string> LinkTypeList);
 
         /// <summary>
         /// Gets the single resource with its properties and nested objects. References to other resources (linked resources) will be ignored.
@@ -111,7 +116,7 @@ namespace COLID.RegistrationService.Services.Interface
         /// </summary>
         /// <param name="resourceType"></param>
         /// <returns>List of all distribution endpints of one resource</returns>
-        IList<DistributionEndpointsTest> GetDistributionEndpoints(string resourceType);
+        IList<DistributionEndpointsTest> GetDistributionEndpoints(IList<string>resourceTypes, Uri? distributionPidUri);
 
         /// <summary>
         /// Gets the PID URI of the resource, which contains the distribution endpoint.
@@ -133,7 +138,7 @@ namespace COLID.RegistrationService.Services.Interface
         /// <param name="pidUris">The List of pidUris of related PID entries to delete</param>
         /// <param name="requester">The user who wants to mark the resource for deletion</param>
         /// <returns>a message of the successful mark</returns>
-        Task<List<ResourceMarkedOrDeletedResult>> MarkResourceAsDeletedListAsync(List<Uri> pidUris, string requester);
+        Task<List<ResourceMarkedOrDeletedResult>> MarkResourceAsDeletedListAsync(IList<Uri> pidUris, string requester);
 
         /// <summary>
         /// Searches for a valid resource to the given pid uri and unmarks this resource for deletion.
@@ -156,7 +161,8 @@ namespace COLID.RegistrationService.Services.Interface
         /// <param name="linkType"></param>
         /// <param name="pidUriToLink"></param>
         /// <returns>Resource containing new created links</returns>
-        Task<Resource> RemoveResourceLink(string pidUri, string linkType, string pidUriToUnLink, bool returnTargetResource, string requester);
+        Task<Resource> RemoveResourceLink(string pidUri, string linkType, string pidUriToUnLink, bool returnTargetResource, string requester);
+
         /// <summary>
         /// Gets the Active Directory (AD) role for the resource pid uri.
         /// Each resource has a consumer group referenced, which is allowed to edit this resource. Each consumer group has one AD role attached.
@@ -244,6 +250,13 @@ namespace COLID.RegistrationService.Services.Interface
         Task<DisplayTableAndColumn> GetTableAndColumnById(Uri pidUri);
 
         /// <summary>
+        /// Gets the Table and Column resource with its properties and nested objects. References to other resources (linked resources) will be ignored
+        /// </summary>
+        /// <param name="pidUris">list of pidUris</param>
+        /// <returns></returns>
+        Task<List<DisplayTableAndColumnByPidUri>> GetTableAndColumnByPidUris(IList<Uri> pidUris);
+
+        /// <summary>
         /// Check whether there is any difference between resources
         /// </summary>
         /// <param name="draft"></param>
@@ -263,7 +276,7 @@ namespace COLID.RegistrationService.Services.Interface
         /// </summary>
         /// <param name="resourceType">the resource type </param>
         /// <returns>The resource types hierarchy in a list</returns>
-        Task<Dictionary<string, List<string>>> GetResourceHierarchy(List<string> resourceType);
+        Task<Dictionary<string, List<string>>> GetResourceHierarchy(IList<string> resourceType);
 
         /// <summary>
         /// Starts the indexing process of new resource towards on indexing crawler service.
@@ -291,6 +304,24 @@ namespace COLID.RegistrationService.Services.Interface
         /// <param name="startPidUri">The unique id of the start resource</param>
         /// <param name="endPidUri">The unique id of the end resource</param>
         /// <returns></returns>
-        List<LinkHistoryDto> GetLinkHistory(Uri startPidUri, Uri endPidUri);
+
+        Uri GetResourceInstanceGraph();
+
+        public Uri GetConsumerGroupInstanceGraph();
+
+        /// <summary> 
+        /// Get Link History 
+        /// </summary> 
+        /// <param name="startPidUri">The unique id of the start resource</param> 
+        /// <param name="endPidUri">The unique id of the end resource</param> 
+        /// <returns></returns> 
+        IList<LinkHistoryDto> GetLinkHistory(Uri startPidUri, Uri endPidUri);
+
+        /// <summary> 
+        /// Search Link History 
+        /// </summary> 
+        /// <param name="searchParam">Parameters: StartDate, EndDate, optional email, linkType</param>         
+        /// <returns></returns> 
+        IList<LinkHistoryDto> SearchLinkHistory(LinkHistorySearchParamDto searchParam);
     }
 }

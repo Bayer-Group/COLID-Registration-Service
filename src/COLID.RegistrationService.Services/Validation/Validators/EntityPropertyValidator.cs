@@ -32,7 +32,7 @@ namespace COLID.RegistrationService.Services.Validation.Validators
             HandleOverwriteProperties(GetKeyValuePair(key, validationFacade), validationFacade);
         }
 
-        private KeyValuePair<string, List<dynamic>> GetKeyValuePair(string key, EntityValidationFacade validationFacade)
+        private static KeyValuePair<string, List<dynamic>> GetKeyValuePair(string key, EntityValidationFacade validationFacade)
         {
             if (!validationFacade.RequestResource.Properties.ContainsKey(key))
             {

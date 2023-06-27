@@ -16,6 +16,6 @@ namespace COLID.RegistrationService.Common.DataModel.Search
 
         public ExportDto exportSettings { get; set; }
         public SearchRequestDto searchRequest { get; set; }
-        public List<Uri> pidUris { get; set; }
+        public IList<Uri> pidUris { get; set; }
     }
 }

@@ -22,7 +22,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V2
     [Route("api/v{version:apiVersion}")]
     [Produces(MediaTypeNames.Application.Json)]
     [TransformIdPropertyResponseFilter]
-    [Obsolete]
+    [Obsolete("A new version of this endpoint is available")]
     public class ExtendedUriTemplateController : Controller
     {
         private readonly IExtendedUriTemplateService _extendedUriTemplateService;

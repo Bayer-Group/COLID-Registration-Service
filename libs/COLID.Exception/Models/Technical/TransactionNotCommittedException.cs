@@ -4,13 +4,14 @@ namespace COLID.Exception.Models.Technical
 {
     public class TransactionNotCommittedException : TechnicalException
     {
-        public TransactionNotCommittedException(string message)
-            : base(message)
+        public TransactionNotCommittedException() : base()
+        {
+        }
+        public TransactionNotCommittedException(string message) : base(message)
         {
         }
 
-        public TransactionNotCommittedException(string message, System.Exception inner)
-            : base(message, inner)
+        public TransactionNotCommittedException(string message, System.Exception inner) : base(message, inner)
         {
         }
     }

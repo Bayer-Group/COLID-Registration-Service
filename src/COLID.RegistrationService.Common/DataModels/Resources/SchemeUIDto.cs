@@ -4,10 +4,16 @@ using System.Text;
 
 namespace COLID.RegistrationService.Common.DataModels.Resources
 {
+    public class DisplayTableAndColumnByPidUri
+    {
+        public string pidURI { get; set; }
+        public DisplayTableAndColumn TableAndColumn { get; set; }
+    }
+
     public class DisplayTableAndColumn
     {
-        public List<TableFiled> tables { get; set; }
-        public List<Filed> columns { get; set; }
+        public IList<TableFiled> tables { get; set; }
+        public IList<Filed> columns { get; set; }
 
         
         public DisplayTableAndColumn()
@@ -22,13 +28,13 @@ namespace COLID.RegistrationService.Common.DataModels.Resources
         public string resourceId { get; set; }
         public string pidURI { get; set; }
         public string label { get; set; }
-        public List<Filed> subColumns { get; set; }
+        public IList<Filed> subColumns { get; set; }
 
     }
 
     public class TableFiled : Filed
     {
-        public List<Filed> linkedTableFiled { get; set; }
+        public IList<Filed> linkedTableFiled { get; set; }
         
         public TableFiled()
         {

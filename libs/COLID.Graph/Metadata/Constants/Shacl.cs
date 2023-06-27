@@ -1,16 +1,11 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using COLID.Graph.Utils;
+using Microsoft.Extensions.Configuration;
 
 namespace COLID.Graph.Metadata.Constants
 {
-    public class Shacl
+    public static class Shacl
     {
-        private static readonly string basePath = System.IO.Path.GetFullPath("appsettings.json");
-        private static readonly string filePath = basePath.Substring(0, basePath.Length - 16);
-        private static IConfigurationRoot configuration = new ConfigurationBuilder()
-                     .SetBasePath(filePath)
-                    .AddJsonFile("appsettings.json")
-                    .Build();
-        public static readonly string ServiceUrl = configuration.GetValue<string>("ServiceUrl");
+        public static readonly string ServiceUrl = GraphUtils.CurrentRootConfiguration.GetValue<string>("ServiceUrl");
 
         public const string Datatype = "http://www.w3.org/ns/shacl#datatype";
         public const string Range = "http://www.w3.org/2000/01/rdf-schema#range";
@@ -27,21 +22,21 @@ namespace COLID.Graph.Metadata.Constants
         public static readonly string IsFacet = ServiceUrl + "kos/19050#isFacet";
         public const string PropertyShape = "http://www.w3.org/ns/shacl#PropertyShape";
 
-        public class NodeKinds
+        public static class NodeKinds
         {
             public const string IRI = "http://www.w3.org/ns/shacl#IRI";
             public const string Literal = "http://www.w3.org/ns/shacl#Literal";
             public const string BlankNode = "http://www.w3.org/ns/shacl#BlankNode";
         }
 
-        public class Severity
+        public static class Severity
         {
             public const string Info = "http://www.w3.org/ns/shacl#Info";
             public const string Warning = "http://www.w3.org/ns/shacl#Warning";
             public const string Violation = "http://www.w3.org/ns/shacl#Violation";
         }
 
-        public class DataTypes
+        public static class DataTypes
         {
             public const string DateTime = "http://www.w3.org/2001/XMLSchema#dateTime";
         }

@@ -5,7 +5,7 @@ namespace COLID.IronMountainService.Common.Models
 {
     public class IronMountainRentionScheduleDto
     { 
-        public List<IronMountainRecordClass> retentionSchedule { get; set; }
+        public IList<IronMountainRecordClass> retentionSchedule { get; set; }
     }
 
     public class IronMountainRecordClass
@@ -18,9 +18,9 @@ namespace COLID.IronMountainService.Common.Models
 
         public string recordClassDescription { get; set; }
 
-        public List<IronMountainRecordClassRules> rules { get; set; }
+        public IList<IronMountainRecordClassRules> rules { get; set; }
 
-        public List<IronMountainRecordClass> children { get; set; }
+        public IList<IronMountainRecordClass> children { get; set; }
     }
 
     public class IronMountainRecordClassRules

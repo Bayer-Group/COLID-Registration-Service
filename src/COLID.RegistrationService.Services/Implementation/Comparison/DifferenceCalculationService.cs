@@ -45,7 +45,7 @@ namespace COLID.RegistrationService.Services.Implementation.Comparison
         /// <param name="metadataComparisonProperty">The current metadata property to compare in the given resources</param>
         /// <param name="resources">resources to compare</param>
         /// <returns>The comparison result for a specific property. While the returned key is the metadata key, the list contains the compared properties of both resources.</returns>
-        private IDictionary<string, IList<dynamic>> CalculateIRIDifference(MetadataComparisonProperty metadataComparisonProperty, params Entity[] resources)
+        private static IDictionary<string, IList<dynamic>> CalculateIRIDifference(MetadataComparisonProperty metadataComparisonProperty, params Entity[] resources)
         {
             if (metadataComparisonProperty.NestedMetadata.IsNullOrEmpty())
             {
@@ -64,7 +64,7 @@ namespace COLID.RegistrationService.Services.Implementation.Comparison
         /// <param name="resources">resources to compare</param>
         /// <exception cref="KeyNotFoundException">If both resources don't contain the key in the properties.</exception>
         /// <returns>The comparison result for a specific property. While the returned key is the metadata key, the list contains the compared properties of both resources.</returns>
-        private IDictionary<string, IList<dynamic>> ExtractIRIValues(MetadataComparisonProperty metadataComparisonProperty, params Entity[] resources)
+        private static IDictionary<string, IList<dynamic>> ExtractIRIValues(MetadataComparisonProperty metadataComparisonProperty, params Entity[] resources)
         {
             var propertyResults = new Dictionary<string, IList<dynamic>>();
 
@@ -92,7 +92,7 @@ namespace COLID.RegistrationService.Services.Implementation.Comparison
         /// <param name="metadataComparisonProperty">The current metadata property to compare in the given resources</param>
         /// <param name="resources">resources to compare</param>
         /// <returns>The comparison result for a specific property. While the returned key is the metadata key, the list contains the compared properties of both resources.</returns>
-        private IDictionary<string, IList<dynamic>> CalculateIRINestedValuesDifference(MetadataComparisonProperty metadataComparisonProperty, params Entity[] resources)
+        private static IDictionary<string, IList<dynamic>> CalculateIRINestedValuesDifference(MetadataComparisonProperty metadataComparisonProperty, params Entity[] resources)
         {
             var propertyResults = new Dictionary<string, IList<dynamic>>();
 
@@ -221,7 +221,7 @@ namespace COLID.RegistrationService.Services.Implementation.Comparison
         /// <param name="metadataKey">The current metadata property key to compare in the given resources</param>
         /// <param name="resources">resources to compare</param>
         /// <returns>The comparison result for a specific property. While the returned key is the metadata key, the list contains the compared properties of both resources.</returns>
-        private IDictionary<string, IList<dynamic>> CalculateLiteralValuesDifference(string metadataKey, params Entity[] resources)
+        private static IDictionary<string, IList<dynamic>> CalculateLiteralValuesDifference(string metadataKey, params Entity[] resources)
         {
             var propertyResults = new Dictionary<string, IList<dynamic>>();
             try
@@ -278,7 +278,7 @@ namespace COLID.RegistrationService.Services.Implementation.Comparison
         /// <param name="firstLiteral">First literal to compare</param>
         /// <param name="secondLiteral">Second literal to compare</param>
         /// <returns>Returns the result of the comparison, where all changes can be tracked with tags.</returns>
-        private Tuple<IList<string>, IList<string>> CalculateLiteralSingleValueDiff(string firstLiteral, string secondLiteral)
+        private static Tuple<IList<string>, IList<string>> CalculateLiteralSingleValueDiff(string firstLiteral, string secondLiteral)
         {
             IDiffer differ = new Differ();
 
@@ -295,7 +295,7 @@ namespace COLID.RegistrationService.Services.Implementation.Comparison
         /// <param name="firstResourceData">First list of literals to compare</param>
         /// <param name="secondResouceData">Second list of literals to compare</param>
         /// <returns>Returns the result of the comparison, where all line changes can be tracked with tags.</returns>
-        private Tuple<IList<string>, IList<string>> CalculateLiteralListDifference(IList<string> firstResourceData, IList<string> secondResouceData)
+        private static Tuple<IList<string>, IList<string>> CalculateLiteralListDifference(IList<string> firstResourceData, IList<string> secondResouceData)
         {
             IDiffer differ = new Differ();
             const string lineEndingSeperator = "\n";
@@ -316,7 +316,7 @@ namespace COLID.RegistrationService.Services.Implementation.Comparison
         /// <param name="diffResult">The Diffplex result containing changes between two literal results</param>
         /// <param name="lineEndingSeperator">If the result contains multiple literals on both sides (lists), the line ending seperator is added to the end of a line.</param>
         /// <returns>literal based tuple containing start and end tags to track changes.</returns>
-        private Tuple<string, string> GenerateDifferenceOutputFormat(DiffResult diffResult, string lineEndingSeperator = "")
+        private static Tuple<string, string> GenerateDifferenceOutputFormat(DiffResult diffResult, string lineEndingSeperator = "")
         {
             string resultA = string.Empty;
             string resultB = string.Empty;

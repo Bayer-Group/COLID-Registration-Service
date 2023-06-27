@@ -8,7 +8,7 @@ namespace COLID.IronMountainService.Common.Models
     {
         public string pidUri { get; set; }
 
-        public List<RetentionClassPolicies> retentionClassPolicies { get; set; }
+        public IList<RetentionClassPolicies> retentionClassPolicies { get; set; }
 
     }
 
@@ -20,7 +20,7 @@ namespace COLID.IronMountainService.Common.Models
 
         public string classDescription { get; set; }
 
-        public List<Policy> policies { get; set; }
+        public IList<Policy> policies { get; set; }
 
     }
     

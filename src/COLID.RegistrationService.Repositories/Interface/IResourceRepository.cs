@@ -1,19 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using COLID.Graph.Metadata.DataModels.Metadata;
-
 using COLID.Graph.Metadata.DataModels.Resources;
-
 using COLID.Graph.TripleStore.Repositories;
-
 using COLID.RegistrationService.Common.DataModel.DistributionEndpoints;
-
 using COLID.RegistrationService.Common.DataModel.Resources;
-
 using COLID.RegistrationService.Common.DataModel.Search;
-
 using COLID.RegistrationService.Common.DataModel.Validation;
-
+using COLID.RegistrationService.Common.DataModels.Contacts;
 using COLID.RegistrationService.Common.DataModels.LinkHistory;
 using COLID.RegistrationService.Common.DataModels.Resources;
 
@@ -50,7 +44,7 @@ namespace COLID.RegistrationService.Repositories.Interface
         /// <param name="resourceTypes">the resource type list to filter by</param> 
         /// <param name="namedGraph">Named graph for current resources</param> 
         /// <returns>The resource containing the given PID URI</returns> 
-        IList<Resource> GetByPidUris(List<Uri> pidUris, IList<string> resourceTypes, Uri namedGraph);
+        IList<Resource> GetByPidUris(IList<Uri> pidUris, IList<string> resourceTypes, Uri namedGraph);
 
 
         Resource GetByPidUriAndColidEntryLifecycleStatus(Uri pidUri, Uri status, IList<string> resourceTypes, Dictionary<Uri, bool> namedGraphs);
@@ -97,7 +91,7 @@ namespace COLID.RegistrationService.Repositories.Interface
         /// <param name="namedGraph"></param>
 
         /// <returns></returns> 
-        IList<DistributionEndpointsTest> GetDistributionEndpoints(string resourceType, Uri namedGraph);
+        IList<DistributionEndpointsTest> GetDistributionEndpoints(IList<string> resourceTypes, Uri namedGraph, Uri consumerGroupGraph, Uri? distributionPidUri);
 
         /// <summary> 
         /// Gets the list of PID URIs of all inbound linked resources to a resource. 
@@ -131,7 +125,7 @@ namespace COLID.RegistrationService.Repositories.Interface
         /// <param name="namedGraph"></param>
         /// <param name="LinkTypeList"></param>
         /// <returns>The outbound/inbound links of the resource, null if no link exists</returns>
-        void GetLinksOfPublishedResources(List<Resource> resources, IList<Uri> pidUris, Uri namedGraph, ISet<string> LinkTypeList);
+        void GetLinksOfPublishedResources(IList<Resource> resources, IList<Uri> pidUris, Uri namedGraph, ISet<string> LinkTypeList);
 
         /// <summary> 
         /// Retrieves all resources of a specified consumer group from today to the specified end date for review 
@@ -246,8 +240,6 @@ namespace COLID.RegistrationService.Repositories.Interface
         /// <param name="namedGraph">Named graph for current resources</param> 
         void DeleteMarkedForDeletion(Uri pidUri, Uri toObject, Uri namedGraph);
 
-
-
         /// <summary> 
         /// Creates a linkhistory entry of a specific link between two resources or sets the status of an existing linkhistory entry to 'created'. 
         /// </summary> 
@@ -255,12 +247,6 @@ namespace COLID.RegistrationService.Repositories.Interface
         /// <param name="namedGraph">Named of the link history graph</param>
 
         void CreateLinkHistoryEntry(LinkHistoryCreateDto linkHistory, Uri namedGraph, Uri CreateLinkHistoryEntry);
-
-
-
-
-
-
 
         /// <summary> 
         /// Checks if the Link entry with same link type exists in linkhistory'. 
@@ -271,8 +257,33 @@ namespace COLID.RegistrationService.Repositories.Interface
         /// <param name="linkHistoryGraph">Named of the link history graph</param>
 
         Uri GetLinkHistoryRecord(Uri linkStart, Uri linkType, Uri linkEnd, Uri linkHistoryGraph, Uri resourceGraph);
-        List<LinkHistoryCreateDto> GetLinkHistoryRecords(Uri linkHistoryGraph);
+        IList<LinkHistoryCreateDto> GetLinkHistoryRecords(Uri linkHistoryGraph);
 
+        /// <summary>
+        /// Gets all distinct data stewards and distribution endpoint contacts of all resources
+        /// </summary>
+        /// <param name="resourceGraph">Name of the resource graph</param>
+        /// <returns>Distinct data stewards and distribution endpoint contacts</returns>
+        ContactsToCheckDto GetContactsToCheck(Uri resourceGraph);
+
+        /// <summary>
+        /// Get all the resources for a given list of invalid datastewards
+        /// </summary>
+        /// <param name="invalidDataStewards">List of invalid data stewards</param>
+        /// <param name="resourceGraph">Name of the resource graph</param>
+        /// <param name="consumerGroupGraph">Name of the consumer group graph</param>
+        /// <returns>Dictionary containing the resource ids as keys and the relevant information to send notifications and set flags as values</returns>
+        Dictionary<string, InvalidDataStewardResourceInformation> GetResourcesForInvalidDataStewards(IList<string> invalidDataStewards, Uri resourceGraph, Uri consumerGroupGraph);
+
+        /// <summary>
+        /// Get all the distribution endpoints for a given list of invalid distribution endpoint contacts
+        /// </summary>
+        /// <param name="invalidDistributionEndpointContacts">List of invalid distribution endpoint contacts</param>
+        /// <param name="resourceGraph">Name of the resource graph</param>
+        /// <param name="consumerGroupGraph">Name of the consumer group graph</param>
+        /// <returns>List containing relevant information to send notifications and set flags </returns>
+        IList<InvalidDistributionEndpointContactResourceInformation> GetResourcesForInvalidDistributionEndpointContacts(IList<string> invalidDistributionEndpointContacts, Uri resourceGraph, Uri consumerGroupGraph);
+        IList<Uri> GetResourcePidUrisWithBrokenEndpointsOrBrokenContacts(Uri resourceGraph);
 
         /// <summary> 
         /// Validate the existence of a resource by a given pidUri. 
@@ -448,7 +459,9 @@ namespace COLID.RegistrationService.Repositories.Interface
         /// <param name="resourceGraph">Named graph for current resources</param>
         /// <param name="metadataGraph">Metadata graphs for current resources</param>
         /// <returns>List of Link history of the given resource pidUri</returns>
-        List<LinkHistoryDto> GetLinkHistory(Uri pidUri, Uri linkHistoryGraph, Uri resourceGraph, ISet<Uri> metadataGraph);
+        IList<LinkHistoryDto> GetLinkHistory(Uri pidUri, Uri linkHistoryGraph, Uri resourceGraph, ISet<Uri> metadataGraph);
+
+        IList<DistributionEndpointsTest>  GetBrokenEndpoints(IList<string> resourceTypes, Uri namedGraph, Uri consumerGroupGraph);
 
         /// <summary>
         /// Get Link History
@@ -459,6 +472,17 @@ namespace COLID.RegistrationService.Repositories.Interface
         /// <param name="resourceGraph">Named graph for current resources</param>
         /// <param name="metadataGraph">Metadata graphs for current resources</param>
         /// <returns>List of Link history of the given resource pidUri</returns>
-        List<LinkHistoryDto> GetLinkHistory(Uri startPidUri, Uri endPidUri, Uri linkHistoryGraph, Uri resourceGraph, ISet<Uri> metadataGraph);
+        IList<LinkHistoryDto> GetLinkHistory(Uri startPidUri, Uri endPidUri, Uri linkHistoryGraph, Uri resourceGraph, ISet<Uri> metadataGraph);
+
+        /// <summary>
+        /// Get Link History
+        /// </summary>
+        /// <param name="searchParam">Parameters: StartDate, EndDate, optional email, linkType</param>        
+        /// <param name="linkHistoryGraph">Link History graph</param>
+        /// <param name="resourceGraph">Named graph for current resources</param>
+        /// <param name="metadataGraph">Metadata graphs for current resources</param>
+        /// <returns>List of Link history of the given resource pidUri</returns>
+        IList<LinkHistoryDto> SearchLinkHistory(LinkHistorySearchParamDto searchParam, Uri linkHistoryGraph, Uri resourceGraph, ISet<Uri> metadataGraph);
+
     }
 }

@@ -35,7 +35,7 @@ namespace COLID.RegistrationService.Services.Validation.Validators.Keys
                     {
                         var validationResultProperty = new ValidationResultProperty(validationFacade.RequestResource.Id,
                             properties.Key, propertyEntity.Id,
-                            string.Format(Common.Constants.Messages.Attachment.NotExists, propertyEntity.Id),
+                            string.Format(Common.Constants.Messages.AttachmentMsg.NotExists, propertyEntity.Id),
                             ValidationResultSeverity.Violation);
 
                         validationFacade.ValidationResults.Add(validationResultProperty);

@@ -25,7 +25,7 @@ namespace COLID.RegistrationService.Services.Interface
         /// Checks and validates the given resources request and creates a new one, in case of success.
         /// </summary>
         /// <param name="resources">the new resource to create</param>
-        Task<List<BulkUploadResult>> ValidateResource(List<ResourceRequestDTO> resources, bool ignoreNonMandatory = false);
+        Task<List<BulkUploadResult>> ValidateResource(IList<ResourceRequestDTO> resources, bool ignoreNonMandatory = false);
 
         /// <summary>
         /// Imports updated data from exported excel template

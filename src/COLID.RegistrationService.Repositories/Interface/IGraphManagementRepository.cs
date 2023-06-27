@@ -21,7 +21,7 @@ namespace COLID.RegistrationService.Repositories.Interface
         /// <summary>
         /// Returns the graph with the given Name in IGraph Format
         /// </summary>
-        /// <param name="graph">Graph name to be deleted</param>
-        IGraph GetGraph(Uri graph);
+        /// <param name="namedGraph">Graph name to be deleted</param>
+        IGraph GetGraph(Uri namedGraph);
     }
 }

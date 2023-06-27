@@ -41,16 +41,16 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         /// <summary>
         /// Get a file, defined by it's filename and the unique guid.
         /// </summary>
-        /// <param name="guid">unique identifier of the file</param>
+        /// <param name="id">unique identifier of the file</param>
         /// <param name="fileName">the filename to use</param>
         /// <returns></returns>
         [HttpGet("attachment")]
         [SwaggerResponse((int)HttpStatusCode.OK, Type = typeof(System.IO.File))]
         [SwaggerResponseExample((int)HttpStatusCode.OK, typeof(AmazonS3FileDownloadDto))]
         [SwaggerResponse((int)HttpStatusCode.InternalServerError)]
-        public async Task<IActionResult> GetAttachment([FromQuery] Guid guid, [FromQuery] string fileName)
+        public async Task<IActionResult> GetAttachment([FromQuery] Guid id, [FromQuery] string fileName)
         {
-            var s3FileDto = await _attachmentService.GetAttachment(guid, fileName);
+            var s3FileDto = await _attachmentService.GetAttachment(id, fileName);
             var file = File(s3FileDto.Stream, _mimetypeOctetStream, fileName);
             return file;
         }
@@ -73,13 +73,13 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         /// <summary>
         /// Delete a file, defined by it's filename and the unique guid.
         /// </summary>
-        /// <param name="guid">unique identifier of the file</param>
+        /// <param name="id">unique identifier of the file</param>
         /// <param name="fileName">the filename to use</param>
         /// <returns></returns>
         [HttpDelete("attachment")]
-        public async Task<IActionResult> DeleteAttachment([FromQuery] Guid guid, [FromQuery] string fileName)
+        public async Task<IActionResult> DeleteAttachment([FromQuery] Guid id, [FromQuery] string fileName)
         {
-            await _attachmentService.DeleteAttachment(guid, fileName);
+            await _attachmentService.DeleteAttachment(id, fileName);
             return NoContent();
         }
     }

@@ -18,7 +18,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V2
     [Route("api/v{version:apiVersion}/reindex")]
     [Produces(MediaTypeNames.Application.Json)]
     //[ApiExplorerSettings(IgnoreApi = true)]
-    [Obsolete]
+    [Obsolete("A new version of this endpoint is available")]
     public class IndexingController : Controller
     {
         private readonly IReindexingService _indexingService;

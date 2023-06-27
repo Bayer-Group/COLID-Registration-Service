@@ -18,7 +18,7 @@ namespace COLID.Graph.Metadata.DataModels.Validation
         public IDictionary<string, string> DistributionEndPoint { get; set; }
         public IList<ValidationResultProperty> Results { get; set; }
         public string TimeTaken { get; set; }
-        public List<IDictionary<string, string>> StateItems { get; set; }
+        public IList<IDictionary<string, string>> StateItems { get; set; }
         public BulkUploadResult()
         {
             Results = new List<ValidationResultProperty>();

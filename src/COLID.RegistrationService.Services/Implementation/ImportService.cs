@@ -69,6 +69,8 @@ namespace COLID.RegistrationService.Services.Implementation
         private readonly string _appDataServiceEndpoint;
         private readonly AmazonWebServicesOptions _awsConfig;
         private readonly IUserInfoService _userInfoService;
+        private readonly IHttpClientFactory _clientFactory;
+        private readonly bool _bypassProxy;
 
         private readonly Func<string, string> _messageBody =
             (url) => string.Format("The import excel file status is available at <a href=\"{0}\">{0}</a href>", url);
@@ -91,7 +93,8 @@ namespace COLID.RegistrationService.Services.Implementation
             IConfiguration configuration,
             ITokenService<ColidAppDataServiceTokenOptions> adsTokenService,
             IOptionsMonitor<AmazonWebServicesOptions> awsOptionsMonitor,
-            IUserInfoService userInfoService)
+            IUserInfoService userInfoService,
+            IHttpClientFactory clientFactory)
         {
             _metadataService = metadataService;
             _resourcePreprocessService = resourcePreprocessService;
@@ -111,6 +114,8 @@ namespace COLID.RegistrationService.Services.Implementation
             _appDataServiceEndpoint = _configuration.GetConnectionString("appDataServiceUrl") + "/api/Messages/sendGenericMessage";
             _awsConfig = awsOptionsMonitor.CurrentValue;
             _userInfoService = userInfoService;
+            _clientFactory = clientFactory;
+            _bypassProxy = _configuration.GetValue<bool>("BypassProxy");
         }
 
         /// <summary>
@@ -118,7 +123,7 @@ namespace COLID.RegistrationService.Services.Implementation
         /// </summary>
         /// <param name="resources"></param>
         /// <returns></returns>
-        public async Task<List<BulkUploadResult>> ValidateResource(List<ResourceRequestDTO> resources, bool ignoreNonMandatory = false)
+        public async Task<List<BulkUploadResult>> ValidateResource(IList<ResourceRequestDTO> resources, bool ignoreNonMandatory = false)
         {
             _logger.LogInformation("ImportService: Received {count} resources. Validation Started...", resources.Count);
             Stopwatch stpWatch = new Stopwatch();
@@ -146,7 +151,7 @@ namespace COLID.RegistrationService.Services.Implementation
                     Uri pidUri = null;
                     try
                     {
-                        if (hasPid != null && ((COLID.Graph.TripleStore.DataModels.Base.Entity)hasPid).Id != string.Empty)
+                        if (hasPid != null && !string.IsNullOrEmpty(((COLID.Graph.TripleStore.DataModels.Base.Entity)hasPid).Id))
                             pidUri = new Uri(((COLID.Graph.TripleStore.DataModels.Base.Entity)hasPid).Id);
                     }
                     catch
@@ -250,7 +255,7 @@ namespace COLID.RegistrationService.Services.Implementation
                                 ActionDone = failed ? "Error" : "Validated",
                                 ErrorMessage = failed ? "Validation Failed while Adding the resource." : string.Empty,
                                 Results = validationResult.Results,
-                                Triples = validationResult.Triples.Replace(ColidEntryLifecycleStatus.Draft, ColidEntryLifecycleStatus.Published),
+                                Triples = validationResult.Triples.Replace(ColidEntryLifecycleStatus.Draft, ColidEntryLifecycleStatus.Published, StringComparison.Ordinal),
                                 InstanceGraph = resInstanceGraph.ToString(),
                                 TimeTaken = stpWatch.ElapsedMilliseconds.ToString(),
                                 pidUri = validationFacade.RequestResource.PidUri == null ? "" : validationFacade.RequestResource.PidUri.ToString(),
@@ -380,7 +385,7 @@ namespace COLID.RegistrationService.Services.Implementation
                                 _resourceRepository.DeleteDraft(validationFacade.RequestResource.PidUri, new Uri(validationFacade.RequestResource.Id), draftInstanceGraph);
 
                                 if (resourcesCTO.HasDraft)
-                                    _identifierService.DeleteAllUnpublishedIdentifiers(resourcesCTO.Draft);
+                                    _identifierService.DeleteAllUnpublishedIdentifiers(resourcesCTO.Draft, resourcesCTO.Versions);
 
                                 if (resourcesCTO.HasPublished)
                                     // Try to delete published and all inbound edges are changed to the new entry.
@@ -494,7 +499,7 @@ namespace COLID.RegistrationService.Services.Implementation
             return totalValidationResult;
         }
 
-        private ResourceProxyDTO ConvertResourceToProxyDto(ResourceRequestDTO resource)
+        private static ResourceProxyDTO ConvertResourceToProxyDto(ResourceRequestDTO resource)
         {
             var hasPid = resource.Properties.GetValueOrNull(Graph.Metadata.Constants.Resource.hasPID, true);
             string pidUri = hasPid != null ? hasPid.Id : "";
@@ -583,7 +588,7 @@ namespace COLID.RegistrationService.Services.Implementation
             return resourceProxyDto;
         }
 
-        private void UpdateStateItemsWithPidUri(ResourceRequestDTO resource, string assetPidUri)
+        private static void UpdateStateItemsWithPidUri(ResourceRequestDTO resource, string assetPidUri)
         {
             foreach (var stateItem in resource.StateItems)
             {
@@ -635,7 +640,7 @@ namespace COLID.RegistrationService.Services.Implementation
 
                     //Validate User email address
                     List<string> emailRowValues = getRowValues(0, doc, technicalInfoRowContainer);
-                    if (emailRowValues[1] == string.Empty)
+                    if (string.IsNullOrEmpty(emailRowValues[1]))
                     {
                         SendNotification(null, "Unable to upload Excel file - No user email mentioned in TechnicalInfo Tab", userEmail);
                         return;
@@ -756,8 +761,8 @@ namespace COLID.RegistrationService.Services.Implementation
                     Sheet techinicalInfoDataSheet = sheets.Elements<Sheet>().Where(s => s.Name == "TechnicalInfo").FirstOrDefault(); //Get data sheet for Technical Info (requested User)
                     Worksheet technicalInfoWorksheet = ((WorksheetPart)workbookPart.GetPartById(techinicalInfoDataSheet.Id)).Worksheet;
                     SheetData technicalInfoRowContainer = (SheetData)technicalInfoWorksheet.GetFirstChild<SheetData>();
-                    userEmail = this.getRowValues(0, doc, technicalInfoRowContainer)[1];
-                    respondToUserEmail = this.getRowValues(2, doc, technicalInfoRowContainer)[1];
+                    userEmail = getRowValues(0, doc, technicalInfoRowContainer)[1];
+                    respondToUserEmail = getRowValues(2, doc, technicalInfoRowContainer)[1];
 
                     Sheet dataSheet = sheets.Elements<Sheet>().Where(s => s.Name == "Data").FirstOrDefault(); //Get data sheet
                     Sheet linkDataSheet = sheets.Elements<Sheet>().Where(s => s.Name == "Links").FirstOrDefault(); //Get data sheet for Links
@@ -773,9 +778,9 @@ namespace COLID.RegistrationService.Services.Implementation
 
 
                     // get the third row of the template(which should include the PID URIs)                             
-                    List<string> uriHeader = this.getRowValues(1, doc, rowContainer);
-                    List<string> pidUriTypes = this.getRowValues(2, doc, rowContainer);
-                    List<string> pidUris = this.getRowValues(3, doc, rowContainer);
+                    List<string> uriHeader = getRowValues(1, doc, rowContainer);
+                    List<string> pidUriTypes = getRowValues(2, doc, rowContainer);
+                    List<string> pidUris = getRowValues(3, doc, rowContainer);
 
 
                     //Collect resources that needs to be created, updated or deleted
@@ -784,7 +789,7 @@ namespace COLID.RegistrationService.Services.Implementation
                     //Loop throug all the Data rows to find rows that needs to be Created, Updated or Deleted                
                     for (int rowCtr = 4; rowCtr < worksheet.GetFirstChild<SheetData>().Descendants<Row>().Count(); rowCtr++)
                     {
-                        List<string> curRowData = this.getRowValues(rowCtr, doc, rowContainer);
+                        List<string> curRowData = getRowValues(rowCtr, doc, rowContainer);
 
                         //Create
                         if (curRowData.ElementAt(1) != null && curRowData.ElementAt(1).ToUpper() == x.ToUpper() && curRowData.ElementAt(ColTypeREDE).ToUpper() == "RE")
@@ -840,7 +845,7 @@ namespace COLID.RegistrationService.Services.Implementation
                     //Loop throug all the Link rows to find Links that needs to be Created, Updated or Deleted                
                     for (int rowCtr = 2; rowCtr < linksWorksheet.GetFirstChild<SheetData>().Descendants<Row>().Count(); rowCtr++)
                     {
-                        List<string> curRowLink = this.getRowValues(rowCtr, doc, linksRowContainer);
+                        List<string> curRowLink = getRowValues(rowCtr, doc, linksRowContainer);
 
                         //Add
                         if (curRowLink.ElementAt(1).ToUpper() == x.ToUpper())
@@ -1058,14 +1063,14 @@ namespace COLID.RegistrationService.Services.Implementation
             catch (System.Exception ex)
             {
                 _logger.LogWarning("ImportService: " + (ex.InnerException == null ? ex.Message : ex.InnerException.Message));
-                if (respondToUserEmail != string.Empty)
+                if (!string.IsNullOrEmpty(respondToUserEmail))
                     SendNotification(null, (ex.InnerException == null ? ex.Message : ex.InnerException.Message), respondToUserEmail);
             }
 
             return inputstream;
         }
 
-        private List<string> getRowValues(int rowNumber, SpreadsheetDocument doc, SheetData rowContainer)
+        private static List<string> getRowValues(int rowNumber, SpreadsheetDocument doc, SheetData rowContainer)
         {
             Row valueRow = rowContainer.Elements<Row>().ElementAt(rowNumber);
 
@@ -1136,7 +1141,7 @@ namespace COLID.RegistrationService.Services.Implementation
                         curResource.Properties.Add(pidUris.ElementAt(colCtr), new List<dynamic> {
                                 new COLID.Graph.TripleStore.DataModels.Base.Entity(rowData.ElementAt(ColBaseUri), new Dictionary<string,List<dynamic>>() {
                                     { Graph.Metadata.Constants.RDF.Type, new List<dynamic> { Graph.Metadata.Constants.Identifier.Type } },
-                                    { Graph.Metadata.Constants.Identifier.HasUriTemplate,  new List<dynamic> {rowData.ElementAt(ColBaseUriTemplate) == string.Empty? rowData.ElementAt(ColPidUriTemplate) : rowData.ElementAt(ColBaseUriTemplate) } }
+                                    { Graph.Metadata.Constants.Identifier.HasUriTemplate,  new List<dynamic> {string.IsNullOrEmpty(rowData.ElementAt(ColBaseUriTemplate)) ? rowData.ElementAt(ColPidUriTemplate) : rowData.ElementAt(ColBaseUriTemplate) } }
                                 })
                             });
                     }
@@ -1149,7 +1154,7 @@ namespace COLID.RegistrationService.Services.Implementation
                         {
                             if (int.TryParse(endpoints[ctr], out int result))
                             {
-                                List<string> curcurDistEndPointRowData = this.getRowValues(result + 3, doc, rowContainer);
+                                List<string> curcurDistEndPointRowData = getRowValues(result + 3, doc, rowContainer);
                                 var curDistEndPoint = ConvertToResource(pidUris, pidUriTypes, curcurDistEndPointRowData, ignoreProperties, doc, rowContainer, userEmail);
                                 curDistributionList.Add(new COLID.Graph.TripleStore.DataModels.Base.Entity("", curDistEndPoint.Properties));
                             }
@@ -1166,13 +1171,13 @@ namespace COLID.RegistrationService.Services.Implementation
                     }
                     else
                     {
-                        if (pidUriTypes.ElementAt(colCtr).Contains("comma separated"))
+                        if (pidUriTypes.ElementAt(colCtr).Contains("comma separated", StringComparison.Ordinal))
                         {
                             string[] values = rowData.ElementAt(colCtr).Split(",");
                             List<dynamic> curValues = new List<dynamic>();
                             for (int ctr = 0; ctr < values.Count(); ctr++)
                             {
-                                if(values.ElementAt(ctr) != null || values.ElementAt(ctr) != string.Empty)
+                                if(!string.IsNullOrEmpty(values.ElementAt(ctr)))
                                     curValues.Add(values.ElementAt(ctr).Trim());
                             }
                             curResource.Properties.Add(pidUris.ElementAt(colCtr), curValues);
@@ -1217,7 +1222,7 @@ namespace COLID.RegistrationService.Services.Implementation
 
         ///<summary>returns an empty cell when a blank cell is encountered
         ///</summary>
-        private IEnumerable<Cell> GetRowCells(Row row)
+        private static IEnumerable<Cell> GetRowCells(Row row)
         {
             int currentCount = 0;
 
@@ -1243,7 +1248,7 @@ namespace COLID.RegistrationService.Services.Implementation
         /// </summary>
         /// <param name="cellReference">Address of the cell (ie. B2)</param>
         /// <returns>Column Name (ie. B)</returns>
-        private string GetColumnName(string cellReference)
+        private static string GetColumnName(string cellReference)
         {
             // Match the column name portion of the cell name.
             var regex = new System.Text.RegularExpressions.Regex("[A-Za-z]+");
@@ -1260,10 +1265,10 @@ namespace COLID.RegistrationService.Services.Implementation
         /// <returns>Zero based index if the conversion was successful</returns>
         /// <exception cref="ArgumentException">thrown if the given string
         /// contains characters other than uppercase letters</exception>
-        private int ConvertColumnNameToNumber(string columnName)
+        private static int ConvertColumnNameToNumber(string columnName)
         {
             var alpha = new System.Text.RegularExpressions.Regex("^[A-Z]+$");
-            if (!alpha.IsMatch(columnName)) throw new ArgumentException();
+            if (!alpha.IsMatch(columnName)) throw new ArgumentException("Does not match expression " + alpha.ToString());
 
             char[] colLetters = columnName.ToCharArray();
             Array.Reverse(colLetters);
@@ -1286,7 +1291,7 @@ namespace COLID.RegistrationService.Services.Implementation
         /// <param name="uploadInfoDto"></param>
         private async void SendNotification(AmazonS3FileUploadInfoDto uploadInfoDto, string errorMsg, string userEmail)
         {
-            HttpClient client = new HttpClient();
+            using HttpClient client = (_bypassProxy ? _clientFactory.CreateClient("NoProxy") : _clientFactory.CreateClient());
             try
             {
                 var fileLink = this._s3AccessLinkPrefix + (uploadInfoDto == null ? "" : uploadInfoDto.FileKey);
@@ -1294,13 +1299,13 @@ namespace COLID.RegistrationService.Services.Implementation
                 var message = new MessageUserDto()
                 {
                     Subject = "Excel import status",
-                    Body = errorMsg == string.Empty ? _messageBody(fileLink) : errorMsg,
+                    Body = (string.IsNullOrEmpty(errorMsg) ? _messageBody(fileLink) : errorMsg),
                     UserEmail = userEmail
                 };
 
                 // Convert Message to JSON-Object
                 string jsonobject = JsonConvert.SerializeObject(message);
-                StringContent content = new StringContent(jsonobject, Encoding.UTF8, "application/json");
+                using StringContent content = new StringContent(jsonobject, Encoding.UTF8, "application/json");
 
                 //Set AAD token
                 var accessToken = await _adsTokenService.GetAccessTokenForWebApiAsync();

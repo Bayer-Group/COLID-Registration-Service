@@ -6,7 +6,7 @@ namespace COLID.RegistrationService.Common.DataModels.Resources
 {
     public class ResourceRevisionsDTO
     {
-        public List<ResourceRevision> Revisions { get; set; }
+        public IList<ResourceRevision> Revisions { get; set; }
     }
     public class ResourceRevision
     {

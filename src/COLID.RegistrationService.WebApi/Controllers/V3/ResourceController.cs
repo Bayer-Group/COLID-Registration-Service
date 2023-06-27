@@ -34,21 +34,21 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         private readonly IResourceLinkingService _resourceLinkingService;
         //private readonly IHistoricResourceService _historicResourceService;
         private readonly IResourceComparisonService _resourceComparisonService;
-
+        //private readonly IEndpointTestService _endpointTestService;
 
         /// <summary>
         /// API endpoint for resources.
         /// </summary>
         /// <param name="resourceService">The service for resources</param>
-        /// <param name="resourceLinkingService">The service for linking two resources as versions together</param>
-        /// <param name="historicResourceService">The service for historic resources</param>
+        /// <param name="resourceLinkingService">The service for linking two resources as versions together</param>        
         /// <param name="resourceComparisonService">The service for comparison of resources</param>
         /// <param name="attachmentService">The service to add attachments to resources</param>
         public ResourceController(IResourceService resourceService,
             IResourceLinkingService resourceLinkingService,
             //IHistoricResourceService historicResourceService,
             IResourceComparisonService resourceComparisonService,
-            IAttachmentService attachmentService)
+            IAttachmentService attachmentService
+            )
         {
             _resourceService = resourceService;
             _resourceLinkingService = resourceLinkingService;
@@ -134,7 +134,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         public IActionResult GetResourceDueForReview([FromQuery, NotRequired] Uri consumerGroup, DateTime endDate)
         {
             var result = _resourceService.GetDueResources(consumerGroup, endDate);
-
+            //TODO Adjust the SPARQL query to return the also brokenLinks property
             return Ok(result);
         }
 
@@ -177,7 +177,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
 
 
         /// <summary>
-        //Adds a new semantic link to a specific resource
+        /// Adds a new semantic link to a specific resource
         /// </summary>
         /// <returns>The resource containing the new links</returns>
         /// <response code="200">Resource containing new created links</response>
@@ -196,7 +196,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         }
 
         /// <summary>
-        //Remove a new semantic link from a specific resource
+        /// Remove a new semantic link from a specific resource
         /// </summary>
         /// <returns>The resource containing the new links</returns>
         /// <response code="200">Resource containing new created links</response>
@@ -215,7 +215,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         }
 
         /// <summary>
-        //Gets the revision history for a specific resource
+        /// Gets the revision history for a specific resource
         /// </summary>
         /// <returns>The resource revision history containing additionals and removals</returns>
         /// <response code="200">Resource containing new created links</response>
@@ -305,6 +305,11 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
             return Ok(result);
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="resource"></param>
+        /// <returns></returns>
         [HttpPost]
         [Route("batch")]
         [ValidateActionParameters]
@@ -355,6 +360,12 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
             return Ok(result);
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="pidUri"></param>
+        /// <param name="resource"></param>
+        /// <returns></returns>
         [HttpPut]
         [Route("batch")]
         [ValidateActionParameters]
@@ -411,6 +422,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         ///   <br><b>Note:</b> To physically delete a resource from COLID Admin rights are required!</br>
         /// </remarks>
         /// <param name="pidUri">The pidUri of the PID entry to delete</param>
+        /// <param name="requester"> email id of the requester</param>"
         /// <returns>Returns a status message according to the result</returns>
         /// <response code="200">Returns status code only</response>
         /// <response code="400">If the given pidUri is null or empty, or the COLID entry could not be deleted (e.g. because it was not present in COLID)</response>
@@ -486,7 +498,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> MarkDeleteResourceListAsync([FromQuery] string requester, [FromBody] List<Uri> pidUris)
+        public async Task<IActionResult> MarkDeleteResourceListAsync([FromQuery] string requester, [FromBody] IList<Uri> pidUris)
         {
             //List<Uri> pidUris = null;
             var result = await _resourceService.MarkResourceAsDeletedListAsync(pidUris, requester);
@@ -617,7 +629,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
-        public IActionResult UnmarkDeleteResourcesAsync([FromBody] List<Uri> pidUris)
+        public IActionResult UnmarkDeleteResourcesAsync([FromBody] IList<Uri> pidUris)
         {
             var result = _resourceService.UnmarkResourcesAsDeleted(pidUris);
 
@@ -631,6 +643,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         ///   <br><b>Note:</b> To physically delete a resource from COLID Admin rights are required!</br>
         /// </remarks>
         /// <param name="pidUris">The List of pidUris of related PID entries to delete</param>
+        /// <param name="requester">email of person requesting the operation</param>
         /// <returns>Returns a status message according to the result</returns>
         /// <response code="200">Returns status code only</response>
         /// <response code="400">If the given pidUris are null or empty</response>
@@ -642,7 +655,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> DeleteMarkedForDeletionResourcesAsync([FromQuery] string requester, [FromBody] List<Uri> pidUris)
+        public async Task<IActionResult> DeleteMarkedForDeletionResourcesAsync([FromQuery] string requester, [FromBody] IList<Uri> pidUris)
         {
             var result = await _resourceService.DeleteMarkedForDeletionResources(pidUris, requester);
 
@@ -662,17 +675,16 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         [ProducesResponseType(typeof(IList<Resource>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(IList<Resource>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(IList<Resource>), StatusCodes.Status500InternalServerError)]
-        public IActionResult GetResourceAndLinkForGraph([FromBody] List<Uri> pidUris)
+        public IActionResult GetResourceAndLinkForGraph([FromBody] IList<Uri> pidUris)
         {
             var result = _resourceLinkingService.GetLinksOfPublishedResource(pidUris);
             return Ok(result);
         }
 
         /// <summary>
-        ///Get Tabele and column detail.
-        /// </summary>
-        /// 
-        /// <param name="pidUris">The pidUri of related PID entries </param>
+        /// Get Table and column detail.
+        /// </summary>        
+        /// <param name="pidUri">The pidUri of related PID entries </param>
         /// <returns>Return list of table and colum</returns>
         /// <response code="200">Returns status code only</response>
         /// <response code="400">If the given pidUris are null or empty</response>
@@ -691,10 +703,31 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         }
 
         /// <summary>
+        /// Get Table and column detail against multiple piduris.
+        /// </summary>        
+        /// <param name="pidUris">List of pidUri </param>
+        /// <returns>Return list of table and colum against each piduri</returns>
+        /// <response code="200">Returns status code only</response>
+        /// <response code="400">If the given pidUris are null or empty</response>
+        /// <response code="500">If an unexpected error occurs</response>
+        [MapToApiVersion(Constants.API.Version.V3)]
+        [HttpPost]
+        [ValidateActionParameters]
+        [Route("linkedTableAndColumnResourceByPidUris")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetTableAndColumnResourceByPidUris([FromBody] IList<Uri> pidUris)
+        {
+            var result = await _resourceService.GetTableAndColumnByPidUris(pidUris);
+
+            return Ok(result);
+        }
+
+        /// <summary>
         ///Gets Resource Type Hierarchy.
         /// </summary>
         /// 
-        /// <param name="resourceType">The base concept class for resource </param>
+        /// <param name="resourceTypes">The base concept class for resource </param>
         /// <returns>Return resources hierarchy of the base resource</returns>
         /// <response code="200">Returns status code only</response>
         /// <response code="400">If the given resource type is null or empty</response>
@@ -705,7 +738,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         [Route("getResourceHierarchy")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(List<string>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> GetResourceHierarchy([FromBody] List<string> resourceTypes)
+        public async Task<IActionResult> GetResourceHierarchy([FromBody] IList<string> resourceTypes)
         {
             var result = await _resourceService.GetResourceHierarchy(resourceTypes);
 
@@ -764,8 +797,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         }
 
         /// <summary>
-        /// Get Link History
-        /// Note: Only deleted links are considered as history.
+        /// Get Link History        
         /// </summary>
         /// <param name="startPidUri">The pid uri of the start resource.</param>   
         /// <param name="endPidUri">Optional pid uri of the end resource.</param>  
@@ -779,6 +811,23 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         public IActionResult GetLinkHistory([FromQuery] Uri startPidUri, [FromQuery, NotRequired] Uri endPidUri)
         {
             var linkHistory = _resourceService.GetLinkHistory(startPidUri, endPidUri);
+            return Ok(linkHistory);
+        }
+
+        /// <summary>
+        /// Search Link History        
+        /// </summary>
+        /// <param name="searchParam">Parameters: StartDate, EndDate, Optional: email, linkType  OrderByColumn: CreatedDate, CreatedBy, DeletionDate, DeletedBy and Status </param>             
+        /// <returns>List of link history</returns>
+        /// <response code="200">Returns list of link history</response>
+        /// <response code="404">If link history does not exist</response>
+        [HttpPost]
+        [Route("searchLinkHistory")]
+        [ValidateActionParameters]
+        [ProducesResponseType(typeof(List<LinkHistoryDto>), StatusCodes.Status200OK)]
+        public IActionResult SearchLinkHistory([FromBody] LinkHistorySearchParamDto searchParam)
+        {
+            var linkHistory = _resourceService.SearchLinkHistory(searchParam);
             return Ok(linkHistory);
         }
     }

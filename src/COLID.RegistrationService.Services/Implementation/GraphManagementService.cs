@@ -79,7 +79,7 @@ namespace COLID.RegistrationService.Services.Implementation
         {
             if (graph == null || !graph.IsAbsoluteUri)
             {
-                throw new ArgumentException(Common.Constants.Messages.Graph.InvalidFormat, nameof(graph));
+                throw new ArgumentException(Common.Constants.Messages.GraphMsg.InvalidFormat, nameof(graph));
             }
 
             var graphs = GetGraphs();
@@ -87,19 +87,19 @@ namespace COLID.RegistrationService.Services.Implementation
 
             if (!graphExists)
             {
-                throw new GraphNotFoundException(Common.Constants.Messages.Graph.NotExists, graph);
+                throw new GraphNotFoundException(Common.Constants.Messages.GraphMsg.NotExists, graph);
             }
 
             if (graphDto.Status != Common.Enums.Graph.GraphStatus.Unreferenced)
             {
-                throw new ReferenceException(Common.Constants.Messages.Graph.Referenced, graph.OriginalString);
+                throw new ReferenceException(Common.Constants.Messages.GraphMsg.Referenced, graph.OriginalString);
             }
 
             _graphManagementRepo.DeleteGraph(graph);
             _auditTrailLogService.AuditTrail($"Graph in database with uri \"{graph}\" deleted.");
         }
 
-        private bool IsActiveGraph(string graph, MetadataGraphConfigurationOverviewDTO currentGraphConfig)
+        private static bool IsActiveGraph(string graph, MetadataGraphConfigurationOverviewDTO currentGraphConfig)
         {
             var isInCurrentConfig = null != currentGraphConfig && currentGraphConfig.Graphs.Contains(graph);
             var isMetadataConfigGraph = graph == COLID.Graph.Metadata.Constants.MetadataGraphConfiguration.Type;
@@ -124,24 +124,25 @@ namespace COLID.RegistrationService.Services.Implementation
             return loaderResponse;
         }
 
-        public async Task<Stream> DownloadGraph(Uri graphName)
+        public byte[] DownloadGraph(Uri graphName)
         {
             Guard.IsValidUri(graphName);
 
             var result = _graphManagementRepo.GetGraph(graphName);
-            var stringAsStream = new MemoryStream();
-            var StreamWriter = new StreamWriter(stringAsStream);
-            CompressingTurtleWriter tw = new CompressingTurtleWriter();
-            tw.Save(result, StreamWriter, true);
-            StreamWriter.Flush();
-            stringAsStream.Position = 0;
+            using (var memStream = new MemoryStream())
+            using (var streamWriter = new StreamWriter(memStream))
+            {
+                CompressingTurtleWriter tw = new CompressingTurtleWriter();
+                tw.Save(result, streamWriter, true);
+                streamWriter.Flush();
 
-            return stringAsStream;
+                return memStream.ToArray();
+            }
         }
 
         private static void CheckFileTypeForTtl(IFormFile turtleFile)
         {
-            if (Path.GetExtension(turtleFile.FileName) != ".ttl" || !MediaTypeNames.Application.Octet.Equals(turtleFile.ContentType))
+            if (Path.GetExtension(turtleFile.FileName) != ".ttl" || !MediaTypeNames.Application.Octet.Equals(turtleFile.ContentType, StringComparison.Ordinal))
             {
                 throw new BusinessException("The given file/content type is not valid, only .ttl-files are allowed.");
             }

@@ -64,7 +64,7 @@ namespace COLID.RegistrationService.Services.Implementation
             return retentionScheduleResponse;
         }
 
-        private List<Policy> mapPolicyRules(List<IronMountainRecordClassRules> rules)
+        private static List<Policy> mapPolicyRules(List<IronMountainRecordClassRules> rules)
         {
             List<Policy> policiesList = new List<Policy>();
             foreach (var rule in rules ?? Enumerable.Empty<IronMountainRecordClassRules>())
@@ -86,14 +86,14 @@ namespace COLID.RegistrationService.Services.Implementation
         }
 
 
-        private List<RetentionClassPolicies> mapRecordClasses(IronMountainRecordClass recordClass, List<RetentionClassPolicies> retentionClassPolicies)
+        private static List<RetentionClassPolicies> mapRecordClasses(IronMountainRecordClass recordClass, List<RetentionClassPolicies> retentionClassPolicies)
         {
             RetentionClassPolicies retentionClass = new RetentionClassPolicies();
 
             retentionClass.classId = recordClass.recordClassId;
             retentionClass.className = recordClass.recordClassName;
             retentionClass.classDescription = recordClass.recordClassDescription;
-            retentionClass.policies = mapPolicyRules(recordClass.rules);
+            retentionClass.policies = mapPolicyRules(recordClass.rules.ToList());
             retentionClassPolicies.Add(retentionClass);
             if (recordClass.children != null && recordClass.children.Count > 0)
             {
@@ -103,7 +103,7 @@ namespace COLID.RegistrationService.Services.Implementation
                     retentionClassChild.classId = child.recordClassId;
                     retentionClassChild.className = child.recordClassName;
                     retentionClassChild.classDescription = child.recordClassDescription;
-                    retentionClassChild.policies = mapPolicyRules(child.rules);
+                    retentionClassChild.policies = mapPolicyRules(child.rules.ToList());
                     retentionClassPolicies.Add(retentionClassChild); 
                 }
             }

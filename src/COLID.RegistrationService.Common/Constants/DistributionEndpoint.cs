@@ -14,5 +14,14 @@
             public static readonly string HttpServiceUrl = Settings.GetHttpServiceUrl();
             public static readonly string MaintenancePoint = HttpServiceUrl + "kos/19014/MaintenancePoint";
         }
+
+        public static class DistributionEndpointsTest
+        {
+            public static readonly string ServiceUrl = Settings.GetServiceUrl();
+            public static readonly string EndpointLifecycleStatus = ServiceUrl + "kos/19050/hasEndpointURLStatus";
+            public static readonly string Broken = "Broken";
+            public static readonly string Repaired = "Repaired";
+        }
+
     }
 }

@@ -87,7 +87,7 @@ namespace COLID.StatisticsLog.Services.PerformanceTracking
             };
         }
 
-        private IEnumerable<LogAttribute> GetLogAttributes(ActionExecutingContext context)
+        private static IEnumerable<LogAttribute> GetLogAttributes(ActionExecutingContext context)
         {
             var logAttributes = new List<LogAttribute>();
             foreach (var item in context.ActionDescriptor.FilterDescriptors)

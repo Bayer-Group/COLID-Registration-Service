@@ -27,7 +27,7 @@ namespace COLID.Identity.Extensions
         /// <returns></returns>
         public static async Task<HttpResponseMessage> SendRequestWithBearerTokenAsync(this HttpClient httpClient, HttpMethod method, string path, object requestBody, string accessToken, CancellationToken ct, JsonSerializerSettings serializerSettings = null)
         {
-            var request = createHttpRequest(method, path, requestBody, accessToken, ref serializerSettings);
+            using var request = createHttpRequest(method, path, requestBody, accessToken, ref serializerSettings);
 
             var response = await httpClient.SendAsync(request, ct);
             return response;
@@ -49,7 +49,7 @@ namespace COLID.Identity.Extensions
         /// <returns></returns>
         public static async Task<HttpResponseMessage> SendRequestWithOptionsAsync(this HttpClient httpClient, HttpMethod method, string path, object requestBody, string accessToken, CancellationToken ct, CorrelationContext correlationContext, JsonSerializerSettings serializerSettings = null)
         {
-            var request = createHttpRequest(method, path, requestBody, accessToken, ref serializerSettings);
+            using var request = createHttpRequest(method, path, requestBody, accessToken, ref serializerSettings);
 
             if (correlationContext != null && !request.Headers.Contains(correlationContext.Header))
             {

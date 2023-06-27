@@ -30,13 +30,13 @@ namespace COLID.RegistrationService.Services.Validation.Validators.Datatypes
                 }
                 catch (FormatException)
                 {
-                    validationFacade.ValidationResults.Add(new ValidationResultProperty(validationFacade.RequestResource.Id, property.Key, value, Common.Constants.Messages.Datetime.InvalidFormat, ValidationResultSeverity.Violation));
+                    validationFacade.ValidationResults.Add(new ValidationResultProperty(validationFacade.RequestResource.Id, property.Key, value, Common.Constants.Messages.DatetimeMsg.InvalidFormat, ValidationResultSeverity.Violation));
                     return value;
                 }
             }).ToList();
         }
 
-        private bool ValueIsNullOrEmptyString(dynamic value)
+        private static bool ValueIsNullOrEmptyString(dynamic value)
         {
             return value is string && string.IsNullOrWhiteSpace(value);
         }

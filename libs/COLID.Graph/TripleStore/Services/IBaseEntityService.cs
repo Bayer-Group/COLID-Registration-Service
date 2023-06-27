@@ -15,7 +15,9 @@ namespace COLID.Graph.TripleStore.Services
     /// <typeparam name="TEntityResult">the entity result class</typeparam>
     /// <typeparam name="TEntityWriteResult">the entity write result class</typeparam>
     /// <typeparam name="TRepository">the repository class</typeparam>
+#pragma warning disable CA1005 // Avoid excessive parameters on generic types
     public interface IBaseEntityService<TEntity, TEntityRequest, TEntityResult, TEntityWriteResult, TRepository>
+#pragma warning restore CA1005 // Avoid excessive parameters on generic types
         where TEntity : Entity, new()
         where TEntityRequest : BaseEntityRequestDTO
         where TEntityResult : BaseEntityResultDTO

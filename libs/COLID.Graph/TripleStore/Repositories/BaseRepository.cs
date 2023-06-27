@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using COLID.Common.Extensions;
@@ -189,7 +189,7 @@ namespace COLID.Graph.TripleStore.Repositories
             return propertyList;
         }
 
-        private bool LinkTypeMatches(MetadataProperty metadata, string predicate)
+        private static bool LinkTypeMatches(MetadataProperty metadata, string predicate)
         {
             if (predicate == Metadata.Constants.Resource.HasLaterVersion)
             {
@@ -201,7 +201,7 @@ namespace COLID.Graph.TripleStore.Repositories
             return group != null && group.Key == Metadata.Constants.Resource.Groups.LinkTypes;
         }
 
-        private bool ReferenceEdgeMatches(string predicate)
+        private static bool ReferenceEdgeMatches(string predicate)
         {
             var referenceEdge = new List<string>() {
                 Metadata.Constants.RDF.Type,
@@ -213,12 +213,12 @@ namespace COLID.Graph.TripleStore.Repositories
             return referenceEdge.Contains(predicate);
         }
 
-        private bool NodekindIRIMatches(MetadataProperty metadata, string propertyValue)
+        private static bool NodekindIRIMatches(MetadataProperty metadata, string propertyValue)
         {
             return metadata?.Properties.GetValueOrNull(Metadata.Constants.Shacl.NodeKind, true) == Metadata.Constants.Shacl.NodeKinds.IRI && Uri.IsWellFormedUriString(propertyValue, UriKind.Absolute);
         }
 
-        private bool NodekindLiteralMatches(MetadataProperty metadata, string propertyValue)
+        private static bool NodekindLiteralMatches(MetadataProperty metadata, string propertyValue)
         {
             return metadata?.Properties?.GetValueOrNull(Metadata.Constants.Shacl.NodeKind, true) == Metadata.Constants.Shacl.NodeKinds.Literal && !string.IsNullOrEmpty(metadata.Properties.GetValueOrNull(Metadata.Constants.Shacl.Datatype, true));
         }
@@ -232,7 +232,7 @@ namespace COLID.Graph.TripleStore.Repositories
         /// <param name="insertGraph">Graph to insert the new data into</param>
         /// <param name="queryGraphs">List of graphs to search data</param>
         /// <returns>Insert string for linked resources in the given insert graph</returns>
-        private string GenerateLinkTypeInsertQuery(string id, string predicate, string linkedPidUri, Uri namedGraph)
+        private static string GenerateLinkTypeInsertQuery(string id, string predicate, string linkedPidUri, Uri namedGraph)
         {
             Guard.IsValidUri(namedGraph);
 
@@ -243,7 +243,7 @@ namespace COLID.Graph.TripleStore.Repositories
                 @"
                 INSERT DATA {
                     GRAPH @insertGraph { @subject @predicate @linkedPidUri. }
-                }";
+                };";
             }
             else
             {
@@ -273,7 +273,7 @@ namespace COLID.Graph.TripleStore.Repositories
         /// <param name="predicate">Predicate of the link type</param>
         /// <param name="linkedPidUri">PID URI of the resource to link to</param>
         /// <returns>Insert string for linked resources in the default graph</returns>
-        private string GenerateLinkTypeInsertQuery(string id, string predicate, string linkedPidUri)
+        private static string GenerateLinkTypeInsertQuery(string id, string predicate, string linkedPidUri)
         {
             var parameterizedString = new SparqlParameterizedString();
 
@@ -347,7 +347,7 @@ namespace COLID.Graph.TripleStore.Repositories
             return parameterizedString;
         }
 
-        private SparqlParameterizedString GenerateGetAllQuery(IList<string> types, ISet<Uri> namedGraphs, EntitySearch entitySearch = null)
+        private static SparqlParameterizedString GenerateGetAllQuery(IList<string> types, ISet<Uri> namedGraphs, EntitySearch entitySearch = null)
         {
             if (types.IsNullOrEmpty())
             {
@@ -433,7 +433,7 @@ namespace COLID.Graph.TripleStore.Repositories
                 var subGroupedResults = result.GroupBy(res => res.GetNodeValuesFromSparqlResult("predicate").Value);
                 var newEntity = new T
                 {
-                    Id = id == string.Empty ? result.Key : id,
+                    Id = string.IsNullOrEmpty(id) ? result.Key : id,
                     Properties = subGroupedResults.ToDictionary(x => x.Key, x => GetResultListBySupportedLanguage(x).ToList<dynamic>())
                 };
 
@@ -471,7 +471,7 @@ namespace COLID.Graph.TripleStore.Repositories
         /// </summary>
         /// <param name="res">The SPARQL result.</param>
         /// <returns>The string based entitiy property.</returns>
-        private SparqlResponseProperty GetEntityPropertyFromSparqlResult(SparqlResult res)
+        private static SparqlResponseProperty GetEntityPropertyFromSparqlResult(SparqlResult res)
         {
             return res.GetNodeValuesFromSparqlResult("object");
         }

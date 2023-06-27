@@ -34,7 +34,7 @@ namespace COLID.Maintenance.Filters
             }
         }
 
-        private bool ShallSkip(ActionExecutingContext context)
+        private static bool ShallSkip(ActionExecutingContext context)
         {
             return context.ActionDescriptor.FilterDescriptors.Any(x => x.Filter is AllowMaintenanceAttribute);
         }

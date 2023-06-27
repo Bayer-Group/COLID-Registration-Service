@@ -72,7 +72,7 @@ namespace COLID.Exception
         /// </summary>
         /// <param name="exception">The exception to check</param>
         /// <returns>True, if this exceptions is of the</returns>
-        private bool IsBusinessException(System.Exception exception)
+        private static bool IsBusinessException(System.Exception exception)
         {
             return exception is ArgumentException || exception is FormatException || exception is JsonReaderException ||
                    exception is InvalidCastException  || exception is FileNotFoundException;

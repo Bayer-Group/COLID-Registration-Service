@@ -25,9 +25,13 @@ using System.Threading;
 
 namespace COLID.AWS.Implementation
 {
+#pragma warning disable CA1063 // Implement IDisposable Correctly
     public class AmazonDynamoDbService : IAmazonDynamoDB
+#pragma warning restore CA1063 // Implement IDisposable Correctly
     {
+#pragma warning disable CA1065 // Do not raise exceptions in unexpected locations
         public IDynamoDBv2PaginatorFactory Paginators => throw new NotImplementedException();
+#pragma warning restore CA1065 // Do not raise exceptions in unexpected locations
         private readonly AmazonWebServicesOptions _awsConfig;
         private readonly ILogger<AmazonS3Service> _logger;
         public AmazonDynamoDbService(IOptionsMonitor<AmazonWebServicesOptions> awsConfig, ILogger<AmazonS3Service> logger)
@@ -55,7 +59,7 @@ namespace COLID.AWS.Implementation
                 if (!string.IsNullOrEmpty(uri))
                 {
                     IWebProxy webProxy = System.Net.WebRequest.GetSystemWebProxy();
-                    var ecsTaskCredentials = new ECSTaskCredentials(webProxy);
+                    using var ecsTaskCredentials = new ECSTaskCredentials(webProxy);
                     var credentials = ecsTaskCredentials.GetCredentials();
 
                     return new AmazonWebServicesSecurityCredentials()
@@ -79,7 +83,9 @@ namespace COLID.AWS.Implementation
             };
         }
 
+#pragma warning disable CA1065 // Do not raise exceptions in unexpected locations
         public IClientConfig Config => throw new NotImplementedException();
+#pragma warning restore CA1065 // Do not raise exceptions in unexpected locations
 
         public Task<BatchExecuteStatementResponse> BatchExecuteStatementAsync(BatchExecuteStatementRequest request, CancellationToken cancellationToken = default)
         {
@@ -313,7 +319,11 @@ namespace COLID.AWS.Implementation
             throw new NotImplementedException();
         }
 
+#pragma warning disable CA1063 // Implement IDisposable Correctly
+#pragma warning disable CA1816 // Dispose methods should call SuppressFinalize
         public void Dispose()
+#pragma warning restore CA1816 // Dispose methods should call SuppressFinalize
+#pragma warning restore CA1063 // Implement IDisposable Correctly
         {
             try
             {
@@ -324,7 +334,9 @@ namespace COLID.AWS.Implementation
 
             catch (AmazonDynamoDBException ex)
             {
+#pragma warning disable CA1065 // Do not raise exceptions in unexpected locations
                 throw ex;
+#pragma warning restore CA1065 // Do not raise exceptions in unexpected locations
             }
         }
 

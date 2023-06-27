@@ -1,4 +1,6 @@
-﻿namespace COLID.RegistrationService.Services.Implementation.Comparison
+﻿using System;
+
+namespace COLID.RegistrationService.Services.Implementation.Comparison
 {
     /// <summary>
     /// Provides different comparison methods for various data types.
@@ -26,7 +28,7 @@
         /// <returns>The similarity between two incoming literals, either 1 or 0.</returns>
         public static double CalculateBooleanSimilarity(string firstLiteral, string secondLiteral)
         {
-            return firstLiteral.Equals(secondLiteral) ? 1 : 0;
+            return firstLiteral.Equals(secondLiteral, StringComparison.Ordinal) ? 1 : 0;
         }
     }
 }

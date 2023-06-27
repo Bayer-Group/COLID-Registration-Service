@@ -46,7 +46,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         [SwaggerResponse((int)HttpStatusCode.NoContent)]
         [SwaggerResponse((int)HttpStatusCode.InternalServerError)]
         [Route("validate")]
-        public async Task<IActionResult> Validate([FromBody] List<ResourceRequestDTO> resources, bool ignoreNonMandatory = false)
+        public async Task<IActionResult> Validate([FromBody] IList<ResourceRequestDTO> resources, bool ignoreNonMandatory = false)
         {
             var result = await _importService.ValidateResource(resources, ignoreNonMandatory);
             return Ok(result);

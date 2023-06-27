@@ -13,6 +13,7 @@ using COLID.Graph.Metadata.DataModels.MetadataGraphConfiguration;
 using COLID.Graph.TripleStore.Extensions;
 using COLID.Graph.TripleStore.DataModels.Base;
 using COLID.Graph.TripleStore.DataModels.Sparql;
+using COLID.Graph.Metadata.DataModels.FilterGroup;
 
 namespace COLID.Graph.Metadata.Repositories
 {
@@ -383,9 +384,8 @@ namespace COLID.Graph.Metadata.Repositories
                         var group = new MetadataPropertyGroup();
                         group.Key = GetDataFromNode(res, "group")?.Value;
                         group.Label = GetDataFromNode(res, "grouplabel")?.Value;
-                        decimal.TryParse(GetDataFromNode(res, "groupOrder")?.Value, out decimal order);
-
-                        group.Order = order;
+                        if (decimal.TryParse(GetDataFromNode(res, "groupOrder")?.Value, out decimal order))
+                            group.Order = order;
                         group.EditDescription = GetDataFromNode(res, "editGroupDescription")?.Value;
                         group.ViewDescription = GetDataFromNode(res, "viewGroupDescription")?.Value;
                         metadataProperty.Properties.AddOrUpdate(Constants.Shacl.Group, group);
@@ -397,7 +397,7 @@ namespace COLID.Graph.Metadata.Repositories
             return metadataProperty;
         }
 
-        private SparqlResponseProperty GetDataFromNode(SparqlResult sparqlResult, string key)
+        private static SparqlResponseProperty GetDataFromNode(SparqlResult sparqlResult, string key)
         {
             return sparqlResult.GetNodeValuesFromSparqlResult(key);
         }
@@ -441,7 +441,7 @@ namespace COLID.Graph.Metadata.Repositories
             return dict;
         }
 
-        private string GetMetadataPropertyKeyFromSparqlResults(IList<SparqlResult> sparqlResults)
+        private static string GetMetadataPropertyKeyFromSparqlResults(IList<SparqlResult> sparqlResults)
         {
             var sparqlResult = sparqlResults.FirstOrDefault(p => GetDataFromNode(p, "shaclProperty")?.Value == Constants.Shacl.Path);
             var key = GetDataFromNode(sparqlResult, "shaclValue")?.Value;
@@ -506,7 +506,7 @@ namespace COLID.Graph.Metadata.Repositories
         /// <summary>
         /// IMPORTANT: It's neccesary to identify the colums with "id", "predicate" and "object" when you query the graph, so the fields can be transformed properly.
         /// </summary>
-        private IList<T> TransformQueryResults<T>(SparqlResultSet results, string id = "") where T : Entity, new()
+        private static IList<T> TransformQueryResults<T>(SparqlResultSet results, string id = "") where T : Entity, new()
         {
             if (results.IsEmpty)
             {
@@ -520,7 +520,7 @@ namespace COLID.Graph.Metadata.Repositories
                 var subGroupedResults = result.GroupBy(res => res.GetNodeValuesFromSparqlResult("predicate").Value);
                 var newEntity = new T
                 {
-                    Id = id == string.Empty ? result.Key : id,
+                    Id = string.IsNullOrEmpty(id) ? result.Key : id,
                     Properties = subGroupedResults.ToDictionary(x => x.Key, x => x.Select(property => GetEntityPropertyFromSparqlResult(property)).ToList())
                 };
 
@@ -530,12 +530,12 @@ namespace COLID.Graph.Metadata.Repositories
             return foundEntities;
         }
 
-        private dynamic GetEntityPropertyFromSparqlResult(SparqlResult res)
+        private static dynamic GetEntityPropertyFromSparqlResult(SparqlResult res)
         {
             return res.GetNodeValuesFromSparqlResult("object").Value;
         }
 
-        public List<CategoryFilterDTO> GetCategoryFilter()
+        public IList<CategoryFilterDTO> GetCategoryFilter()
         {
             var parameterizedString = new SparqlParameterizedString();
             parameterizedString.CommandText = @"SELECT *
@@ -570,7 +570,7 @@ namespace COLID.Graph.Metadata.Repositories
             return resultlist;
         }
 
-        public List<CategoryFilterDTO> GetCategoryFilter(string categoryLabel)
+        public IList<CategoryFilterDTO> GetCategoryFilter(string categoryLabel)
         {
             var parameterizedString = new SparqlParameterizedString();
             parameterizedString.CommandText = @"SELECT *
@@ -684,5 +684,46 @@ namespace COLID.Graph.Metadata.Repositories
             return linkTypes;
         }
 
+        public IList<FilterGroup> GetFilterGroups()
+        {
+            var parameterizedString = new SparqlParameterizedString();
+            parameterizedString.CommandText =
+              @"SELECT ?subject ?label ?groupOrder ?propertyUri ?propertyOrder
+                  @fromMetadataNamedGraph
+                    WHERE {
+    ?subject rdf:type @filterCategoryGroups .
+    ?subject rdfs:label ?label .
+    ?subject @filterGroupOrder ?groupOrder .
+    ?subject @filterProperties ?properties .
+    ?properties @filterPropertyUri ?propertyUri .
+    ?properties @filterPropertyOrder ?propertyOrder
+}
+ORDER BY  ?groupOrder ?propertyOrder";
+
+            parameterizedString.SetPlainLiteral("fromMetadataNamedGraph", _metadataGraphConfigurationRepository.GetGraphs(Constants.MetadataGraphConfiguration.HasInstanceGraph).JoinAsFromNamedGraphs());
+            parameterizedString.SetUri("filterCategoryGroups", new Uri(Constants.FilterGroupAndProperties.FilterCategoryGroups));
+            parameterizedString.SetUri("filterGroupOrder", new Uri(Constants.FilterGroupAndProperties.FilterGroupOrder));
+            parameterizedString.SetUri("filterProperties", new Uri(Constants.FilterGroupAndProperties.FilterProperties));
+            parameterizedString.SetUri("filterPropertyUri", new Uri(Constants.FilterGroupAndProperties.FilterPropertyUri));
+            parameterizedString.SetUri("filterPropertyOrder", new Uri(Constants.FilterGroupAndProperties.FilterPropertyOrder));
+
+
+            var results = _tripleStoreRepository.QueryTripleStoreResultSet(parameterizedString);
+
+            var groupedResults = results.GroupBy(result => result.GetNodeValuesFromSparqlResult("subject").Value);
+
+            IList<FilterGroup> foundEntities = groupedResults.Select(result => new FilterGroup
+            {
+                GroupName = result.FirstOrDefault().GetNodeValuesFromSparqlResult("label").Value,
+                Order = int.Parse(result.FirstOrDefault().GetNodeValuesFromSparqlResult("groupOrder").Value),
+                Filters = result.Select(result => new FilterProperty()
+                {
+                    PropertyOrder = int.Parse(result.GetNodeValuesFromSparqlResult("propertyOrder").Value),
+                    PropertyUri = new Uri(result.GetNodeValuesFromSparqlResult("propertyUri").Value)
+                }).ToList()
+            }).ToList();
+
+            return foundEntities;
+        }
     }
 }

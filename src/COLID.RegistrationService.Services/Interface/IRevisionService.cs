@@ -29,7 +29,7 @@ namespace COLID.RegistrationService.Services.Interface
         /// <param name="published">the published resource that should be updated</param>
         /// <param name="draftToBePublished">the draft resource whose values should be used to update the published resource</param>
         /// <param name="metaDataToCheck">metadata properties to be checked</param>
-        Task<Resource> AddAdditionalsAndRemovals(Entity Published, Entity draftToBePublished, List<MetadataProperty> metaDataToCheck);
+        Task<Resource> AddAdditionalsAndRemovals(Entity Published, Entity draftToBePublished, IList<MetadataProperty> metaDataToCheck);
 
         /// <summary>
         /// Creates the additional revision graph when a draft resource is published the first time

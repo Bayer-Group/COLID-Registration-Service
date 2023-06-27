@@ -140,10 +140,10 @@ namespace COLID.RegistrationService.Services
             services.AddTransient<IAttachmentService, AttachmentService>();
             services.AddTransient<IImportService, ImportService>();
 
-            services.AddSingleton<EndpointTestService>();
-            services.AddSingleton<IEndpointTestService>(x => x.GetRequiredService<EndpointTestService>());
-            services.AddSingleton<IMessageQueueReceiver>(x => x.GetRequiredService<EndpointTestService>());
-            services.AddSingleton<IMessageQueuePublisher>(x => x.GetRequiredService<EndpointTestService>());
+            services.AddSingleton<ResourceDataValidityCheckService>();
+            services.AddSingleton<IResourceDataValidityCheckService>(x => x.GetRequiredService<ResourceDataValidityCheckService>());
+            services.AddSingleton<IMessageQueueReceiver>(x => x.GetRequiredService<ResourceDataValidityCheckService>());
+            services.AddSingleton<IMessageQueuePublisher>(x => x.GetRequiredService<ResourceDataValidityCheckService>());
 
             services.AddSingleton<ProxyConfigService>();
             services.AddSingleton<IProxyConfigService>(x => x.GetRequiredService<ProxyConfigService>());
@@ -151,6 +151,7 @@ namespace COLID.RegistrationService.Services
             services.AddSingleton<IMessageQueueReceiver>(x => x.GetRequiredService<ProxyConfigService>());
 
             services.AddTransient<IExportService, ExportService>();
+            services.AddTransient<ICacheManagerService, CacheManagerService>();
 
             // Must be injected as the only instance of a request so that all generated identifiers are stored in the state of the service.
             // TODO: What the heck? Refactor with new Microservice for PID URI Generation

@@ -25,10 +25,10 @@ namespace COLID.Maintenance.Services
             return _cacheService.GetValue<bool>(InMaintenanceModeKey);
         }
 
-        public void UpdateInMaintenanceMode(bool inMaintenanceModeValue)
+        public void UpdateInMaintenanceMode(bool inMaintenanceMode)
         {
-            _logger.LogInformation("Services set to InMaintenance = {inMaintenanceModeValue}", inMaintenanceModeValue);
-            _cacheService.Set<bool>(InMaintenanceModeKey, inMaintenanceModeValue, TimeSpan.FromHours(24));
+            _logger.LogInformation("Services set to InMaintenance = {inMaintenanceModeValue}", inMaintenanceMode);
+            _cacheService.Set<bool>(InMaintenanceModeKey, inMaintenanceMode, TimeSpan.FromHours(24));
         }
 
     }

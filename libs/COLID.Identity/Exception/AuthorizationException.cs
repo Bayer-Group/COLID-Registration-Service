@@ -7,6 +7,10 @@ namespace COLID.Identity.Exception
     [StatusCode(HttpStatusCode.Forbidden)]
     public class AuthorizationException : BusinessException
     {
+        public AuthorizationException() : base()
+        {
+        }
+
         public AuthorizationException(string message) : base(message)
         {
         }

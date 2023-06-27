@@ -53,14 +53,14 @@ namespace COLID.RegistrationService.Services.Validation.Validators.Ranges
             }
         }
 
-        private bool IsIgnoredProperty(ResourceCrudAction resourceCrudAction, KeyValuePair<string, List<dynamic>> properties)
+        private static bool IsIgnoredProperty(ResourceCrudAction resourceCrudAction, KeyValuePair<string, List<dynamic>> properties)
         {
             if (properties.Value is null)
             {
                 return true;
             }
 
-            return resourceCrudAction != ResourceCrudAction.Create && properties.Key == Graph.Metadata.Constants.Resource.Author;
+            return resourceCrudAction != ResourceCrudAction.Create && (properties.Key == Graph.Metadata.Constants.Resource.Author || properties.Key == Graph.Metadata.Constants.Resource.HasLastReviewer);
         }
     }
 }

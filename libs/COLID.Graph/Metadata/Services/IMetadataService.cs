@@ -5,6 +5,7 @@ using COLID.Graph.TripleStore.DataModels.Base;
 using VDS.RDF;
 using Newtonsoft.Json.Schema;
 using COLID.Graph.Metadata.DataModels.Metadata.Comparison;
+using COLID.Graph.Metadata.DataModels.FilterGroup;
 
 namespace COLID.Graph.Metadata.Services
 {
@@ -24,8 +25,9 @@ namespace COLID.Graph.Metadata.Services
         /// Based on a given entity type, all related metadata will be determined and stored in a list.
         /// </summary>
         /// <param name="entityType">the entity type to use</param>
+        /// <param name="configIdentifier">the config identifier used to build the metadata</param>
         /// <returns>a List of properties, related to an entity type</returns>
-        IList<MetadataProperty> GetMetadataForEntityTypeInConfig(string entityType, string entityConfig);
+        IList<MetadataProperty> GetMetadataForEntityTypeInConfig(string entityType, string configIdentifier);
 
         /// <summary>
         /// Based on given entity types, all related metadata will be determined and stored in a list.
@@ -96,9 +98,9 @@ namespace COLID.Graph.Metadata.Services
         /// Determines all entity types of a given entity uri and stores them in a list.
         /// These entity types can be any possible type.
         /// </summary>
-        /// <param name="firstEntityType">URI of a entity type to search for</param>
+        /// <param name="entityType">URI of a entity type to search for</param>
         /// <returns>a list of entity types</returns>
-        IList<string> GetEntityTypes(string firstEntityType);
+        IList<string> GetEntityTypes(string entityType);
 
         /// <summary>
         /// Returns the metadata properties of a specific metadata
@@ -194,12 +196,18 @@ namespace COLID.Graph.Metadata.Services
         /// </summary>
         /// <param name="entityType">entity type to use</param>
         /// <returns>the validation schema</returns>
-        List<Entity> GetLinkedEntityTypes (List<Entity> entityType);
+        IList<Entity> GetLinkedEntityTypes (IList<Entity> entityType);
 
         /// <summary>
         /// Get all distribution endpoint types
         /// </summary>
         /// <returns></returns>
         Dictionary<string, string> GetDistributionEndpointTypes();
+
+        /// <summary>
+        /// Get Filter Group and Properties
+        /// </summary>
+        /// <returns></returns>
+        IList<FilterGroup> GetFilterGroupAndProperties();
     }
 }

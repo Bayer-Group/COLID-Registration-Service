@@ -50,8 +50,10 @@ namespace COLID.RegistrationService.Services.Implementation
                     .Select(s =>
                     {
                         long pidUriAsNumber = -1;
-                        long.TryParse(s, out pidUriAsNumber);
-                        return pidUriAsNumber;
+                        if (long.TryParse(s, out pidUriAsNumber))
+                            return pidUriAsNumber;
+                        else
+                            return -1;
                     })
                     .OrderBy(d => d);
                 long nextFreeNumber = 1;
@@ -77,7 +79,9 @@ namespace COLID.RegistrationService.Services.Implementation
                 {
                     if (nextFreeNumber.ToString().Count() > idLength)
                     {
+#pragma warning disable CA2201 // Do not raise reserved exception types
                         throw new System.Exception($"Next free id number '{nextFreeNumber}' exceeds the defined id length of '{idLength}'.");
+#pragma warning restore CA2201 // Do not raise reserved exception types
                     }
                     var format = "D" + idLength;
                     id = nextFreeNumber.ToString(format);
@@ -89,7 +93,7 @@ namespace COLID.RegistrationService.Services.Implementation
             }
             else
             {
-                throw new System.Exception($"Unrecognized id type {pidUriTemplateFlat.IdType}.");
+                throw new System.ArgumentException($"Unrecognized id type {pidUriTemplateFlat.IdType}.");
             }
 
             var pidUri = prefix + id + pidUriTemplateFlat.Suffix;

@@ -51,9 +51,9 @@ namespace COLID.RegistrationService.Services.Validation
         public async Task<ValidationResult> ValidateEntity(Entity entity, IList<MetadataProperty> metadataProperties, bool ignoreInvalidProperties = false)
         {
             var resourceGraph = GetResourceGraph(entity, metadataProperties);
-            var shapesGraph = GetShapesGraph();
+            using var shapesGraph = GetShapesGraph();
 
-            var processor = new ShapesGraph(shapesGraph);
+            using var processor = new ShapesGraph(shapesGraph);
             var report = processor.Validate(resourceGraph);
             var validationResult = CreateValidationResult(report);
             
@@ -108,12 +108,12 @@ namespace COLID.RegistrationService.Services.Validation
             return await Task.FromResult(validationResult);
         }
 
-        public async Task<ValidationResult> ValidateEntity(List<Entity> entities, IList<MetadataProperty> metadataProperties)
+        public async Task<ValidationResult> ValidateEntity(IList<Entity> entities, IList<MetadataProperty> metadataProperties)
         {
             var resourceGraph = GetResourceGraph(entities, metadataProperties);
-            var shapesGraph = GetShapesGraph();
+            using var shapesGraph = GetShapesGraph();
             
-            var processor = new ShapesGraph(shapesGraph);
+            using var processor = new ShapesGraph(shapesGraph);
             var report = processor.Validate(resourceGraph);
 
             var validationResult = CreateValidationResult(report);
@@ -150,7 +150,7 @@ namespace COLID.RegistrationService.Services.Validation
         /// <returns>RDf graph of entity</returns>
         private IGraph GetResourceGraph(Entity entity, IList<MetadataProperty> metadataProperties)
         {
-            var store = new TripleStore();
+            using var store = new TripleStore();
 
             //Create InsertString from resource
             if (metadataProperties.IsNullOrEmpty())
@@ -172,9 +172,9 @@ namespace COLID.RegistrationService.Services.Validation
         /// <param name="entities">List of entities to be converted</param>
         /// <param name="metadataProperties">Metadata of the entity to be converted</param>
         /// <returns>RDf graph of entity</returns>
-        private IGraph GetResourceGraph(List<Entity> entities, IList<MetadataProperty> metadataProperties)
+        private IGraph GetResourceGraph(IList<Entity> entities, IList<MetadataProperty> metadataProperties)
         {
-            var store = new TripleStore();
+            using var store = new TripleStore();
 
             //Create InsertString from resource
             foreach (Entity entity in entities)
@@ -230,7 +230,7 @@ namespace COLID.RegistrationService.Services.Validation
         /// The shacl validator would therefore throw a error, which is suppressed by this function to the metadata graph. 
         /// </summary>
         /// <param name="store">InMemory store with metadata</param>
-        private void ModifyShapesForShaclClass(VDS.RDF.TripleStore store)
+        private static void ModifyShapesForShaclClass(VDS.RDF.TripleStore store)
         {
             store.ExecuteUpdate(@"
                                     PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -244,7 +244,7 @@ namespace COLID.RegistrationService.Services.Validation
         /// Classes must be referenced as target class. This must be added to the shacls. 
         /// </summary>
         /// <param name="store">InMemory store with metadata</param>
-        private void ModifiyShapesForTargetClass(VDS.RDF.TripleStore store)
+        private static void ModifiyShapesForTargetClass(VDS.RDF.TripleStore store)
         {
             store.ExecuteUpdate(@"
                                     PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -266,7 +266,7 @@ namespace COLID.RegistrationService.Services.Validation
             CheckType(entity, _metadataService.GetInstantiableEntityTypes);
         }
 
-        private void CheckType<TEntity>(TEntity entity, Func<string, IList<string>> getEntityTypes) where TEntity : EntityBase
+        private static void CheckType<TEntity>(TEntity entity, Func<string, IList<string>> getEntityTypes) where TEntity : EntityBase
         {
             string name = typeof(TEntity).GetAttributeValue((TypeAttribute type) => type.Type);
             var leafTypes = string.IsNullOrWhiteSpace(name) ? new List<string>() : getEntityTypes.Invoke(name);
@@ -274,12 +274,12 @@ namespace COLID.RegistrationService.Services.Validation
 
             if (string.IsNullOrWhiteSpace(entityType))
             {
-                throw new BusinessException(string.Format(Common.Constants.Messages.Exception.MissingProperty, Graph.Metadata.Constants.RDF.Type));
+                throw new BusinessException(string.Format(Common.Constants.Messages.ExceptionMsg.MissingProperty, Graph.Metadata.Constants.RDF.Type));
             }
 
             if (!leafTypes.Any() || !leafTypes.Contains(entityType))
             {
-                throw new BusinessException(Common.Constants.Messages.Exception.ForbiddenEntityType);
+                throw new BusinessException(Common.Constants.Messages.ExceptionMsg.ForbiddenEntityType);
             }
         }
         #endregion

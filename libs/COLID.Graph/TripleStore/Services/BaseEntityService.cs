@@ -19,7 +19,9 @@ using Entity = COLID.Graph.TripleStore.DataModels.Base.Entity;
 
 namespace COLID.Graph.TripleStore.Services
 {
+#pragma warning disable CA1005 // Avoid excessive parameters on generic types
     public abstract class BaseEntityService<TEntity, TEntityRequest, TEntityResult, TEntityWriteResult, TRepository> : IBaseEntityService<TEntity, TEntityRequest, TEntityResult, TEntityWriteResult, TRepository>
+#pragma warning restore CA1005 // Avoid excessive parameters on generic types
         where TEntity : Entity, new()
         where TEntityRequest : BaseEntityRequestDTO
         where TEntityResult : BaseEntityResultDTO
