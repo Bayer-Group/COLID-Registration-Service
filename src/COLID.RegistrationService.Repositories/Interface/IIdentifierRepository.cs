@@ -44,5 +44,14 @@ namespace COLID.RegistrationService.Repositories.Interface
         /// <param name="namedGraph">Named graph for resource instances</param>
         /// <param name="historicNamedGraph">Named graph for historic resource instances</param>
         void DeleteOrphanedIdentifier(Uri identifierUri, Uri namedGraph, Uri draftNamedGraph, Uri historicNamedGraph, bool checkInOrphanedList = true);
+
+        /// <summary> 
+        /// Insert a new property into the graph (triple store). 
+        /// </summary> 
+        /// <param name="subject">the subject to insert</param> 
+        /// <param name="predicate">the predicate to insert</param> 
+        /// <param name="obj">the object to insert</param> 
+        /// <param name="namedGraph">Named graph for current resources</param> 
+        void CreateProperty(Uri subject, Uri predicate, Uri obj, Uri namedGraph);
     }
 }

@@ -151,7 +151,7 @@ namespace COLID.RegistrationService.Services.Implementation
                     exportRequest.searchRequest.From = original_from;
 
 
-                    //return this.generateExcelTemplate(resources, resourcesWithLink);
+                    
                     // Generate Excel file from resource metadata
                     var stream = this.exportToExcel(resources, exportRequest, resourcesWithLink);
                     //return stream;
@@ -215,8 +215,7 @@ namespace COLID.RegistrationService.Services.Implementation
 
                     Uri publishedGraph = _metaDataService.GetInstanceGraph(PIDO.PidConcept);
                     _resourceService.GetLinksOfPublishedResources(hits, exportRequest.pidUris, publishedGraph, metaDataEntityTypes.Select(x => x.Key).ToHashSet());
-                    //return this.generateExcelTemplate(to_return, hits);
-                    //var stream = this.generateExcelTemplate(resources, hits);
+                    
                     var stream = this.exportToExcel(resources, exportRequest, hits);
                     //return stream;
                     //Upload generated Excel file to S3-Server
@@ -373,7 +372,7 @@ namespace COLID.RegistrationService.Services.Implementation
                     resources,
                     exportRequestDto.exportSettings.includeHeader,
                     exportRequestDto.exportSettings.readableValues,
-                    exportRequestDto.searchRequest);
+                    exportRequestDto.searchRequest, resourcesWithLink);
             }
             else if (exportRequestDto.exportSettings.exportFormat == _excelTemplate)
             {
@@ -520,10 +519,16 @@ namespace COLID.RegistrationService.Services.Implementation
 
             List<string> _order = new List<string>()
             {
-                COLID.Graph.Metadata.Constants.Resource.HasLabel,
-                COLID.Graph.Metadata.Constants.Resource.HasResourceDefintion,
+                COLID.Graph.Metadata.Constants.RDF.Type,
+                "Endpoint Type",
+                "Link Type",
+                COLID.Graph.Metadata.Constants.Resource.HasLabel,                
                 COLID.Graph.Metadata.Constants.Resource.hasPID,
+                COLID.Graph.Metadata.Constants.Resource.DistributionEndpoints.HasNetworkedResourceLabel,
+                "InOrOutBound",
+                "IsMainDistribution",
                 COLID.Graph.Metadata.Constants.Resource.LifecycleStatus,
+                COLID.Graph.Metadata.Constants.Resource.HasResourceDefintion,
                 COLID.Graph.Metadata.Constants.Resource.HasVersion,
                 COLID.Graph.Metadata.Constants.Resource.EditorialNote,
                 COLID.Graph.Metadata.Constants.Resource.HasEntryLifecycleStatus,
@@ -540,7 +545,7 @@ namespace COLID.RegistrationService.Services.Implementation
                 COLID.Graph.Metadata.Constants.Resource.Distribution,
                 COLID.Graph.Metadata.Constants.Resource.DistributionEndpoints.DistributionEndpointLifecycleStatus,
                 COLID.Graph.Metadata.Constants.Resource.DistributionEndpoints.HasNetworkAddress,
-                COLID.Graph.Metadata.Constants.Resource.DistributionEndpoints.HasNetworkedResourceLabel,
+                
                 COLID.Graph.Metadata.Constants.Resource.DistributionEndpoints.HasContactPerson,
             };
 
@@ -553,7 +558,7 @@ namespace COLID.RegistrationService.Services.Implementation
         /// </summary>
         /// <param name="resources"></param>
         /// <returns></returns>
-        private List<(string key, string value)> loadLabels(List<Dictionary<string, List<dynamic>>> resources)
+        private List<(string key, string value)> loadLabels(List<IDictionary<string, List<dynamic>>> resources)
         {
             //Final list of URI and Labels
             List<(string key, string value)> _labelList = new List<(string key, string value)>();
@@ -578,7 +583,7 @@ namespace COLID.RegistrationService.Services.Implementation
                 //for key(COLUMN) labels
                 var resourceType = resource.GetValueOrNull(COLID.Graph.Metadata.Constants.RDF.Type, true);
 
-                if (!_resourceTypes.Contains(resourceType))
+                if (!_resourceTypes.Contains(resourceType) && resourceType != null)
                 {
                     List<MetadataProperty> _metaDataMap = _metaDataService.GetMetadataForEntityType(resourceType);
                     labels.AddRange(_metaDataMap
@@ -656,12 +661,14 @@ namespace COLID.RegistrationService.Services.Implementation
         /// <param name="includeHeader"></param>
         /// <param name="readableValues"></param>
         /// <param name="searchRequest"></param>
+        /// <param name="resWithLinks"></param>
         /// <returns></returns>
         private MemoryStream generateReadableExcel(
             List<Dictionary<string, List<dynamic>>> resources,
             bool includeHeader,
             string readableValues,
-            SearchRequestDto searchRequest)
+            SearchRequestDto searchRequest, 
+            List<Graph.Metadata.DataModels.Resources.Resource> resWithLinks)
         {
             // Stream that will be returned
             MemoryStream memoryStream = new MemoryStream();
@@ -691,16 +698,16 @@ namespace COLID.RegistrationService.Services.Implementation
             // Generate one row per resource
             List<Row> rows = new List<Row>();
 
+            List<IDictionary<string, List<dynamic>>> resToPrint = getAdditionalInfo(resources, resWithLinks);
+
             // Save all previously seen properties in a list
-            List<string> properties = removeUnwantedColumnsAndOrder(resources.SelectMany(x => x.Keys).Distinct().ToList());
+            List<string> properties = removeUnwantedColumnsAndOrder(resToPrint.SelectMany(x => x.Keys).Distinct().ToList());
 
-            getAdditionalInfo(ref resources);
+            List<(string key, string value)> _labelList = loadLabels(resToPrint);
 
-            List<(string key, string value)> _labelList = loadLabels(resources);
-
-            for (int i = 0; i < resources.Count; i++)
+            for (int i = 0; i < resToPrint.Count; i++)
             {
-                var resource = resources[i];
+                var resource = resToPrint[i];
 
                 // Check for all known properties, add existing values
                 var current_row = new Row();
@@ -761,11 +768,14 @@ namespace COLID.RegistrationService.Services.Implementation
                 {
                     throw new ArgumentException(string.Format("Unexpected value for readableValues. Accepted values: {0}, {1}. Given value: {2}.", _clearText, _uris, readableValues));
                 }
+
                 Cell cell = new Cell()
                 {
                     DataType = CellValues.String,
                     CellValue = new CellValue(prop_value)
                 };
+
+
                 headerRow.Append(cell);
             }
 
@@ -818,42 +828,33 @@ namespace COLID.RegistrationService.Services.Implementation
             return cell;
         }
 
-        private static void getAdditionalInfo(ref List<Dictionary<string, List<dynamic>>> resources)
+        /// <summary>
+        /// Seperate out distribution Endpoint from Resources
+        /// </summary>
+        /// <param name="resources"></param>
+        /// <returns></returns>
+        private List<IDictionary<string, List<dynamic>>> getAdditionalInfo(List<Dictionary<string, List<dynamic>>> resources, List<Graph.Metadata.DataModels.Resources.Resource> resWithLinks)
         {
+            //Initialize return list
+            List<IDictionary<string, List<dynamic>>> returnList = new List<IDictionary<string, List<dynamic>>>();
+            List<string> distEndpointProperties = new List<string>()
+            {
+                Graph.Metadata.Constants.Resource.MainDistribution,
+                Graph.Metadata.Constants.Resource.Distribution
+            };
+
+            //Extract all Resource Info
             foreach (var resource in resources)
             {
-                //fetch distribution endpoint info
-                if (resource.TryGetValue(Graph.Metadata.Constants.Resource.Distribution, out List<dynamic> value))
-                {
-                    if (value.First() is Graph.TripleStore.DataModels.Base.Entity)
-                    {
-                        var distributionEndpointProperties = ((COLID.Graph.TripleStore.DataModels.Base.Entity)value[0]).Properties;
-                        if (distributionEndpointProperties.TryGetValue(EnterpriseCore.PidUri, out List<dynamic> pidUriDEValue))
-                        {
-                            if (pidUriDEValue.First() is Graph.TripleStore.DataModels.Base.Entity)
-                            {
-                                var distributionEndpointPidUri = ((COLID.Graph.TripleStore.DataModels.Base.Entity)pidUriDEValue[0]).Id;
-                                resource.Remove(Graph.Metadata.Constants.Resource.Distribution);
-                                resource.Add(Graph.Metadata.Constants.Resource.Distribution, new List<dynamic>() { distributionEndpointPidUri });
-                                distributionEndpointProperties.Remove(RDF.Type);
-                                distributionEndpointProperties.Remove(EnterpriseCore.PidUri);
-                                foreach (KeyValuePair<string, List<dynamic>> distributionProperty in distributionEndpointProperties)
-                                {
-                                    if (!resource.ContainsKey(distributionProperty.Key))
-                                        resource.Add(distributionProperty.Key, distributionProperty.Value);
-                                }
-                            }
-                        }
-                    }
-                }
-
+                //Extract PidUri of resource
+                string curResPidUri = "";
                 if (resource.TryGetValue(EnterpriseCore.PidUri, out List<dynamic> pidUriValue))
                 {
                     if (pidUriValue.First() is Graph.TripleStore.DataModels.Base.Entity)
                     {
                         //The URI is a pid uri, now we need to extract it
-                        var pidUri = ((COLID.Graph.TripleStore.DataModels.Base.Entity)pidUriValue[0]).Id;
-                        resource[EnterpriseCore.PidUri] = new List<dynamic> { pidUri };
+                        curResPidUri = ((COLID.Graph.TripleStore.DataModels.Base.Entity)pidUriValue[0]).Id;
+                        resource[EnterpriseCore.PidUri] = new List<dynamic> { curResPidUri };
 
                         if (pidUriValue.First() is Graph.TripleStore.DataModels.Base.Entity)
                         {
@@ -866,7 +867,68 @@ namespace COLID.RegistrationService.Services.Implementation
                         }
                     }
                 }
+
+                returnList.Add(resource);
+
+                //Fetch resource links
+                var linkedResources = resWithLinks.Where(s => s.PidUri.ToString() == curResPidUri).ToList();
+                
+                foreach (var linkRes in linkedResources.First().Links)
+                {
+                    //Add property of Linked resource
+                    IDictionary<string, List<dynamic>> linkResProp = new Dictionary<string, List<dynamic>>();
+                    linkResProp.Add("Link Type", new List<dynamic>() { linkRes.Key });
+                    linkResProp.Add(EnterpriseCore.PidUri, new List<dynamic>() { linkRes.Value[0].PidUri });
+                    linkResProp.Add("InOrOutBound", new List<dynamic>() { linkRes.Value[0].LinkType });
+                    
+                    linkResProp.Add(COLID.Graph.Metadata.Constants.Resource.DistributionEndpoints.HasNetworkedResourceLabel, new List<dynamic>() { 
+                        _resourceService.GetResourceLabel(new Uri(linkRes.Value[0].PidUri)) 
+                    }); 
+                    returnList.Add(linkResProp);
+                }
+
+                //Get Main and Normal Distribution endpoints
+                string collectEndPoints = "";
+                foreach(string distProperty in distEndpointProperties)
+                {
+                    if (resource.TryGetValue(distProperty, out List<dynamic> distEnpoints))
+                    {
+                        collectEndPoints = "";
+                        foreach (var endpoint in distEnpoints)
+                        {
+                            if (endpoint is Graph.TripleStore.DataModels.Base.Entity)
+                            {
+                                var distributionEndpointProperties = ((COLID.Graph.TripleStore.DataModels.Base.Entity)endpoint).Properties;
+
+                                if (distributionEndpointProperties.TryGetValue(EnterpriseCore.PidUri, out List<dynamic> pidUriDEValue))
+                                {
+                                    if (pidUriDEValue.First() is Graph.TripleStore.DataModels.Base.Entity)
+                                    {
+                                        string distributionEndpointPidUri = ((COLID.Graph.TripleStore.DataModels.Base.Entity)pidUriDEValue[0]).Id;
+                                        collectEndPoints += String.IsNullOrWhiteSpace(collectEndPoints) ? distributionEndpointPidUri : "," + distributionEndpointPidUri;
+
+                                        distributionEndpointProperties.TryGetValue(RDF.Type, out var distEndPointType);                                        
+                                        distributionEndpointProperties.Add("Endpoint Type", new List<dynamic>() { distEndPointType[0] });
+                                        distributionEndpointProperties.Remove(RDF.Type);
+                                        distributionEndpointProperties.Remove(EnterpriseCore.PidUri);
+                                        distributionEndpointProperties.Add(EnterpriseCore.PidUri, new List<dynamic>() { distributionEndpointPidUri });
+                                        distributionEndpointProperties.Add("IsMainDistribution", new List<dynamic>() { 
+                                            (distProperty == Graph.Metadata.Constants.Resource.MainDistribution? "True" :"False") 
+                                        });
+                                    }
+                                }
+
+                                returnList.Add(distributionEndpointProperties);
+                            }
+                        }
+
+                        resource.Remove(distProperty);
+                        resource.Add(distProperty, new List<dynamic>() { collectEndPoints });
+                    }
+                }                
             }
+
+            return returnList;
         }
 
         /// <summary>

@@ -24,20 +24,28 @@ using Microsoft.Extensions.Options;
 using COLID.MessageQueue.Services;
 using System.Threading.Tasks;
 using COLID.Graph.Metadata.DataModels.Resources;
-using COLID.MessageQueue.Configuration;
-using COLID.MessageQueue.Datamodel;
-using Microsoft.Extensions.Options;
-using COLID.MessageQueue.Services;
-using System.Threading.Tasks;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using COLID.RegistrationService.Common.DataModel.Search;
+using System.Net.Http;
+using COLID.RegistrationService.Common.DataModels.Search;
+using System.Collections;
+using DocumentFormat.OpenXml.ExtendedProperties;
+using System.Text.RegularExpressions;
+using COLID.RegistrationService.Common.Constants;
+using COLID.RegistrationService.Common.DataModels.RelationshipManager;
 
 namespace COLID.RegistrationService.Services.Implementation
 {
-    public class ProxyConfigService : IProxyConfigService, IMessageQueuePublisher, IMessageQueueReceiver
+    public class ProxyConfigService : IProxyConfigService //, IMessageQueuePublisher, IMessageQueueReceiver
     {
         private readonly string _colidFrontEndUrl;
         private readonly string _dmpFrontEndUrl;
+        private readonly string _rrmFrontEndUrl;
         private readonly string _colidDomain;
         private readonly string _topicName;
+        private readonly string _topicNameProxyFilter;
+        private readonly string _topicNameProxyMaps;
         private readonly IResourceRepository _resourceRepository;
         private readonly IExtendedUriTemplateService _extendedUriTemplateService;
         private readonly IMetadataService _metadataService;
@@ -46,12 +54,17 @@ namespace COLID.RegistrationService.Services.Implementation
         private readonly string _nginxConfigDynamoDbTable;        
         private readonly IAmazonDynamoDB _amazonDynamoDbService;
         private readonly ColidMessageQueueOptions _mqOptions;
-        public Action<string, string, BasicProperty> PublishMessage { get; set; }
+        private readonly IRemoteAppDataService _remoteAppDataService;
+        private readonly IRemoteRRMService _remoteRRMService;
 
-        public IDictionary<string, Action<string>> OnTopicReceivers => new Dictionary<string, Action<string>>()
-            {
-            { _mqOptions.Topics[_topicName], AddUpdateNginxConfigRepository}
-            };
+        //public Action<string, string, BasicProperty> PublishMessage { get; set; }
+
+        //public IDictionary<string, Action<string>> OnTopicReceivers => new Dictionary<string, Action<string>>()
+        //    {
+        //    { _mqOptions.Topics[_topicName], AddUpdateNginxConfigRepository},
+        //    { _mqOptions.Topics[_topicNameProxyFilter], AddUpdateNginxConfigSearchFilter},
+        //    { _mqOptions.Topics[_topicNameProxyMaps], AddUpdateNginxConfigRRMMaps}
+        //    };
 
 
         public ProxyConfigService(IConfiguration configuration,
@@ -60,19 +73,26 @@ namespace COLID.RegistrationService.Services.Implementation
             IExtendedUriTemplateService extendedUriTemplateService,
             IMetadataService metadataService,
             ILogger<ProxyConfigService> logger,
-            IAmazonDynamoDB amazonDynamoDbService)
+            IAmazonDynamoDB amazonDynamoDbService,
+            IRemoteAppDataService remoteAppDataService,
+            IRemoteRRMService remoteRRMService)
         {
             _mqOptions = messageQueuingOptionsAccessor.CurrentValue;
             _colidFrontEndUrl = configuration.GetConnectionString("colidFrontEndUrl");
             _dmpFrontEndUrl = configuration.GetConnectionString("dmpFrontEndUrl");
+            _rrmFrontEndUrl = configuration.GetConnectionString("rrmFrontEndUrl");
             _colidDomain = configuration.GetConnectionString("colidDomain");
             _topicName = "ProxyConfigRebuild";
+            _topicNameProxyFilter = "ProxyConfigRebuildSearchFilter";
+            _topicNameProxyMaps = "ProxyConfigRebuildMaps";
             _resourceRepository = resourceRepository;
             _extendedUriTemplateService = extendedUriTemplateService;
             _metadataService = metadataService;
             _logger = logger;
             _nginxConfigDynamoDbTable = configuration.GetConnectionString("proxyDynamoDbTablename");
             _amazonDynamoDbService = amazonDynamoDbService;
+            _remoteAppDataService = remoteAppDataService;
+            _remoteRRMService = remoteRRMService;
         }
 
         /// <summary>
@@ -699,7 +719,7 @@ namespace COLID.RegistrationService.Services.Implementation
             return nginxConfigSections;
         }
 
-        public void AddUpdateNginxConfigRepository(string pidUriString)
+        public bool AddUpdateNginxConfigRepository(string pidUriString)
         {
             Uri pidUri = new Uri(pidUriString);
             Dictionary<string, AttributeValue> attributes = new Dictionary<string, AttributeValue>();
@@ -710,29 +730,41 @@ namespace COLID.RegistrationService.Services.Implementation
             //Try deleting if there is an existing entry in dynamoDB
             try
             {
-                _amazonDynamoDbService.DeleteItemAsync(_nginxConfigDynamoDbTable, attributes);
+                var delResponse = _amazonDynamoDbService.DeleteItemAsync(_nginxConfigDynamoDbTable, attributes).Result;
+                _logger.LogInformation($"ProxyConfigService: Delete {pidUri} with status {delResponse.HttpStatusCode}", pidUri, delResponse);
             }
             catch (System.Exception ex)
             {
-                _logger.LogInformation($"ProxyConfigService: could not delete Nginx Config before Added/Updated for : {pidUri} Error {ex.StackTrace}", pidUri, ex);
+                _logger.LogError($"ProxyConfigServiceError: could not delete Nginx Config before Added/Updated for : {pidUri} Message {(ex.InnerException != null ? ex.InnerException.Message : ex.Message)} Error {ex}", pidUri, ex);
+                return false;
             }
 
-            // Title is range-key
-            attributes["configString"] = new AttributeValue { S = GetProxyConfigurationByPidUri(pidUri) };
+            try
+            {                
+                // Title is range-key
+                attributes["configString"] = new AttributeValue { S = GetProxyConfigurationByPidUri(pidUri) };
+            }
+            catch (System.Exception ex)
+            {
+                _logger.LogError($"ProxyConfigServiceError: Error occured while Fetching Proxy Config info for: {pidUri} Message {(ex.InnerException != null ? ex.InnerException.Message : ex.Message)} Error {ex.StackTrace}", pidUri, ex);
+                return false;
+            }            
 
             //Add new Entry
             try
             {
-                _amazonDynamoDbService.PutItemAsync(_nginxConfigDynamoDbTable, attributes);
-                _logger.LogInformation($"ProxyConfigService: Nginx Config Added/Updated for : {pidUri}", pidUri);
+                var addResponse = _amazonDynamoDbService.PutItemAsync(_nginxConfigDynamoDbTable, attributes).Result;                
+                _logger.LogInformation($"ProxyConfigService: Nginx Config Added/Updated for : {pidUri} with status {addResponse.HttpStatusCode}", pidUri, addResponse);
             }
             catch (System.Exception ex)
             {
-                _logger.LogError($"ProxyConfigService: Error occured while Add & Update DynamoDb: {ex.StackTrace}", ex);
-            }            
+                _logger.LogError($"ProxyConfigServiceError: Error occured while Add & Update DynamoDb for: {pidUri} Message {(ex.InnerException != null ? ex.InnerException.Message : ex.Message)} Error {ex.StackTrace}", pidUri, ex);
+                return false;
+            }
+            return true;
         }
 
-        public void AddUpdateNginxConfigRepository(ResourceRequestDTO resource)
+        public bool AddUpdateNginxConfigRepository(ResourceRequestDTO resource)
         {
             var hasPid = resource.Properties.GetValueOrNull(Graph.Metadata.Constants.Resource.hasPID, true);
             string pidUri = hasPid != null ? hasPid.Id : "";
@@ -744,35 +776,48 @@ namespace COLID.RegistrationService.Services.Implementation
             //Try deleting if there is an existing entry in dynamoDB
             try
             {
-                _amazonDynamoDbService.DeleteItemAsync(_nginxConfigDynamoDbTable, attributes);
+                var delResponse = _amazonDynamoDbService.DeleteItemAsync(_nginxConfigDynamoDbTable, attributes).Result;
+                _logger.LogInformation($"ProxyConfigService: Delete {pidUri} with status {delResponse.HttpStatusCode}", pidUri, delResponse);
             }
             catch (System.Exception ex)
             {
-                _logger.LogInformation($"ProxyConfigService: could not delete Nginx Config before Added/Updated for : {pidUri} Error {ex.StackTrace}", pidUri, ex);
+                _logger.LogInformation($"ProxyConfigServiceError: could not delete Nginx Config before Added/Updated for : {pidUri} Error {ex.StackTrace}", pidUri, ex);
+                return false;
             }
 
-            // Title is range-key
-            attributes["configString"] = new AttributeValue { S = GetProxyConfigurationByResource(resource) };
+            try
+            { 
+                // Title is range-key
+                attributes["configString"] = new AttributeValue { S = GetProxyConfigurationByResource(resource) };
+            }
+            catch (System.Exception ex)
+            {
+                _logger.LogError($"ProxyConfigServiceError: Error occured while Fetching Proxy Config info for: {pidUri} Message {(ex.InnerException != null ? ex.InnerException.Message : ex.Message)} Error {ex.StackTrace}", pidUri, ex);
+                return false;
+            }
 
             //Add new Entry
             try
             {
-                _amazonDynamoDbService.PutItemAsync(_nginxConfigDynamoDbTable, attributes);
-                _logger.LogInformation($"ProxyConfigService: Nginx Config Added/Updated for : {pidUri}", pidUri);
+                var addResponse = _amazonDynamoDbService.PutItemAsync(_nginxConfigDynamoDbTable, attributes).Result;
+                _logger.LogInformation($"ProxyConfigService: Nginx Config Added/Updated for : {pidUri} with status {addResponse.HttpStatusCode}", pidUri, addResponse);
             }
             catch (System.Exception ex)
             {
-                _logger.LogError($"ProxyConfigService: Error occured while Add & Update DynamoDb: {ex.StackTrace}", ex);
+                _logger.LogError($"ProxyConfigServiceError: Error occured while Add & Update DynamoDb for: {pidUri} Message {(ex.InnerException != null ? ex.InnerException.Message : ex.Message)} Error {ex.StackTrace}", pidUri, ex);
+                return false;
             }
+            return true;
         }
-        public void DeleteNginxConfigRepository(Uri pidUri)
+
+        public async void DeleteNginxConfigRepository(Uri pidUri)
         {
             Dictionary<string, AttributeValue> attributes = new Dictionary<string, AttributeValue>();
             // PidUri is hash-key
             attributes["pid_uri"] = new AttributeValue { S = pidUri.ToString() };
             try
             {
-                _amazonDynamoDbService.DeleteItemAsync(_nginxConfigDynamoDbTable, attributes);
+                var delResponse = await _amazonDynamoDbService.DeleteItemAsync(_nginxConfigDynamoDbTable, attributes);
                 _logger.LogInformation($"ProxyConfigService: Nginx Config deleted for : {pidUri}", pidUri);
             }
             catch (System.Exception ex)
@@ -781,19 +826,38 @@ namespace COLID.RegistrationService.Services.Implementation
             }                        
         }
 
-        public void proxyConfigRebuild()
+        public async Task proxyConfigRebuild()
         {
             clearProxyConfigDynamoAsync();
 
             var pidUriList = _resourceRepository.GetAllPidUris(_metadataService.GetInstanceGraph(PIDO.PidConcept), _metadataService.GetMetadataGraphs());
             
             var numberOfResults = pidUriList.Count;
-            _logger.LogInformation($"Number of pid Uris : {numberOfResults}", numberOfResults);
+            _logger.LogInformation($"ProxyConfigService: Number of pid Uris : {numberOfResults}", numberOfResults);
 
             foreach (string pidUri in pidUriList)
             {
-                PublishMessage(_mqOptions.Topics[_topicName], pidUri, null);
+                //PublishMessage(_mqOptions.Topics[_topicName], pidUri, null);
+                var result = AddUpdateNginxConfigRepository(pidUri);
+                
             }
+
+            var searchFilterProxyDTOs = await GetAllSearchFilters();
+
+            foreach (var searchFilterProxyDTO in searchFilterProxyDTOs)
+            {
+                //PublishMessage(_mqOptions.Topics[_topicNameProxyFilter], JsonConvert.SerializeObject(searchFilterProxyDTO), null);
+                AddUpdateNginxConfigSearchFilter(JsonConvert.SerializeObject(searchFilterProxyDTO));
+            }
+
+            var mapProxyDTOs = await GetAllRRMMaps();
+
+            foreach (var mapProxyDTO in mapProxyDTOs)
+            {
+                //PublishMessage(_mqOptions.Topics[_topicNameProxyMaps], JsonConvert.SerializeObject(mapProxyDTO), null);
+                AddUpdateNginxConfigRRMMaps(JsonConvert.SerializeObject(mapProxyDTO));
+            }
+
         }
 
         private void clearProxyConfigDynamoAsync()
@@ -923,6 +987,226 @@ namespace COLID.RegistrationService.Services.Implementation
             }
 
             return resourceProxyDto;
+        }
+
+        private async Task<IList<SearchFilterProxyDTO>> GetAllSearchFilters()
+        {
+            try
+            {
+                // Try to get the resource with the PidUri from the RegistrationService endpoint 
+               var result = await _remoteAppDataService.GetAllSavedSearchFilters();
+
+                return result;
+            }
+            catch (System.Exception ex)
+            {
+                _logger.LogError("An error occurred while writing the proxy config for all existing search filters.", ex);
+                throw;
+            }
+        }
+
+        private async Task<IList<MapProxyDTO>> GetAllRRMMaps()
+        {
+            try
+            {
+                // Try to get the maps with the PidUri from the RRM Service endpoint 
+                var result = await _remoteRRMService.GetAllRRMMaps();
+
+                return result;
+            }
+            catch (System.Exception ex)
+            {
+                _logger.LogError("An error occurred while writing the proxy config for all existing rrn maps.", ex);
+                throw;
+            }
+        }
+        private string GenerateConfigSectionsSearchFilters(SearchFilterProxyDTO searchFilter)
+        {
+            //below code fetches the value till the last slash.TODO - verbessern
+            Match match = Regex.Match(searchFilter.PidUri, @".*/([^/]+)$");
+            string location = "~ query/" + match.Groups["1"].Value;
+
+            var rewrite_base = _dmpFrontEndUrl + "/search?";
+            var rewrite_options = new List<string>() { "p=1" };
+            if (searchFilter.SearchTerm != null)
+            {
+                rewrite_options.Add("q=" + searchFilter.SearchTerm.Replace(" ", "%20", StringComparison.Ordinal)
+                        .Replace("\"", "%22", StringComparison.Ordinal)
+                        .Replace("#", "%23", StringComparison.Ordinal)
+                        .Replace("/", "%2F", StringComparison.Ordinal)
+                        .Replace("[", "%5B", StringComparison.Ordinal)
+                        .Replace("]", "%5D", StringComparison.Ordinal)
+                        .Replace("{", "%7B", StringComparison.Ordinal)
+                        .Replace("}", "%7D", StringComparison.Ordinal));
+            }
+
+            if (searchFilter.FilterJson.TryGetValue("aggregations", out var aggregations))
+            {
+                var aggregations_string = JsonConvert.SerializeObject(aggregations);
+                if (aggregations_string != "{}")
+                {
+                    rewrite_options.Add("f=" + aggregations_string.Replace(" ", "%20", StringComparison.Ordinal)
+                        .Replace("\"", "%22", StringComparison.Ordinal)
+                        .Replace("#", "%23", StringComparison.Ordinal)
+                        .Replace("/", "%2F", StringComparison.Ordinal)
+                        .Replace("[", "%5B", StringComparison.Ordinal)
+                        .Replace("]", "%5D", StringComparison.Ordinal)
+                        .Replace("{", "%7B", StringComparison.Ordinal)
+                        .Replace("}", "%7D", StringComparison.Ordinal));
+                }
+            }
+
+            if (searchFilter.FilterJson.TryGetValue("ranges", out var ranges))
+            {
+                var ranges_string = JsonConvert.SerializeObject(ranges);
+                if (ranges_string != "{}")
+                {
+                    rewrite_options.Add("r=" + ranges_string.Replace(" ", "%20", StringComparison.Ordinal)
+                        .Replace("\"", "%22", StringComparison.Ordinal)
+                        .Replace("#", "%23", StringComparison.Ordinal)
+                        .Replace("/", "%2F", StringComparison.Ordinal)
+                        .Replace("[", "%5B", StringComparison.Ordinal)
+                        .Replace("]", "%5D", StringComparison.Ordinal)
+                        .Replace("{", "%7B", StringComparison.Ordinal)
+                        .Replace("}", "%7D", StringComparison.Ordinal));
+                }
+            }
+            // %7B: {, %22: ", %2F: /, %5B: [, %5D: ], %23: #, %20: ' ', %7D: } 
+
+            var rewrite = rewrite_base + string.Join("&", rewrite_options);
+            var newObject = new NginxConfigSection();
+            newObject.Name = "location";
+            newObject.Parameters = location;
+            newObject.Attributes.Add(new NginxAttribute("rewrite ^.*", rewrite));
+
+            return SerializeNginxConfigList(new List<NginxConfigSection>() { newObject });
+        }
+
+        public void AddUpdateNginxConfigRepositoryForSearchFilter(SearchFilterProxyDTO searchFilterProxyDTO)
+        {
+            Dictionary<string, AttributeValue> attributes = new Dictionary<string, AttributeValue>();
+
+            // PidUri is hash-keyd
+            attributes["pid_uri"] = new AttributeValue { S = searchFilterProxyDTO.PidUri };
+
+            // Title is range-key
+            attributes["configString"] = new AttributeValue { S = GenerateConfigSectionsSearchFilters(searchFilterProxyDTO) };
+
+            //Add new Entry
+            try
+            {
+                _amazonDynamoDbService.PutItemAsync(_nginxConfigDynamoDbTable, attributes);
+                _logger.LogInformation($"ProxyConfigService: Nginx Config Added/Updated for searchfilter : {searchFilterProxyDTO.PidUri}", searchFilterProxyDTO.PidUri);
+            }
+            catch (System.Exception ex)
+            {
+                _logger.LogError($"ProxyConfigService: Error occured while Add & Update DynamoDb: {ex.StackTrace}", ex);
+            }
+        }
+
+        public void RemoveSearchFilterUriFromNginxConfigRepository(string pidUri, string parentNode)
+        {
+            Dictionary<string, AttributeValue> attributes = new Dictionary<string, AttributeValue>();
+
+            attributes["pid_uri"] = new AttributeValue { S = pidUri };
+
+            using (var transaction = _resourceRepository.CreateTransaction())
+            {
+                try
+                {
+                    //delete the association from Triplestore
+                    _resourceRepository.DeleteProperty(new Uri(parentNode),
+                        new Uri(EnterpriseCore.PidUri),
+                        new Uri(pidUri),
+                        _metadataService.GetInstanceGraph(PIDO.PidConcept)
+                        );
+
+                    transaction.Commit();
+                    _amazonDynamoDbService.DeleteItemAsync(_nginxConfigDynamoDbTable, attributes);
+                }
+                catch (System.Exception ex)
+                {
+                    _logger.LogInformation($"ProxyConfigService: could not delete Nginx Config for searchfilter: {pidUri} Error {ex.StackTrace}", pidUri, ex);
+                    throw;
+                }
+            }
+        }
+
+        private void AddUpdateNginxConfigSearchFilter(string rawSearchFilterProxyDto)
+        {
+            SearchFilterProxyDTO searchFilterProxyDto = JsonConvert.DeserializeObject<SearchFilterProxyDTO>(rawSearchFilterProxyDto);
+            AddUpdateNginxConfigRepositoryForSearchFilter(searchFilterProxyDto);
+        }
+
+        private void AddUpdateNginxConfigRRMMaps (string rawMapProxyDto)
+        {
+            MapProxyDTO mapProxyDTO = JsonConvert.DeserializeObject<MapProxyDTO>(rawMapProxyDto);
+            AddUpdateNginxConfigRepositoryForRRMMaps(mapProxyDTO);
+        }
+
+        public void AddUpdateNginxConfigRepositoryForRRMMaps(MapProxyDTO mapProxyDTO)
+        {
+            Dictionary<string, AttributeValue> attributes = new Dictionary<string, AttributeValue>();
+
+            // PidUri is hash-key
+            attributes["pid_uri"] = new AttributeValue { S = mapProxyDTO.PidUri};
+
+            Match match = Regex.Match(mapProxyDTO.PidUri, @".*/([^/]+)$");
+            string location = "~ maps/" + match.Groups["1"].Value;
+            
+            var rewrite_base = _rrmFrontEndUrl + $"/home/graph/{mapProxyDTO.MapId}";
+            var newObject = new NginxConfigSection();
+            newObject.Name = "location";
+            newObject.Parameters = location;
+            newObject.Attributes.Add(new NginxAttribute("rewrite ^.*", rewrite_base));
+
+            attributes["configString"] = new AttributeValue { S = SerializeNginxConfigList(new List<NginxConfigSection>() { newObject })};
+
+            try
+            {
+                _amazonDynamoDbService.PutItemAsync(_nginxConfigDynamoDbTable, attributes);
+                _logger.LogInformation($"ProxyConfigService: Nginx Config Added/Updated for rrmMaps : {mapProxyDTO.MapId}", mapProxyDTO.MapId);
+            }
+            catch (System.Exception ex)
+            {
+                _logger.LogError($"ProxyConfigService: Error occured while Add & Update DynamoDb: {ex.StackTrace}", ex);
+            }            
+        }
+
+        public IList<string> FindPidUrisNotConfiguredForProxy()
+        {
+            var respPidUris = new List<string>();
+            //Get All Piduris from DynamoDB
+            List<Dictionary<string, AttributeValue>> resultList = new List<Dictionary<string, AttributeValue>>();
+            Dictionary<string, AttributeValue> lastKeyEvaluated = null;
+            do
+            {
+                var request = new ScanRequest
+                {
+                    TableName = _nginxConfigDynamoDbTable,
+                    Limit = 1000000,
+                    ExclusiveStartKey = lastKeyEvaluated,
+                };
+
+                var response = _amazonDynamoDbService.ScanAsync(request).Result;
+
+                resultList.AddRange(response.Items);
+                lastKeyEvaluated = response.LastEvaluatedKey;
+            } while (lastKeyEvaluated != null && lastKeyEvaluated.Count != 0);
+
+
+            _logger.LogInformation($"Number of dynamo items : {0}", resultList.Count);
+
+            //GetAll Published PidUris from GraphDB
+            var pidUriList = _resourceRepository.GetAllPidUris(_metadataService.GetInstanceGraph(PIDO.PidConcept), _metadataService.GetMetadataGraphs());
+
+            _logger.LogInformation($"Number of pid Uris : {0}", pidUriList.Count);
+            var DynamoDBPidUris = resultList.Select(x => x.GetValueOrDefault("pid_uri").S).ToList();
+
+            //Compare whether all Piduris from GrapgDB also Exits in DynamoDB
+            respPidUris = pidUriList.Where(x => !DynamoDBPidUris.Contains(x)).ToList();
+
+            return respPidUris;
         }
     }
 }

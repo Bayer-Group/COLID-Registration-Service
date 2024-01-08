@@ -5,6 +5,7 @@ using COLID.Graph.Metadata.DataModels.Resources;
 using COLID.Graph.TripleStore.DataModels.Base;
 using COLID.RegistrationService.Common.DataModel.DistributionEndpoints;
 using COLID.RegistrationService.Common.DataModels.Contacts;
+using COLID.RegistrationService.Common.DataModels.Search;
 using COLID.RegistrationService.Common.DataModels.TransferObjects;
 
 namespace COLID.RegistrationService.Services.Interface
@@ -103,5 +104,10 @@ namespace COLID.RegistrationService.Services.Interface
         /// <returns></returns>
         Task<IList<AdUserDto>> CheckUsersValidity(ISet<string> userEmails);
 
+        /// <summary>
+        /// Fetches all the saved search filters from AppData Service
+        /// </summary>
+        /// <returns>List of filters in form of SearchFilterProxyDTO</returns>
+        Task<List<SearchFilterProxyDTO>> GetAllSavedSearchFilters();
     }
 }

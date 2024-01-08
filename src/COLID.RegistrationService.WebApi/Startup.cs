@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Reflection;
-using COLID.Common.Logger;
 using COLID.Exception;
 using COLID.Identity;
 using COLID.Maintenance;
@@ -12,12 +11,8 @@ using COLID.MessageQueue;
 using COLID.RegistrationService.Common;
 using COLID.RegistrationService.Services.Authorization;
 using COLID.RegistrationService.WebApi.Filters;
-using COLID.SQS;
-using COLID.SQS.Model;
 using COLID.StatisticsLog;
 using COLID.Swagger;
-using CorrelationId;
-using CorrelationId.DependencyInjection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -55,8 +50,6 @@ namespace COLID.RegistrationService.WebApi
         /// <param name="services">The service collection</param>
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddDefaultCorrelationId();
-            services.AddCorrelationIdLogger();
             Settings.InitializeServiceUrl(Configuration);
             services.AddCors();
 
@@ -105,9 +98,7 @@ namespace COLID.RegistrationService.WebApi
             services.AddRegistrationServiceAuthorizationModule(Configuration);
             services.AddMessageQueueModule(Configuration);
             services.AddStatisticsLogModule(Configuration);
-            services.AddMaintenanceModule(mvcBuilder);
-            services.Configure<AWSSQSConfiguration>(Configuration.GetSection("AWSSQSConfiguration"));
-            services.AddAWSSQSModule(Configuration);
+            services.AddMaintenanceModule(mvcBuilder);            
         }
 
         /// <summary>
@@ -116,7 +107,6 @@ namespace COLID.RegistrationService.WebApi
         /// <param name="app">The application builder</param>
         public void Configure(IApplicationBuilder app)
         {
-            app.UseCorrelationId();
             app.UseExceptionMiddleware();
 
             app.UseRouting();

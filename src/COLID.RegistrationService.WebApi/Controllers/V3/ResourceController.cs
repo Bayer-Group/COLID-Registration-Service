@@ -109,7 +109,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         [HttpPut]
         [Route("notifyDueReviews")]
         [ValidateActionParameters]
-        [ProducesResponseType(typeof(Dictionary<string, string>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Dictionary<string, List<string>>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
         public IActionResult GetResourceDueForReview()
         {

@@ -4,7 +4,6 @@ using System.Net.Mime;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using CorrelationId;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
@@ -43,18 +42,12 @@ namespace COLID.Identity.Extensions
         /// <param name="requestBody">The body of the request</param>
         /// <param name="accessToken">The access token to be used as Bearer authentication</param>
         /// <param name="ct">A <see cref="CancellationToken"/></param>
-        /// <param name="correlationContext">A <see cref="CorrelationContext"/></param>
         /// <param name="serializerSettings">A <see cref="JsonSerializerSettings"/> to serialize the requestBody.</param>
         /// 
         /// <returns></returns>
-        public static async Task<HttpResponseMessage> SendRequestWithOptionsAsync(this HttpClient httpClient, HttpMethod method, string path, object requestBody, string accessToken, CancellationToken ct, CorrelationContext correlationContext, JsonSerializerSettings serializerSettings = null)
+        public static async Task<HttpResponseMessage> SendRequestWithOptionsAsync(this HttpClient httpClient, HttpMethod method, string path, object requestBody, string accessToken, CancellationToken ct, JsonSerializerSettings serializerSettings = null)
         {
             using var request = createHttpRequest(method, path, requestBody, accessToken, ref serializerSettings);
-
-            if (correlationContext != null && !request.Headers.Contains(correlationContext.Header))
-            {
-                request.Headers.Add(correlationContext.Header, correlationContext.CorrelationId);
-            }
             
             var response = await httpClient.SendAsync(request, ct);
             return response;

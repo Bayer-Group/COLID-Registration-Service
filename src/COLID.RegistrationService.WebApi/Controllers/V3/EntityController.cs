@@ -66,5 +66,27 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
 
             return Ok(entity);
         }
+
+        /// <summary>
+        /// Returns the labels of all entities in the system.
+        /// </summary>
+        /// <returns>Returns the labels of all entities in the system.</returns>
+        /// <response code="200">Returns the entity of the given Id</response>
+        /// <response code="404">If no entity exists with the given Id</response>
+        /// <response code="500">If an unexpected error occurs</response>
+        [HttpGet]
+        [ValidateActionParameters]
+        [Route("entityLabelsMapping")]
+        public IActionResult GetEntitiesLabels()
+        {
+            var entitiesList = _entityService.GetEntitiesLabels();
+
+            if (entitiesList == null)
+            {
+                return NotFound("No entity found");
+            };
+
+            return Ok(entitiesList);
+        }
     }
 }

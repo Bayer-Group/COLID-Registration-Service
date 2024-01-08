@@ -24,6 +24,13 @@ namespace COLID.RegistrationService.Services.Implementation
         private readonly ICacheService _cacheService;
         private readonly IMetadataGraphConfigurationService _metadataGraphConfigurationService;
 
+        private static readonly List<string> _searchIgnoredProperties = new List<string>()
+        {
+            RDF.Type,
+            SKOS.Broader,
+        };
+
+
         public TaxonomyService(
             IMapper mapper,
             IMetadataService metadataService,
@@ -84,6 +91,71 @@ namespace COLID.RegistrationService.Services.Implementation
                 return TransformTaxonomyListToHierarchy(taxonomyList);
             });
             return taxonomies;
+        }
+
+        public IList<TaxonomyResultDTO> GetTaxonomySearchHits(string taxonomyType, string searchTerm)
+        {
+            var taxonomies = _cacheService.GetOrAdd($"type:{taxonomyType}", () =>
+            {
+                // This block fetches multiple graphs for a field type from metadata config
+                // This can be dynamically extended for future taxonomies which need multiple graphs
+                var taxonomyList = new List<Taxonomy>();
+                var configurationGraphs = new HashSet<Uri>();
+                var latestMetadataGraphConfiguration = _metadataGraphConfigurationService.GetLatestConfiguration();
+                var graphList = latestMetadataGraphConfiguration.Properties.GetValueOrNull(taxonomyType, false);
+
+                if (graphList.Count > 0)
+                {
+                    foreach (var graphitem in graphList)
+                    {
+                        configurationGraphs.Add(new Uri(graphitem));
+                    }
+                    taxonomyList = (List<Taxonomy>)_taxonomyRepository.BuildTaxonomy(taxonomyType, configurationGraphs);
+                }
+                else
+                {
+                    var graphs = _metadataService.GetMultiInstanceGraph(taxonomyType);
+                    taxonomyList = (List<Taxonomy>)_taxonomyRepository.GetTaxonomies(taxonomyType, graphs);
+                }
+                return TransformTaxonomyListToHierarchy(taxonomyList);
+            });
+
+            foreach (var taxonomy in taxonomies)
+            {
+                CheckIfTaxonomyContainsSearchText(taxonomy, searchTerm);
+            }
+
+            return taxonomies;
+        }
+
+        public static bool CheckIfTaxonomyContainsSearchText(TaxonomyResultDTO taxonomy, string searchTerm)
+        {
+            bool expandTaxonomy = false;
+            foreach (var prop in taxonomy.Properties)
+            {
+                if (!_searchIgnoredProperties.Contains(prop.Key))
+                {
+                    if (prop.Value.Any(val => ((string)val).ToLower().Contains(searchTerm.ToLower(), StringComparison.Ordinal)))
+                    {
+                        taxonomy.FoundInSearch = true;
+                        expandTaxonomy = true;
+                    }
+                }
+            }
+
+            if (taxonomy.HasChild)
+            {
+                foreach (var child in taxonomy.Children)
+                {
+                    if (CheckIfTaxonomyContainsSearchText(child, searchTerm))
+                    {
+                        expandTaxonomy = true;
+                        taxonomy.Expanded = true;
+                    }
+                }
+            }
+
+            return expandTaxonomy;
         }
 
         public IList<TaxonomyLabel> GetTaxonomyLabels()

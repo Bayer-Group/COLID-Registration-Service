@@ -274,11 +274,10 @@ namespace COLID.RegistrationService.Services.Validation
 
         private IList<DuplicateResult> CheckTargetUriDuplicate(string duplicateRequestTargetUri)
         {
-            var leafResourceTypes = _metadataService.GetInstantiableEntityTypes(Graph.Metadata.Constants.Resource.Type.FirstResouceType);
             var graphList = new HashSet<Uri>();
             graphList.Add(GetInstanceGraph());
             graphList.Add(GetDraftInstanceGraph());
-            return _resourceRepository.CheckTargetUriDuplicate(duplicateRequestTargetUri, leafResourceTypes, graphList, GetMetadataGraphs());
+            return _resourceRepository.CheckTargetUriDuplicate(duplicateRequestTargetUri, graphList, GetMetadataGraphs());
         }
 
         private IList<VersionOverviewCTO> GetVersions(string pidUriString, string previousVersionString)

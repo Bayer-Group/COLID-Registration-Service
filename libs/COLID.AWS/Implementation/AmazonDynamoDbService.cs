@@ -48,7 +48,13 @@ namespace COLID.AWS.Implementation
            
                 return new AmazonDynamoDBClient(awsCredentials.AccessKeyId, awsCredentials.SecretAccessKey, awsCredentials.Token);
             }
-            return new AmazonDynamoDBClient(awsCredentials.AccessKeyId, awsCredentials.SecretAccessKey, RegionEndpoint.GetBySystemName(_awsConfig.S3Region));
+            AmazonDynamoDBConfig clientConfig = new AmazonDynamoDBConfig();
+            // Set the endpoint URL
+            //clientConfig.RegionEndpoint = RegionEndpoint.GetBySystemName(_awsConfig.S3Region);            
+            clientConfig.ServiceURL = _awsConfig.S3ServiceUrl;
+            
+            _logger.LogInformation("Service Url: " + _awsConfig.S3ServiceUrl);
+            return new AmazonDynamoDBClient(awsCredentials.AccessKeyId, awsCredentials.SecretAccessKey, clientConfig);
         }
 
         private AmazonWebServicesSecurityCredentials GetECSCredentials()
@@ -149,7 +155,7 @@ namespace COLID.AWS.Implementation
             try
             {
                 AmazonDynamoDBClient client = GetAmazonDynamoDbClient();
-
+                
                 var result = client.DeleteItemAsync(tableName, key);
                 return result;
             }
@@ -764,6 +770,21 @@ namespace COLID.AWS.Implementation
         }
 
         public Task<UpdateTimeToLiveResponse> UpdateTimeToLiveAsync(UpdateTimeToLiveRequest request, CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<DescribeImportResponse> DescribeImportAsync(DescribeImportRequest request, CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<ImportTableResponse> ImportTableAsync(ImportTableRequest request, CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<ListImportsResponse> ListImportsAsync(ListImportsRequest request, CancellationToken cancellationToken = default)
         {
             throw new NotImplementedException();
         }

@@ -1,4 +1,5 @@
 ﻿using System.Net.Mime;
+using System.Web;
 using COLID.RegistrationService.Services.Interface;
 using COLID.RegistrationService.WebApi.Filters;
 using Microsoft.AspNetCore.Authorization;
@@ -68,6 +69,17 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
             };
 
             return Ok(taxonomy);
+        }
+
+        [HttpGet]
+        [Authorize]
+        [ValidateActionParameters]
+        [Route("searchTaxonomy/{taxonomyType}")]
+        public IActionResult SearchTaxonomies(string taxonomyType, [FromQuery] string searchTerm)
+        {
+            var searchHits = _taxonomyService.GetTaxonomySearchHits(HttpUtility.UrlDecode(taxonomyType), searchTerm);
+
+            return Ok(searchHits);
         }
     }
 }

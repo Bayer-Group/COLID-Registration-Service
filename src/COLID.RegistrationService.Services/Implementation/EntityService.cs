@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using AutoMapper;
@@ -36,6 +36,11 @@ namespace COLID.RegistrationService.Services.Implementation
             var type = search == null ? Type : search.Type;
             var cacheKey = $"{type}:{search.CalculateHash()}";
             return _cacheService.GetOrAdd($"entities:{cacheKey}", () => base.GetEntities(search));
+        }
+
+        public override IList<BaseEntityResultDTO> GetEntitiesLabels()
+        {
+            return _cacheService.GetOrAdd($"entitiesLabels:", () => base.GetEntitiesLabels());
         }
 
         public override BaseEntityResultDTO GetEntity(string id)

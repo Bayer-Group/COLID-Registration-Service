@@ -53,6 +53,7 @@
             public const string InvalidFormat = "An invalid graph name was given";
             public const string NotExists = "The given graph does not exist in the database";
             public const string Referenced = "The given graph is referenced in the system and cannot be deleted.";
+            public const string InUse = "The given graph is in use and cannot be modified.";
         }
 
         public static class LinkTypes

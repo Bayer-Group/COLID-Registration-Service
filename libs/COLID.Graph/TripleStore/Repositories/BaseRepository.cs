@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using COLID.Common.Extensions;
@@ -12,8 +12,10 @@ using COLID.Graph.TripleStore.DataModels.Base;
 using COLID.Graph.TripleStore.DataModels.Sparql;
 using COLID.Graph.TripleStore.Extensions;
 using COLID.Graph.TripleStore.Transactions;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.VisualBasic;
 using VDS.RDF.Query;
 
 namespace COLID.Graph.TripleStore.Repositories
@@ -523,6 +525,22 @@ namespace COLID.Graph.TripleStore.Repositories
             return TransformQueryResults(results);
         }
 
+        public virtual IList<T> GetEntitiesLabels(ISet<Uri> namedGraphs)
+        {
+            var query = GenerateGetEntitiesLabelQuery(namedGraphs);
+
+            var results = _tripleStoreRepository.QueryTripleStoreResultSet(query);
+
+            var entities = TransformQueryResults(results, "");
+
+            if (!entities.Any())
+            {
+                throw new EntityNotFoundException(Metadata.Constants.Messages.Entity.NotFound);
+            }
+
+            return TransformQueryResults(results);
+        }
+
         public virtual ITripleStoreTransaction CreateTransaction()
         {
             return _tripleStoreRepository.CreateTransaction();
@@ -569,6 +587,24 @@ namespace COLID.Graph.TripleStore.Repositories
             id = results.Results.FirstOrDefault().GetNodeValuesFromSparqlResult("subject").Value;
             return true;
 
+        }
+
+        protected SparqlParameterizedString GenerateGetEntitiesLabelQuery(ISet<Uri> namedGraphs)
+        {
+            var parameterizedString = new SparqlParameterizedString();
+            parameterizedString.CommandText =
+                @"SELECT ?subject ?predicate ?object
+                  @fromNamedGraphs
+                  WHERE {
+                      ?subject ?predicate ?object;
+                               rdfs:label ?object.
+                      FILTER(lang(str(?object)) IN (@language , """"))
+                  }";
+
+            parameterizedString.SetPlainLiteral("fromNamedGraphs", namedGraphs.JoinAsFromNamedGraphs());
+            parameterizedString.SetLiteral("language", COLID.Graph.Metadata.Constants.I18n.DefaultLanguage);
+
+            return parameterizedString;
         }
     }
 }

@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using COLID.Graph.TripleStore.DataModels.Base;
 using COLID.Graph.Metadata.DataModels.Metadata;
+using System;
 
 namespace COLID.RegistrationService.WebApi.Controllers.V3
 {
@@ -212,6 +213,6 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         {
             var result = _metadataService.GetFilterGroupAndProperties();
             return Ok(result);
-        }
+        }       
     }
 }

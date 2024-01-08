@@ -109,7 +109,7 @@ namespace COLID.RegistrationService.Services.Interface
         /// Checks all due resources for review and notifies responsible people
         /// </summary>
         /// <returns>Status of Notification Job</returns>
-        Task<Dictionary<string, string>> NotifyForDueReviews();
+        Task<Dictionary<string, List<string>>> NotifyForDueReviews();
 
         /// <summary>
         /// Gets the list of all distribution endpoints of one resource.
@@ -323,5 +323,12 @@ namespace COLID.RegistrationService.Services.Interface
         /// <param name="searchParam">Parameters: StartDate, EndDate, optional email, linkType</param>         
         /// <returns></returns> 
         IList<LinkHistoryDto> SearchLinkHistory(LinkHistorySearchParamDto searchParam);
+
+        /// <summary>
+        /// Get label of a resource
+        /// </summary>
+        /// <param name="piUri">The unique id of the resource</param>        
+        /// <returns></returns>
+        string GetResourceLabel(Uri piUri);
     }
 }

@@ -27,5 +27,6 @@ namespace COLID.RegistrationService.Services.Interface
         /// </summary>
         /// <returns></returns>
         IList<TaxonomyLabel> GetTaxonomyLabels();
+        IList<TaxonomyResultDTO> GetTaxonomySearchHits(string taxonomyType, string searchTerm);
     }
 }

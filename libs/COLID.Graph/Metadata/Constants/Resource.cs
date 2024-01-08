@@ -235,6 +235,7 @@ namespace COLID.Graph.Metadata.Constants
         public static readonly string hasApplicationId = ServiceUrl + "kos/19050/hasApplicationId";
         public static readonly string hasClimateDatasetCategories = ServiceUrl + "kos/19050/hasClimateDatasetCategories";
         public static readonly string hasRefreshRate = ServiceUrl + "kos/19050/hasRefreshRate";
+        public static readonly string hasSystemOwner = ServiceUrl + "kos/19050/hasSystemOwner";
         #endregion
     }
 }

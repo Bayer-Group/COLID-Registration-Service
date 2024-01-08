@@ -22,7 +22,6 @@ using COLID.RegistrationService.Services.Validation.Exceptions;
 using System.Threading;
 using COLID.Graph.Metadata.Extensions;
 using COLID.Graph.TripleStore.DataModels.Base;
-using COLID.Helper.SQS;
 using System.Text.Json;
 using Newtonsoft.Json;
 using Microsoft.Extensions.Logging;

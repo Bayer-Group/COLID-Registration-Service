@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using COLID.Identity.Requirements;
 using COLID.Graph.Metadata.Services;
 using COLID.Graph.Metadata.DataModels.MetadataGraphConfiguration;
+using System;
 
 namespace COLID.RegistrationService.WebApi.Controllers.V3
 {
@@ -89,6 +90,6 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         {
             var result = _MetadataGraphConfigurationService.GetConfigurationOverview();
             return Ok(result);
-        }
+        }             
     }
 }

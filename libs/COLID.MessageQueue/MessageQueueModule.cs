@@ -2,7 +2,6 @@
 using COLID.MessageQueue.Configuration;
 using COLID.MessageQueue.Extensions;
 using COLID.MessageQueue.Services;
-using CorrelationId;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -35,8 +34,6 @@ namespace COLID.MessageQueue
         /// <returns></returns>
         public static IApplicationBuilder UseMessageQueueModule(this IApplicationBuilder app, IConfiguration configuration)
         {
-            app.UseCorrelationId();
-
             if (configuration.GetValue<bool>($"{nameof(ColidMessageQueueOptions)}:Enabled"))
             {
                 app.RegisterMessageQueueReceiver();

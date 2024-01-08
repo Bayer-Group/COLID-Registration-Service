@@ -15,10 +15,10 @@ using COLID.Graph.Metadata.DataModels.Validation;
 using COLID.Graph.Metadata.Services;
 using COLID.Graph.TripleStore.DataModels.Resources;
 using COLID.Graph.TripleStore.Extensions;
-using COLID.Helper.SQS;
 using COLID.RegistrationService.Repositories.Interface;
 using COLID.RegistrationService.Services.Interface;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -29,7 +29,7 @@ namespace COLID.RegistrationService.Services.Implementation
     public class BulkProcessBackgroundService : BackgroundService
     {
         private readonly ILogger<BulkProcessBackgroundService> _logger;
-        private readonly IAWSSQSHelper _awsSQSHelper;
+        private readonly IAmazonSQSService _amazonSQSService;
         private readonly IResourcePreprocessService _resourcePreprocessService;
         private readonly IResourceService _resourceService;
         private readonly IResourceRepository _resourceRepository;
@@ -40,24 +40,23 @@ namespace COLID.RegistrationService.Services.Implementation
         private readonly IReindexingService _indexingService;
         private readonly IProxyConfigService _proxyConfigService;        
         private readonly IImportService _importService;
-        private readonly IRemoteAppDataService _remoteAppDataService;
+        private readonly IRemoteAppDataService _remoteAppDataService;        
+        private readonly string _resourceInputQueueUrl;
+        private readonly string _resourceOutputQueueUrl;
+        private readonly string _linkingInputQueueUrl;
+        private readonly string _linkingOutputQueueUrl;
 
         /// <summary>
         /// Constructer to initialize
-        /// </summary>
-        /// <param name="logger"></param>
-        /// <param name="awsSQSHelper"></param>
-        /// <param name="resourcePreprocessService"></param>
-        /// <param name="resourceService"></param>
-        /// <param name="resourceRepository"></param>
-        public BulkProcessBackgroundService(ILogger<BulkProcessBackgroundService> logger, IAWSSQSHelper awsSQSHelper,
-            IResourcePreprocessService resourcePreprocessService, IResourceService resourceService,
+        /// </summary>        
+        public BulkProcessBackgroundService(ILogger<BulkProcessBackgroundService> logger, IAmazonSQSService amazonSQSService,
+            IResourcePreprocessService resourcePreprocessService, IResourceService resourceService, IConfiguration configuration,
             IResourceRepository resourceRepository, IRevisionService revisionService, IMetadataService metadataService,
             IValidationService validationService, IIdentifierService identifierService, IReindexingService indexingService,
             IProxyConfigService proxyConfigService, IImportService importService, IRemoteAppDataService remoteAppDataService)
         {
             _logger = logger;
-            _awsSQSHelper = awsSQSHelper;
+            _amazonSQSService = amazonSQSService;
             _resourcePreprocessService = resourcePreprocessService;
             _resourceService = resourceService;
             _resourceRepository = resourceRepository;
@@ -69,6 +68,12 @@ namespace COLID.RegistrationService.Services.Implementation
             _proxyConfigService = proxyConfigService;            
             _importService = importService;
             _remoteAppDataService = remoteAppDataService;
+
+            _resourceInputQueueUrl = configuration.GetConnectionString("ResourceInputQueueUrl");
+            _resourceOutputQueueUrl = configuration.GetConnectionString("ResourceOutputQueueUrl");
+            _linkingInputQueueUrl = configuration.GetConnectionString("LinkingInputQueueUrl");
+            _linkingOutputQueueUrl = configuration.GetConnectionString("LinkingOutputQueueUrl");
+
         }
 
         /// <summary>
@@ -114,7 +119,7 @@ namespace COLID.RegistrationService.Services.Implementation
                 do
                 {
                     //Check msgs available in SQS  
-                    var msgs = await _awsSQSHelper.ReceiveResourceMessageAsync();
+                    var msgs = await _amazonSQSService.ReceiveMessageAsync(_resourceInputQueueUrl,10,10);
                     msgcount = msgs.Count;
                     totalMsgCount += msgs.Count;
 
@@ -523,7 +528,7 @@ namespace COLID.RegistrationService.Services.Implementation
                         //Send msg to output queue  
                         try
                         {                            
-                            await _awsSQSHelper.SendResourceMessageAsync(totalValidationResult);                            
+                            await _amazonSQSService.SendMessageAsync(_resourceOutputQueueUrl, totalValidationResult);                            
                         }
                         catch(System.Exception ex)
                         {
@@ -559,7 +564,7 @@ namespace COLID.RegistrationService.Services.Implementation
             do
             {
                 //Check msgs available in SQS  
-                var msgs = await _awsSQSHelper.ReceiveLinkingMessageAsync();
+                var msgs = await _amazonSQSService.ReceiveMessageAsync(_linkingInputQueueUrl, 10, 10);
                 msgcount = msgs.Count;
                 totalMsgCount += msgs.Count;
 
@@ -606,9 +611,9 @@ namespace COLID.RegistrationService.Services.Implementation
                     await Task.WhenAll(tasks);
 
                     //Send msg to output queue and delete message from input queue 
-                    if (await _awsSQSHelper.SendLinkingMessageAsync(totalLinkingResult))
+                    if (await _amazonSQSService.SendMessageAsync(_linkingOutputQueueUrl, totalLinkingResult))
                     {
-                        await _awsSQSHelper.DeleteLinkingMessageAsync(msg.ReceiptHandle);
+                        await _amazonSQSService.DeleteMessageAsync(_linkingInputQueueUrl, msg.ReceiptHandle);
                     }
                 }
 
@@ -628,7 +633,7 @@ namespace COLID.RegistrationService.Services.Implementation
             try
             {
                 // Delete msg from input Queue
-                await _awsSQSHelper.DeleteResourceMessageAsync(msgReceiptHandle);
+                await _amazonSQSService.DeleteMessageAsync(_resourceInputQueueUrl, msgReceiptHandle);
                 return true;
             }
             catch

@@ -149,12 +149,11 @@ namespace COLID.RegistrationService.Repositories.Interface
         /// <summary> 
         /// Gets a list of all target URI occurences. 
         /// </summary> 
-        /// <param name="targetUri">target uri to search for</param> 
-        /// <param name="resourceTypes">the resource type list to filter by</param> 
+        /// <param name="targetUri">target uri to search for</param>         
         /// <param name="resourceNamedGraph">Named graph for current resources</param> 
         /// <param name="metaDataNamedGraphs">Metadata Named Graphs</param> 
         /// <returns>List of <see cref="DuplicateResult"/>, empty list if no occurence</returns> 
-        IList<DuplicateResult> CheckTargetUriDuplicate(string targetUri, IList<string> resourceTypes, ISet<Uri> namedGraph, ISet<Uri> metaDataNamedGraphs);
+        IList<DuplicateResult> CheckTargetUriDuplicate(string targetUri, ISet<Uri> namedGraph, ISet<Uri> metaDataNamedGraphs);
 
         /// <summary> 
         /// Searches for resources filtered by given criteria parameters. 
@@ -484,5 +483,12 @@ namespace COLID.RegistrationService.Repositories.Interface
         /// <returns>List of Link history of the given resource pidUri</returns>
         IList<LinkHistoryDto> SearchLinkHistory(LinkHistorySearchParamDto searchParam, Uri linkHistoryGraph, Uri resourceGraph, ISet<Uri> metadataGraph);
 
+        /// <summary>
+        /// Get label of a resource
+        /// </summary>
+        /// <param name="piUri">The unique id of the resource</param>
+        /// <param name="resourceGraph">Named graph for current resource</param>
+        /// <returns></returns>
+        string GetResourceLabel(Uri piUri, Uri resourceGraph);
     }
 }
