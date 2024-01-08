@@ -171,5 +171,23 @@ namespace COLID.RegistrationService.Repositories.Implementation
             Console.WriteLine(queryString.ToString());
             _tripleStoreRepository.UpdateTripleStore(queryString);
         }
+        public void CreateProperty(Uri id, Uri predicate, Uri obj, Uri namedGraph)
+        {
+            var queryString = new SparqlParameterizedString
+            {
+                CommandText = @"INSERT DATA {
+                      GRAPH @namedGraph {
+                          @subject @predicate @object
+                      }
+                  }"
+            };
+
+            queryString.SetUri("namedGraph", namedGraph);
+            queryString.SetUri("subject", id);
+            queryString.SetUri("predicate", predicate);
+            queryString.SetUri("object", obj);
+
+            _tripleStoreRepository.UpdateTripleStore(queryString);
+        }
     }
 }

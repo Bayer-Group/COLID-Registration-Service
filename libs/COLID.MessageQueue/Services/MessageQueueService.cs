@@ -6,8 +6,6 @@ using System.Text;
 using System.Threading;
 using COLID.MessageQueue.Configuration;
 using COLID.MessageQueue.Datamodel;
-using CorrelationId;
-using CorrelationId.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -18,8 +16,7 @@ using RabbitMQ.Client.Exceptions;
 namespace COLID.MessageQueue.Services
 {
     internal class MessageQueueService : IMessageQueueService
-    {
-        private readonly ICorrelationContextAccessor _correlationContext;
+    {
         //private readonly IConnectionFactory _connectionFactory;
         private readonly IConnection _connection;
         private readonly ILogger _logger;
@@ -31,12 +28,10 @@ namespace COLID.MessageQueue.Services
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization", "CA1303:Do not pass literals as localized parameters", Justification = "<Pending>")]
         public MessageQueueService(
-            ICorrelationContextAccessor correlationContext,
             IOptionsMonitor<ColidMessageQueueOptions> messageQueueOptionsAccessor,
             IServiceProvider provider,
             ILogger<MessageQueueService> logger)
-        {
-            _correlationContext = correlationContext;
+        {
             _logger = logger;
 
             var options = messageQueueOptionsAccessor.CurrentValue;
@@ -137,8 +132,7 @@ namespace COLID.MessageQueue.Services
                     arguments: null);
 
                 var body = Encoding.UTF8.GetBytes(message);
-                var basicProperties = CreateBasicProperties(basicProperty);
-                _logger.LogDebug($"[Reindexing] Publish > CorrelationId = {basicProperties.CorrelationId}");
+                var basicProperties = CreateBasicProperties(basicProperty);
 
                 lock (_channel)
                 {
@@ -159,8 +153,7 @@ namespace COLID.MessageQueue.Services
         {
             var props = _channel.CreateBasicProperties();
             props.Priority = basicProperty?.Priority ?? 0;
-            props.CorrelationId = _correlationContext.CorrelationContext == null ? Guid.NewGuid().ToString() : _correlationContext.CorrelationContext.CorrelationId;
-
+
             return props;
         }
 
@@ -188,9 +181,6 @@ namespace COLID.MessageQueue.Services
             {
                 var routingKey = ea.RoutingKey;
                 var message = Encoding.UTF8.GetString(ea.Body.ToArray());
-                var correlationContext = new CorrelationContext(ea.BasicProperties.CorrelationId, CorrelationIdOptions.DefaultHeader);
-                _correlationContext.CorrelationContext = correlationContext;
-                _logger.LogDebug($"CorrelationId(Received)={_correlationContext.CorrelationContext.CorrelationId}");
 
                 _logger.LogDebug($"Received message on MQ topic {routingKey}");
 

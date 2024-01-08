@@ -2,6 +2,8 @@
 using COLID.Graph.TripleStore.Services;
 using COLID.Graph.Metadata.DataModels.MetadataGraphConfiguration;
 using COLID.Graph.Metadata.Repositories;
+using System;
+using COLID.Graph.Metadata.DataModels.Metadata;
 
 namespace COLID.Graph.Metadata.Services
 {
@@ -22,5 +24,11 @@ namespace COLID.Graph.Metadata.Services
         /// </summary>
         /// <returns>the latest configuration</returns>
         MetadataGraphConfigurationResultDTO GetLatestConfiguration();
+
+        /// <summary>
+        /// Gets the latest keyword graphs.
+        /// </summary>
+        /// <returns>the latest keyword graphs</returns>
+        IList<string> GetAllKeywordGraphs();        
     }
 }

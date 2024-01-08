@@ -55,6 +55,16 @@ namespace COLID.Graph.Metadata.Services
             return _mapper.Map<MetadataGraphConfigurationResultDTO>(latestMetadataGraphConfiguration);
         }
 
+        public IList<string> GetAllKeywordGraphs()
+        {
+            MetadataGraphConfigurationResultDTO allGraphs = GetLatestConfiguration();
+
+            var keywordGraphs = allGraphs.Properties.Where(x => x.Key == Constants.MetadataGraphConfiguration.HasInstanceGraph || x.Key == Constants.MetadataGraphConfiguration.HasKeywordsGraph).
+                SelectMany(x => x.Value).Select(x => x).OfType<string>().ToList();            
+            
+            return keywordGraphs;
+        }
+
         public override async Task<MetadataGraphConfigurationWriteResultCTO> CreateEntity(MetadataGraphConfigurationRequestDTO metadataGraphConfiguration)
         {
             metadataGraphConfiguration.Properties.TryRemoveKey(Constants.EnterpriseCore.HasStartDateTime);

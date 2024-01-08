@@ -16,7 +16,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using COLID.Graph.Metadata.DataModels.Resources;
-using CorrelationId.Abstractions;
 using Newtonsoft.Json;
 using COLID.Graph.TripleStore.DataModels.Resources;
 using System.Collections.Generic;
@@ -28,7 +27,6 @@ namespace COLID.RegistrationService.Services.Implementation
         private readonly ColidMessageQueueOptions _mqOptions;
         private readonly IHttpClientFactory _clientFactory;
         private readonly CancellationToken _cancellationToken;
-        private readonly ICorrelationContextAccessor _correlationContext;
         private readonly IConfiguration _configuration;
         private readonly ITokenService<ColidIndexingCrawlerServiceTokenOptions> _tokenService;        
         private readonly string IndexingCrawlerServiceReindexApi;
@@ -40,14 +38,12 @@ namespace COLID.RegistrationService.Services.Implementation
             ITokenService<ColidIndexingCrawlerServiceTokenOptions> tokenService,
             IHttpContextAccessor httpContextAccessor,
             IHttpClientFactory clientFactory,
-            ICorrelationContextAccessor correlationContext,
             IConfiguration configuration
             )
         {
             _mqOptions = messageQueuingOptionsAccessor.CurrentValue;
             _tokenService = tokenService;
             _clientFactory = clientFactory;
-            _correlationContext = correlationContext;
             _configuration = configuration;
             _cancellationToken = httpContextAccessor?.HttpContext?.RequestAborted ?? CancellationToken.None;
            
@@ -62,7 +58,7 @@ namespace COLID.RegistrationService.Services.Implementation
             {
                 var accessToken = await _tokenService.GetAccessTokenForWebApiAsync();
                 var response = await httpClient.SendRequestWithOptionsAsync(HttpMethod.Post, IndexingCrawlerServiceReindexApi,
-                    string.Empty, accessToken, _cancellationToken, _correlationContext.CorrelationContext);
+                    string.Empty, accessToken, _cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                 {

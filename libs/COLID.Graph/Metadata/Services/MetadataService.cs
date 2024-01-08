@@ -630,6 +630,6 @@ namespace COLID.Graph.Metadata.Services
             var filterGrp = _metadataRepository.GetFilterGroups();
 
             return filterGrp;
-        }
+        }        
     }
 }

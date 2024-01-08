@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
     <ServerGarbageCollection>false</ServerGarbageCollection>
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
@@ -18,7 +18,6 @@
     <ProjectReference Include="..\..\libs\COLID.Graph\COLID.Graph.csproj" />
     <ProjectReference Include="..\..\libs\COLID.Identity\COLID.Identity.csproj" />
     <ProjectReference Include="..\..\libs\COLID.MessageQueue\COLID.MessageQueue.csproj" />
-    <ProjectReference Include="..\..\libs\COLID.SQS\COLID.SQS.csproj" />
     <ProjectReference Include="..\COLID.RegistrationService.Common\COLID.RegistrationService.Common.csproj" />
     <ProjectReference Include="..\COLID.RegistrationService.References\COLID.RegistrationService.References.csproj" />
     <ProjectReference Include="..\COLID.RegistrationService.Repositories\COLID.RegistrationService.Repositories.csproj" />

@@ -8,6 +8,7 @@ using COLID.AWS.Interface;
 using Amazon.DynamoDBv2;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Amazon.SQS;
 
 namespace COLID.AWS
 {
@@ -31,9 +32,10 @@ namespace COLID.AWS
             {
                 services.AddTransient<IAmazonS3Service, MinIoService>();
             }
-
+            
             services.AddTransient<IAmazonDynamoDB, AmazonDynamoDbService>();
-
+            services.AddAWSService<IAmazonSQS>();
+            services.AddSingleton<IAmazonSQSService, AmazonSQSService>();
 
             return services;
         }

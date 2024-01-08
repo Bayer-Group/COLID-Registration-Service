@@ -9,7 +9,6 @@ using Newtonsoft.Json;
 using COLID.IronMountainService.Common.Models;
 using Microsoft.Extensions.Configuration;
 using System.Threading;
-using CorrelationId.Abstractions;
 using Microsoft.AspNetCore.Http;
 using System.Linq;
 using COLID.Identity.Extensions;
@@ -25,17 +24,14 @@ namespace COLID.RegistrationService.Repositories.Implementation
         private readonly IConfiguration _configuration;
         private readonly bool _bypassProxy;
         private readonly CancellationToken _cancellationToken;
-        private readonly ICorrelationContextAccessor _correlationContext;
         private readonly string _retentionScheduleEndpoint;
         public IronMountainRepository(ILogger<IronMountainRepository> logger, IHttpClientFactory clientFactory,
-                                      IConfiguration configuration, IHttpContextAccessor httpContextAccessor,
-                                      ICorrelationContextAccessor correlationContext)
+                                      IConfiguration configuration, IHttpContextAccessor httpContextAccessor)
         {
             _logger = logger;
             _clientFactory = clientFactory;
             _configuration = configuration;
             _cancellationToken = httpContextAccessor?.HttpContext?.RequestAborted ?? CancellationToken.None;
-            _correlationContext = correlationContext;
             var serverUrl = _configuration.GetConnectionString("ironMountainConnectionUrl");
             _retentionScheduleEndpoint = $"{serverUrl}/api/5.4/retention-schedule";
             _bypassProxy = configuration.GetValue<bool>("BypassProxy");
@@ -54,7 +50,7 @@ namespace COLID.RegistrationService.Repositories.Implementation
             try
             {
                 var path = $"{_retentionScheduleEndpoint}/62/rs_5fb5024870735";
-                response = await httpClient.SendRequestWithOptionsAsync(HttpMethod.Get, path, null, token.AccessToken, _cancellationToken, _correlationContext.CorrelationContext);
+                response = await httpClient.SendRequestWithOptionsAsync(HttpMethod.Get, path, null, token.AccessToken, _cancellationToken);
                 response.EnsureSuccessStatusCode();
             }
             catch (AuthenticationException ex)

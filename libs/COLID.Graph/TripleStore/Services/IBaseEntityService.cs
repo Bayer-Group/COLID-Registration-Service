@@ -67,5 +67,11 @@ namespace COLID.Graph.TripleStore.Services
         /// <param name="id">Output parameter is the id of the located instance.</param>
         /// <returns>true if entity exists, otherwise false</returns>
         bool CheckIfPropertyValueExists(Uri predicate, string obj, string entityType, out string id);
+
+        /// <summary>
+        /// Searches for entities labels in the given system.
+        /// </summary>
+        /// <returns>List of entities matching their label</returns>
+        IList<TEntityResult> GetEntitiesLabels();
     }
 }

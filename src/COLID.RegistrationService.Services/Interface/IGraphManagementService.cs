@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using COLID.AWS.DataModels;
 using COLID.Graph.Triplestore.Exceptions;
 using COLID.RegistrationService.Common.DataModel.Graph;
+using COLID.RegistrationService.Common.DataModels.Graph;
 using Microsoft.AspNetCore.Http;
 
 namespace COLID.RegistrationService.Services.Interface
@@ -51,5 +52,32 @@ namespace COLID.RegistrationService.Services.Interface
         /// </summary>
         /// <param name="graph">Graph name to be downloaded</param>
         public byte[] DownloadGraph(Uri graphName);
+
+        /// <summary>
+        /// Gets the latest keyword graphs.
+        /// </summary>
+        /// <returns>the latest keyword graphs</returns>
+        IList<string> GetAllKeywordGraphs();
+
+        /// <summary>
+        /// Get distinct rdf types in the graph
+        /// </summary>
+        /// <param name="graph"></param>
+        /// <returns></returns>
+        public IList<Uri> GetGraphType(Uri graph);
+
+        /// <summary>
+        /// Gets all keywords and thier usage for the given graph.        
+        /// </summary>
+        /// <param name="graph">the graph to find keywords</param>
+        /// <returns>keywords and thier usage</returns>
+        IList<GraphKeyWordUsage> GetKeyWordUsageInGraph(Uri graph);
+
+        /// <summary>
+        /// Creates a new unreferenced graph with the changes
+        /// </summary>
+        /// <param name="changes">changes to be done in the Graph.</param>
+        /// <response>name of the newly created graph</response>        
+        public Uri ModifyKeyWordGraph(UpdateKeyWordGraph changes);       
     }
 }

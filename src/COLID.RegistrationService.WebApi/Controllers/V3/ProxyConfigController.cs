@@ -1,6 +1,9 @@
 ﻿using System.Net.Mime;
 using COLID.RegistrationService.Services.Interface;
 using Microsoft.AspNetCore.Mvc;
+using System.Threading.Tasks;
+using COLID.RegistrationService.Common.DataModels.Search;
+using System;
 
 namespace COLID.RegistrationService.WebApi.Controllers.V3
 {
@@ -10,8 +13,8 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
     [ApiController]
     [ApiVersion(Constants.API.Version.V3)]
     [Route("api/v{version:apiVersion}/proxyConfig")]
-    [Produces(MediaTypeNames.Text.Plain)]
-    [ApiExplorerSettings(IgnoreApi = true)]
+    [Produces(MediaTypeNames.Text.Plain, MediaTypeNames.Application.Json)]
+    //[ApiExplorerSettings(IgnoreApi = true)]
     public class ProxyConfigController : Controller
     {
         private readonly IProxyConfigService _proxyConfigService;
@@ -48,9 +51,9 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         /// Rebuild Proxy Config DynamoDb.
         /// </summary>
         [HttpPut]
-        public IActionResult RebuildProxyConfiguration()
+        public async Task<IActionResult> RebuildProxyConfiguration()
         {
-            _proxyConfigService.proxyConfigRebuild();
+            await _proxyConfigService.proxyConfigRebuild();
 
             return Ok();
         }
@@ -71,6 +74,59 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
                 return NotFound("No proxy config found.");
             }
             return Ok(proxyConfig);
+        }
+
+        /// <summary>
+        /// Creates and insert proxy config in dynamodb for a search filter.
+        /// </summary>
+        [HttpPost("addSearchFilterProxy")]
+        public IActionResult AddUpdateNginxConfigRepositoryForSearchFilter([FromBody] SearchFilterProxyDTO searchFilterProxyDTO)
+        {
+            _proxyConfigService.AddUpdateNginxConfigRepositoryForSearchFilter(searchFilterProxyDTO);
+
+            return Ok();
+        }
+
+        /// <summary>
+        /// Deletes the proxy config in dynamodb for a search filter
+        /// </summary>
+        [HttpDelete("removeSearchFilterProxy")]
+        public IActionResult RemoveSearchFilterUriFromNginxConfigRepository([FromBody] string pidUri)
+        {
+            _proxyConfigService.RemoveSearchFilterUriFromNginxConfigRepository(pidUri, Common.Constants.PidUriTemplateSuffix.SavedSearchesParentNode);
+
+            return Ok();
+        }
+
+        /// <summary>
+        /// Deletes the proxy config in dynamodb for rrm maps.
+        /// </summary>
+        [HttpDelete("removeMapsProxy")]
+        public IActionResult RemoveMapsUriFromNginxConfigRepository([FromBody] string pidUri)
+        {
+            _proxyConfigService.RemoveSearchFilterUriFromNginxConfigRepository(pidUri, Common.Constants.PidUriTemplateSuffix.RRMMapsParentNode);
+
+            return Ok();
+        }
+
+        /// <summary>
+        /// Finds pidUris that are not configured for Proxy
+        /// </summary>
+        [HttpGet("pidUrisWithNoProxyConfig")]
+        public IActionResult FindPidUrisNotConfiguredForProxy()
+        {
+            return Ok(_proxyConfigService.FindPidUrisNotConfiguredForProxy());
+        }
+
+        /// <summary>
+        /// Rebuild Proxy Configuration for a given PidUri
+        /// </summary>
+        /// <param name="pidUri"></param>
+        /// <returns>true if configured successfully </returns>
+        [HttpPut("RebuildProxyConfig")]
+        public IActionResult RebuildProxyConfigurationByPidUri(string pidUri)
+        {
+            return Ok(_proxyConfigService.AddUpdateNginxConfigRepository(pidUri));
         }
     }
 }

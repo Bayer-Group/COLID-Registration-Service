@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -2038,14 +2038,14 @@ namespace COLID.RegistrationService.Services.Implementation
             }
         }
 
-        public async Task<Dictionary<string, string>> NotifyForDueReviews()
+        public async Task<Dictionary<string, List<string>>> NotifyForDueReviews()
         {
             var userList = await _remoteAppDataService.GetAllColidUser();
             var messageTemplateList = await _remoteAppDataService.GetAllMessageTemplates();
             var duewarningTemplate = messageTemplateList.First(x => x.Type == "ReviewDueWarning");
             var deprecatedNotificationTemplate = messageTemplateList.First(x => x.Type == "ReviewDeprecatedNotification");
             var consumerGroupList = _consumerGroupService.GetEntities(null);
-            Dictionary<string, string> emailList = new Dictionary<string, string>();
+            Dictionary<string, List<string>> emailList = new Dictionary<string, List<string>>();
 
             var resources = GetDueResources(null,DateTime.Today.AddDays(10)) ; // give me all resources which are due in the next 10 days
 
@@ -2092,7 +2092,14 @@ namespace COLID.RegistrationService.Services.Implementation
                         }
                         else
                         {
-                            emailList.Add(dataSteward,messageToSend);
+                            if (emailList.ContainsKey(dataSteward))
+                            {
+                                emailList[dataSteward].Add(messageToSend);
+                            }
+                            else
+                            {
+                                emailList.Add(dataSteward,new List<string>() { messageToSend });
+                            }
                         }
                     }
                 }
@@ -2107,7 +2114,14 @@ namespace COLID.RegistrationService.Services.Implementation
                     }
                     else
                     {
-                        emailList.Add(consumergroup_contact, messageToSend);
+                        if (emailList.ContainsKey(consumergroup_contact))
+                        {
+                            emailList[consumergroup_contact].Add(messageToSend);
+                        }
+                        else
+                        {
+                            emailList.Add(consumergroup_contact, new List<string>() { messageToSend });
+                        }
                     }
                 }
             }
@@ -2140,6 +2154,12 @@ namespace COLID.RegistrationService.Services.Implementation
         public void CreateProperty(Uri subject, Uri predicate, string literal, Uri namedGraph)
         {
             _resourceRepository.CreateProperty(subject, predicate, literal, namedGraph);
+        }
+        
+        public string GetResourceLabel(Uri piUri)
+        {
+            Uri instanceGraphUri = GetResourceInstanceGraph();
+            return _resourceRepository.GetResourceLabel(piUri, instanceGraphUri);
         }
     }
 }

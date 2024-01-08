@@ -2331,7 +2331,7 @@ VALUES ?resourceTypes {@resourceTypes}.
 
 
 
-        public IList<DuplicateResult> CheckTargetUriDuplicate(string targetUri, IList<string> resourceTypes, ISet<Uri> resourceNamedGraph, ISet<Uri> metaDataNamedGraphs)
+        public IList<DuplicateResult> CheckTargetUriDuplicate(string targetUri, ISet<Uri> resourceNamedGraph, ISet<Uri> metaDataNamedGraphs)
         {
             if (string.IsNullOrWhiteSpace(targetUri))
             {
@@ -2351,14 +2351,9 @@ VALUES ?resourceTypes {@resourceTypes}.
                 @resourceNamedGraph
                 @metaDataNamedGraphs
                 WHERE
-                     {
-                        Values ?filterType { @resourceTypes }
-                        ?pidEntry rdf:type ?filterType.
-                        ?pidEntry pid2:hasNetworkAddress | pid3:distribution/pid2:hasNetworkAddress | pid3:mainDistribution/pid2:hasNetworkAddress @targetUri.
-                        OPTIONAL {
-                            ?entry pid2:hasNetworkAddress @targetUri.
-                            ?entry a ?type
-                        }
+                     {                        
+                        ?pidEntry rdf:type ?type.
+                        ?pidEntry pid2:hasNetworkAddress @targetUri.                        
                         OPTIONAL {
                              ?pidEntry @hasDraft ?draft
                         }
@@ -2368,7 +2363,7 @@ VALUES ?resourceTypes {@resourceTypes}.
             parameterizedString.SetPlainLiteral("resourceNamedGraph", resourceNamedGraph.JoinAsFromNamedGraphs());
             parameterizedString.SetPlainLiteral("metaDataNamedGraphs", metaDataNamedGraphs.JoinAsFromNamedGraphs());
             parameterizedString.SetUri("hasDraft", new Uri(Graph.Metadata.Constants.Resource.HasPidEntryDraft));
-            parameterizedString.SetPlainLiteral("resourceTypes", resourceTypes.JoinAsValuesList());
+            
 
             SparqlResultSet results = _tripleStoreRepository.QueryTripleStoreResultSet(parameterizedString);
 
@@ -3446,6 +3441,38 @@ VALUES ?resourceTypes {@resourceTypes}.
             });
 
             return linkhistories.ToList();
+        }
+       
+        public string GetResourceLabel(Uri piUri, Uri resourceGraph)
+        {
+            string retrnString = "";
+
+            SparqlParameterizedString parameterizedString = new SparqlParameterizedString
+            {
+                CommandText =
+                @"
+                    SELECT ?label 
+                    From @resourceGraph
+                    WHERE {
+                        ?s @hasPid @pidUri.                                
+                        ?s @hasLabel ?label.                            
+                    }
+                "
+            };
+
+            parameterizedString.SetUri("pidUri", piUri);
+            parameterizedString.SetUri("hasPid", new Uri(Graph.Metadata.Constants.EnterpriseCore.PidUri));
+            parameterizedString.SetUri("hasLabel", new Uri(Graph.Metadata.Constants.Resource.HasLabel));
+            parameterizedString.SetUri("resourceGraph", resourceGraph);
+
+            var results = _tripleStoreRepository.QueryTripleStoreResultSet(parameterizedString);
+
+            if (results.Count > 0)
+            {
+                retrnString = results[0].GetNodeValuesFromSparqlResult("label").Value;
+            }
+
+            return retrnString;
         }
     }
 }

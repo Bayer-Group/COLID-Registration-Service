@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Threading;
@@ -14,11 +15,11 @@ using COLID.Identity.Extensions;
 using COLID.Identity.Services;
 using COLID.RegistrationService.Common.DataModel.DistributionEndpoints;
 using COLID.RegistrationService.Common.DataModels.Contacts;
+using COLID.RegistrationService.Common.DataModels.Search;
 using COLID.RegistrationService.Common.DataModels.TransferObjects;
 using COLID.RegistrationService.Services.Configuration;
 using COLID.RegistrationService.Services.DataModel;
 using COLID.RegistrationService.Services.Interface;
-using CorrelationId.Abstractions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -30,7 +31,6 @@ namespace COLID.RegistrationService.Services.Implementation
     {
         private readonly CancellationToken _cancellationToken;
         private readonly IHttpClientFactory _clientFactory;
-        private readonly ICorrelationContextAccessor _correlationContext;
         private readonly IConfiguration _configuration;
         private readonly ILogger<RemoteAppDataService> _logger;
         private readonly ITokenService<ColidAppDataServiceTokenOptions> _tokenService;
@@ -47,12 +47,12 @@ namespace COLID.RegistrationService.Services.Implementation
         private readonly string AppDataServiceCheckUsersAreValid;
         private readonly string AppDataServiceDeleteByAdditionalInfoApi;
         private readonly string AppDataServiceGetByAdditionalInfoApi;
+        private readonly string AppDataServiceGetAllSavedSearchFiltersApi;
 
         public RemoteAppDataService(
             IHttpClientFactory clientFactory,
             IConfiguration configuration,
             IHttpContextAccessor httpContextAccessor,
-            ICorrelationContextAccessor correlationContext,
             ILogger<RemoteAppDataService> logger,
             ITokenService<ColidAppDataServiceTokenOptions> tokenService,
             ICacheService cacheService)
@@ -60,7 +60,6 @@ namespace COLID.RegistrationService.Services.Implementation
             _clientFactory = clientFactory;
             _configuration = configuration;
             _tokenService = tokenService;
-            _correlationContext = correlationContext;
             _logger = logger;
             _cancellationToken = httpContextAccessor?.HttpContext?.RequestAborted ?? CancellationToken.None;
             _cacheService = cacheService;
@@ -78,6 +77,7 @@ namespace COLID.RegistrationService.Services.Implementation
             AppDataServiceCheckUsersAreValid = $"{serverUrl}/api/ActiveDirectory/users/status";
             AppDataServiceDeleteByAdditionalInfoApi = $"{serverUrl}/api/Messages/deleteByAdditionalInfo";
             AppDataServiceGetByAdditionalInfoApi = $"{serverUrl}/api/Messages/getByAdditionalInfo";
+            AppDataServiceGetAllSavedSearchFiltersApi = $"{serverUrl}/api/Users/searchAllFiltersDataMarketplace";
         }
 
         public async Task CreateConsumerGroup(Uri consumerGroupId)
@@ -295,7 +295,7 @@ namespace COLID.RegistrationService.Services.Implementation
         {
             var accessToken = await _tokenService.GetAccessTokenForWebApiAsync();
             var response = await httpClient.SendRequestWithOptionsAsync(httpMethod, endpointUrl,
-                requestBody, accessToken, _cancellationToken, _correlationContext.CorrelationContext);
+                requestBody, accessToken, _cancellationToken);
             _logger.LogInformation("AquireTokenAndSendToAppDataService: with the response: ", response);
             Console.WriteLine("in remotAppDataServ/AquireTokenAnd... response: "+response);
             return response;
@@ -327,6 +327,28 @@ namespace COLID.RegistrationService.Services.Implementation
                 var jsonResponse = await response.Content.ReadAsStringAsync();
 
                   
+            }
+        }
+
+        public async Task<List<SearchFilterProxyDTO>> GetAllSavedSearchFilters()
+        {
+
+            using (var httpClient = (_bypassProxy ? _clientFactory.CreateClient("NoProxy") : _clientFactory.CreateClient()))
+            {
+                var response = await AquireTokenAndSendToAppDataService(httpClient, HttpMethod.Get, AppDataServiceGetAllSavedSearchFiltersApi, null);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var message = "Something went wrong while getting all saved search filters";
+                    var result = await response.Content.ReadAsStringAsync();
+                    _logger.LogError(message, result);
+                    throw new TechnicalException(message);
+                }
+
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+
+                List<SearchFilterProxyDTO> allSearchFiltersList = JsonConvert.DeserializeObject<List<SearchFilterProxyDTO>>(jsonResponse);
+                return allSearchFiltersList.Where(x=>x.PidUri!=null).ToList();
             }
         }
     }

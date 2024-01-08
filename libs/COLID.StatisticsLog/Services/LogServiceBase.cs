@@ -8,15 +8,19 @@ using Amazon.Runtime;
 using COLID.StatisticsLog.Configuration;
 using COLID.StatisticsLog.DataModel;
 using COLID.StatisticsLog.LogTypes;
-using Elasticsearch.Net;
-using Elasticsearch.Net.Aws;
+using OpenSearch.Net;
+using OpenSearch.Net.Auth.AwsSigV4;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 using Serilog;
 using Serilog.Events;
-using Serilog.Formatting.Elasticsearch;
-using Serilog.Sinks.Elasticsearch;
+using Serilog.Formatting.OpenSearch;
+using Serilog.Sinks.OpenSearch;
 using Destructurama;
+using OpenSearch.Client.JsonNetSerializer;
+using OpenSearch.Client;
+using Microsoft.Extensions.Hosting;
+using COLID.StatisticsLog.Constants;
 
 namespace COLID.StatisticsLog.Services
 {
@@ -28,11 +32,13 @@ namespace COLID.StatisticsLog.Services
         protected readonly string _productName;
         protected readonly string _layerName;
         protected readonly string _anonymizerKey;
-        protected readonly AwsHttpConnection _awsHttpConnection;
+        protected readonly AwsSigV4HttpConnection _awsHttpConnection;
         protected readonly SHA256 _sha256;
+        private readonly IHostEnvironment _environment;
+
 #pragma warning restore CA1051 // Do not declare visible instance fields
 
-        protected LogServiceBase(IOptionsMonitor<Configuration.ColidStatisticsLogOptions> optionsAccessor, IHttpContextAccessor httpContextAccessor)
+        protected LogServiceBase(IOptionsMonitor<Configuration.ColidStatisticsLogOptions> optionsAccessor, IHttpContextAccessor httpContextAccessor, IHostEnvironment environment)
         {
             Contract.Requires(optionsAccessor != null);
 
@@ -42,26 +48,26 @@ namespace COLID.StatisticsLog.Services
             _layerName = options.LayerName;
             _anonymizerKey = options.AnonymizerKey;
             _sha256 = SHA256.Create();
-
+            _environment = environment;
             if (options.Enabled)
             {
+                var region = RegionEndpoint.GetBySystemName(options.AwsRegion);
                 // if accessKey and secretKey are provided via configuration, use them. otherwise try to
                 // determine by default AWS credentials resolution process see https://docs.aws.amazon.com/sdk-for-net/v3/developer-guide/net-dg-config-creds.html#creds-assign
                 if (!string.IsNullOrWhiteSpace(options.AccessKey) && !string.IsNullOrWhiteSpace(options.SecretKey))
                 {
                     var creds = new BasicAWSCredentials(options.AccessKey, options.SecretKey);
-                    var region = RegionEndpoint.GetBySystemName(options.AwsRegion);
-                    _awsHttpConnection = new AwsHttpConnection(creds, region);
+                    _awsHttpConnection = new AwsSigV4HttpConnection(creds, region);
                 }
                 else
                 {
                     try
                     {
-                        _awsHttpConnection = new AwsHttpConnection(options.AwsRegion);
+                        _awsHttpConnection = new AwsSigV4HttpConnection(region);
                     }
                     catch (System.ArgumentException exception) //catch case where an invalid endpoint is provided. Sometimes happens on local Docker
                     {
-                        _awsHttpConnection = new AwsHttpConnection(RegionEndpoint.EUCentral1.SystemName);
+                        Console.WriteLine("Error: Unable to establish region connection " + exception.Message);
                     }
                 }
             }
@@ -82,14 +88,41 @@ namespace COLID.StatisticsLog.Services
             return new LoggerConfiguration()
               .Destructure.JsonNetTypes()
               .MinimumLevel.Verbose()
-              .WriteTo.Elasticsearch(new ElasticsearchSinkOptions(options.BaseUri)
+              .WriteTo.OpenSearch(new Serilog.Sinks.OpenSearch.OpenSearchSinkOptions(options.BaseUri)
               {
                   NumberOfShards = 1,
                   ModifyConnectionSettings = conn =>
                   {
-                      var httpConnection = _awsHttpConnection;
                       var pool = new SingleNodeConnectionPool(options.BaseUri);
-                      return new ConnectionConfiguration(pool, httpConnection);
+                      switch (_environment.EnvironmentName)
+                      {
+                          case LogConstants.EnvironmentLocal:
+                              {
+                                  //Connect Local to AWS Opensearch
+                                  var cred = new SessionAWSCredentials("ASIAYZLCAZR6JBGCN5H7", "eF8VcOpZfzUTj+hmxTw6GhoCkvTmN2AFXcjd/kmS", "FwoGZXIvYXdzEBwaDEcMU4YLkLkkd1izVSK9AcZq/JCFnMH0/S8r0r8ezTyFgm18NRooawhHiKJRQp6QUAKSNaeLjfN9lIvopcBdFjcIZJg+MlI98rKh0jC7pwt8HVIszmlq9HEneLrFCZrJZ8Dy9th6rgir4IJ3aAGW9ILu9xAffoxzn9/RSVpxUafbFpSQBgf+kee+7AXYlyRDHa3dUQnluBpa2u/Fzh/p0O2s739pI1hxYy0z+Kl71/XGZgyYBNpeuTM/C9FvUqaH48dXOHR9qYrRfxHpyyii5MGnBjItJd7S/BbyYkzCUYfpTzNfuL8HIAUa4hTlKId4HwpLw0ywpeXXhYyIM0xqvz8Z");
+                                  var httpConnection = new AwsSigV4HttpConnection(cred, RegionEndpoint.GetBySystemName(options.AwsRegion));                                  
+                                  var conConfig = new ConnectionConfiguration(pool, httpConnection).PrettyJson();
+                                  conConfig.ServerCertificateValidationCallback(CertificateValidations.AllowAll);
+                                  return conConfig;
+                                  break;
+                              }
+                          case LogConstants.EnvironmentDocker:
+                              {
+                                  //Connect to Docker Opensearch
+                                  var conConfig = new ConnectionConfiguration(pool);                                  
+                                  conConfig.BasicAuthentication("admin", "admin");
+                                  conConfig.ServerCertificateValidationCallback(CertificateValidations.AllowAll);
+                                  conConfig.DisableAutomaticProxyDetection(true);
+                                  return conConfig;                                  
+                                  break;
+                              }
+                          default:
+                              {
+                                  //Connect to AWS DEV/QA/Prod
+                                  return new ConnectionConfiguration(pool, _awsHttpConnection);
+                              }
+                      }
+                      
                   },
                   IndexFormat = IndexFormat(options),
                   FailureCallback = e =>
@@ -103,7 +136,8 @@ namespace COLID.StatisticsLog.Services
                   EmitEventFailure = EmitEventFailureHandling.WriteToSelfLog |
                                      EmitEventFailureHandling.WriteToFailureSink |
                                      EmitEventFailureHandling.RaiseCallback,
-                  CustomFormatter = new ElasticsearchJsonFormatter(),
+                  CustomFormatter = new OpenSearchJsonFormatter(),
+                  
               });
         }
 

@@ -5,6 +5,7 @@ using COLID.StatisticsLog.DataModel;
 using COLID.StatisticsLog.LogTypes;
 using COLID.StatisticsLog.Type;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Serilog;
 using Serilog.Events;
@@ -13,8 +14,8 @@ namespace COLID.StatisticsLog.Services
 {
     internal class GeneralLogService : LogServiceBase, IGeneralLogService
     {
-        public GeneralLogService(IOptionsMonitor<ColidStatisticsLogOptions> optionsAccessor, IHttpContextAccessor httpContextAccessor)
-            : base(optionsAccessor, httpContextAccessor) { }
+        public GeneralLogService(IOptionsMonitor<ColidStatisticsLogOptions> optionsAccessor, IHttpContextAccessor httpContextAccessor, IHostEnvironment environment)
+            : base(optionsAccessor, httpContextAccessor, environment) { }
 
         protected override string Suffix() => "general";
 

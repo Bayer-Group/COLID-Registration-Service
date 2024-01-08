@@ -383,21 +383,16 @@ namespace COLID.RegistrationService.Services.Implementation
             try
             {
                 var distributionEndpoint = endpoint.NetworkAddress;
-                HttpResponseMessage responseMessage = _client.GetAsync(distributionEndpoint).Result;
+                var responseMessage = _client.GetAsync(distributionEndpoint).Result;
                 var responseString = responseMessage.Content.ReadAsStringAsync().Result;
 
+                _logger.LogInformation("Status code for {request} is {statusCode}", endpoint.NetworkAddress, responseMessage.StatusCode);
                 switch (responseMessage.StatusCode)
                 {
                     /*204, 205*/
                     case HttpStatusCode.NoContent:
                     case HttpStatusCode.ResetContent:
                         result = false;
-                        break;
-
-                    /*304*/
-                    case HttpStatusCode.NotModified:
-                        result = true;
-                        //result = validate_content(string.Empty, string.Empty);
                         break;
 
                     /*401, 402, 403, 406, 409, 411, 413, 415, 416, 417, [418], 422, 423, 424, [425], 426, 429, 431 */
@@ -432,7 +427,7 @@ namespace COLID.RegistrationService.Services.Implementation
                                 //result = validate_content(string.Empty, string.Empty);
                                 break;
                             case 3:/*300+*/
-                                result = false;
+                                result = true;
                                 break;
                             case 4:/*400+*/
                                 result = false;
@@ -447,8 +442,9 @@ namespace COLID.RegistrationService.Services.Implementation
             //if not 200 it will fail 
             catch (System.Exception exception)
             {
-                _logger.LogDebug(exception.Message);
-                result = false;
+                // in case there is a timeout we cant check the validity of the endpoint and therefore set it to true
+                _logger.LogError(exception.Message);
+                result = true;
             }
             endpoint.CheckedFlag = !result; //if the checkedflag is true that means the link is broken
             return (endpoint, result); //the tested endpoint and the test result

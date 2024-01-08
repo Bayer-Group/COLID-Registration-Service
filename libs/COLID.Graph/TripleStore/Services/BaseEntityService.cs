@@ -133,6 +133,17 @@ namespace COLID.Graph.TripleStore.Services
                     .OrderBy(c => c.Name).ToList();
         }
 
+        public virtual IList<TEntityResult> GetEntitiesLabels()
+        {
+
+            var entities = _repository.GetEntitiesLabels(GetAllMetadataGraphs());
+
+            return entities
+                    .Where(c => c.Id.IsValidBaseUri())
+                    .Select(c => _mapper.Map<TEntityResult>(c))
+                    .OrderBy(c => c.Name).ToList();
+        }
+
         public virtual TEntityResult GetEntity(string id)
         {
             var entity = _repository.GetEntityById(id, GetAllInstanceGraphs());
@@ -159,6 +170,11 @@ namespace COLID.Graph.TripleStore.Services
         private ISet<Uri> GetAllInstanceGraphs()
         {
             return _metadataService.GetAllGraph();
+        }
+
+        private ISet<Uri> GetAllMetadataGraphs()
+        {
+            return _metadataService.GetMetadataGraphs();
         }
 
         public bool CheckIfPropertyValueExists(Uri predicate, string obj, string entityType, out string id)

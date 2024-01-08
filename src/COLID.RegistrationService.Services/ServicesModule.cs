@@ -96,6 +96,7 @@ namespace COLID.RegistrationService.Services
                 typeof(PidUriTemplateProfile));
 
             services.Configure<ColidAppDataServiceTokenOptions>(configuration.GetSection("ColidAppDataServiceTokenOptions"));
+            services.Configure<ColidRRMServiceTokenOptions>(configuration.GetSection("ColidRRMServiceTokenOptions"));
             services.Configure<ColidIndexingCrawlerServiceTokenOptions>(configuration.GetSection("ColidIndexingCrawlerServiceTokenOptions"));
             services.Configure<ColidSearchServiceTokenOptions>(configuration.GetSection("ColidSearchServiceTokenOptions"));
             services.Configure<AmazonWebServicesOptions>(configuration.GetSection("AmazonWebServicesOptions"));
@@ -131,6 +132,7 @@ namespace COLID.RegistrationService.Services
             services.AddTransient<IEntityPropertyValidator, EntityPropertyValidator>();
 
             services.AddTransient<IRemoteAppDataService, RemoteAppDataService>();
+            services.AddTransient<IRemoteRRMService, RemoteRRMService>();
             services.AddTransient<IValidationService, ValidationService>();
             services.AddTransient<IIdentifierValidationService, IdentifierValidationService>();
 
@@ -147,8 +149,8 @@ namespace COLID.RegistrationService.Services
 
             services.AddSingleton<ProxyConfigService>();
             services.AddSingleton<IProxyConfigService>(x => x.GetRequiredService<ProxyConfigService>());
-            services.AddSingleton<IMessageQueuePublisher>(x => x.GetRequiredService<ProxyConfigService>());
-            services.AddSingleton<IMessageQueueReceiver>(x => x.GetRequiredService<ProxyConfigService>());
+            //services.AddSingleton<IMessageQueuePublisher>(x => x.GetRequiredService<ProxyConfigService>());
+            //services.AddSingleton<IMessageQueueReceiver>(x => x.GetRequiredService<ProxyConfigService>());
 
             services.AddTransient<IExportService, ExportService>();
             services.AddTransient<ICacheManagerService, CacheManagerService>();

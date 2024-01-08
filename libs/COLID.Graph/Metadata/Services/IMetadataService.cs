@@ -208,6 +208,6 @@ namespace COLID.Graph.Metadata.Services
         /// Get Filter Group and Properties
         /// </summary>
         /// <returns></returns>
-        IList<FilterGroup> GetFilterGroupAndProperties();
+        IList<FilterGroup> GetFilterGroupAndProperties();        
     }
 }

@@ -16,6 +16,7 @@ namespace COLID.StatisticsLog.DataModel
 
         public string UserId { get; set; }
         public string AppId { get; set; }
+        public string Department { get; set; }
 
         public long? ElapsedMilliseconds { get; set; }
 

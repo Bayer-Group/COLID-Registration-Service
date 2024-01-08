@@ -724,6 +724,6 @@ ORDER BY  ?groupOrder ?propertyOrder";
             }).ToList();
 
             return foundEntities;
-        }
+        }        
     }
 }

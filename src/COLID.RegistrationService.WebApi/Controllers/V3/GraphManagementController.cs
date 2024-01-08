@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using COLID.Common.DataModel.Attributes;
 using COLID.Graph.Utils;
 using COLID.Identity.Requirements;
+using COLID.RegistrationService.Common.DataModels.Graph;
 using COLID.RegistrationService.Services.Interface;
 using COLID.RegistrationService.WebApi.Filters;
 using COLID.StatisticsLog.Type;
@@ -101,9 +102,59 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         [HttpGet("download")]
         public IActionResult DownloadGraph([FromQuery] Uri graph)
         {
-            var file = File(_graphService.DownloadGraph(graph), _mimetypeOctetStream, GraphUtils.GetFileName(graph));
-            
+            var file = File(_graphService.DownloadGraph(graph), _mimetypeOctetStream, GraphUtils.GetFileName(graph));            
             return file;
+        }
+
+        /// <summary>
+        /// Returns the keyword graphs that are currently in use.
+        /// </summary>
+        /// <returns>The latest keyword graphs</returns>
+        /// <response code="200">Returns the latest keyword graphs</response>
+        /// <response code="404">If no keyword graph exists</response>
+        /// <response code="500">If an unexpected error occurs</response>
+        [HttpGet]
+        [Route("keywordGraphs")]
+        public IActionResult GetAllKeywordGraphs()
+        {
+            return Ok(_graphService.GetAllKeywordGraphs());
+        }
+
+        /// <summary>
+        /// Get the rdf type of instances in the graph, checks in the first triple only so multiple types will be ignored
+        /// assuming one graph will hold only one type of instance
+        /// </summary>
+        /// <param name="graph"></param>
+        /// <returns></returns>
+        [HttpGet]
+        [Route("graphType")]
+        public IActionResult GetGraphType(Uri graph)
+        {
+            return Ok(_graphService.GetGraphType(graph));
+        }
+
+        /// <summary>
+        /// Gets all keywords and thier usage for the given graph.        
+        /// </summary>
+        /// <param name="graph">the graph to find keywords</param>
+        /// <returns>keywords and thier usage</returns>
+        [HttpGet]
+        [Route("keywordUsageInGraph")]
+        public IActionResult GetKeyWordUsageInGraph(Uri graph)
+        {
+            return Ok(_graphService.GetKeyWordUsageInGraph(graph));
+        }
+
+        /// <summary>
+        /// Creates a new unreferenced graph with the changes
+        /// </summary>
+        /// <param name="changes">changes to be done in the Graph.</param>
+        /// <response code="500">If an unexpected error occurs</response>
+        [HttpPost]
+        [Route("modifyKeyWordGraph")]
+        public IActionResult ModifyKeyWordGraph(UpdateKeyWordGraph changes)
+        {
+            return Ok(_graphService.ModifyKeyWordGraph(changes));
         }
     }
 }
