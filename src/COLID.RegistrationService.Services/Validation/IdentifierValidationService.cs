@@ -318,7 +318,7 @@ namespace COLID.RegistrationService.Services.Validation
             return namedGraphList;
         }*/
         #endregion
-        private Dictionary<Uri, bool> checkIfResourceExistAndReturnNamedGraph(Uri pidUri)
+        public Dictionary<Uri, bool> CheckIfResourceExistAndReturnNamedGraph(Uri pidUri)
         {
             var resourceTypes = _metadataService.GetInstantiableEntityTypes(Graph.Metadata.Constants.Resource.Type.FirstResouceType);
             var draftExist = _resourceRepository.CheckIfExist(pidUri, resourceTypes, GetDraftInstanceGraph());

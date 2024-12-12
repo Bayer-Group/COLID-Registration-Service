@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using COLID.Graph.TripleStore.DataModels.Base;
 using COLID.Graph.Metadata.DataModels.Validation;
+using System;
 
 namespace COLID.RegistrationService.Services.Validation
 {
@@ -17,5 +18,7 @@ namespace COLID.RegistrationService.Services.Validation
         /// <param name="previousVersion">previous version identifiers of the resource</param>
         /// <returns></returns>
         IList<ValidationResultProperty> CheckDuplicates(Entity resource, string resourceId, string previousVersion);
+
+        Dictionary<Uri, bool> CheckIfResourceExistAndReturnNamedGraph(Uri pidUri);
     }
 }

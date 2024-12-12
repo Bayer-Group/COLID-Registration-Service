@@ -330,5 +330,11 @@ namespace COLID.RegistrationService.Services.Interface
         /// <param name="piUri">The unique id of the resource</param>        
         /// <returns></returns>
         string GetResourceLabel(Uri piUri);
+
+        IList<string> GetEligibleCollibraDataTypes();
+
+        IList<string> GetPIDURIsForCollibra();
+
+        Task PostPIDURIsForCollibra();
     }
 }

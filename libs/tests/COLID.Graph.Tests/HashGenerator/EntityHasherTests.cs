@@ -15,6 +15,7 @@ namespace COLID.Graph.Tests.HashGenerator
     {
         private readonly IEntityHasher _hasher;
         private readonly ITestOutputHelper _output;
+        //private readonly Mock<IResourceConstants> _resourceConstantsMock;
 
         public EntityHasherTests(ITestOutputHelper outputHelper)
         {

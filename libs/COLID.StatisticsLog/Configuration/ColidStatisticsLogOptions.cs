@@ -16,9 +16,9 @@ namespace COLID.StatisticsLog.Configuration
 
         public string AwsRegion { get; set; }
 
-        public string AccessKey { get; set; }
+        public string Username { get; set; }
 
-        public string SecretKey { get; set; }
+        public string Password { get; set; }
 
         public string AnonymizerKey { get; set; }
     }

@@ -23,6 +23,7 @@ namespace COLID.RegistrationService.Services.Implementation
         private readonly ITaxonomyRepository _taxonomyRepository;
         private readonly ICacheService _cacheService;
         private readonly IMetadataGraphConfigurationService _metadataGraphConfigurationService;
+        private readonly ILogger<TaxonomyService> _logger;
 
         private static readonly List<string> _searchIgnoredProperties = new List<string>()
         {
@@ -43,6 +44,7 @@ namespace COLID.RegistrationService.Services.Implementation
             _taxonomyRepository = taxonomyRepository;
             _cacheService = cacheService;
             _metadataGraphConfigurationService = metadataGraphConfigurationService;
+            _logger = logger;
         }
 
         public override TaxonomyResultDTO GetEntity(string id)
@@ -66,31 +68,40 @@ namespace COLID.RegistrationService.Services.Implementation
 
         public IList<TaxonomyResultDTO> GetTaxonomies(string taxonomyType)
         {
-            var taxonomies = _cacheService.GetOrAdd($"type:{taxonomyType}", () =>
+            try
             {
+                //_logger.LogInformation("Taxonomy: GetTaxonomies for - " + taxonomyType);
+                var taxonomies = _cacheService.GetOrAdd($"type:{taxonomyType}", () =>
+                {
                 // This block fetches multiple graphs for a field type from metadata config
                 // This can be dynamically extended for future taxonomies which need multiple graphs
-                var taxonomyList = new List<Taxonomy>();
-                var configurationGraphs = new HashSet<Uri>();
-                var latestMetadataGraphConfiguration = _metadataGraphConfigurationService.GetLatestConfiguration();
-                var graphList = latestMetadataGraphConfiguration.Properties.GetValueOrNull(taxonomyType, false);
+                    var taxonomyList = new List<Taxonomy>();
+                    var configurationGraphs = new HashSet<Uri>();
+                    var latestMetadataGraphConfiguration = _metadataGraphConfigurationService.GetLatestConfiguration();
+                    var graphList = latestMetadataGraphConfiguration.Properties.GetValueOrNull(taxonomyType, false);
 
-                if (graphList.Count > 0)
-                {
-                    foreach (var graphitem in graphList)
+                    if (graphList.Count > 0)
                     {
-                        configurationGraphs.Add(new Uri(graphitem));
+                        foreach (var graphitem in graphList)
+                        {
+                            configurationGraphs.Add(new Uri(graphitem));
+                        }
+                        taxonomyList = (List<Taxonomy>)_taxonomyRepository.BuildTaxonomy(taxonomyType, configurationGraphs);
                     }
-                    taxonomyList = (List<Taxonomy>)_taxonomyRepository.BuildTaxonomy(taxonomyType, configurationGraphs);
-                }
-                else
-                {
-                    var graphs = _metadataService.GetMultiInstanceGraph(taxonomyType);
-                    taxonomyList = (List<Taxonomy>)_taxonomyRepository.GetTaxonomies(taxonomyType, graphs);
-                }
-                return TransformTaxonomyListToHierarchy(taxonomyList);
-            });
-            return taxonomies;
+                    else
+                    {
+                        var graphs = _metadataService.GetMultiInstanceGraph(taxonomyType);
+                        taxonomyList = (List<Taxonomy>)_taxonomyRepository.GetTaxonomies(taxonomyType, graphs);
+                    }
+                    return TransformTaxonomyListToHierarchy(taxonomyList);
+                });
+                return taxonomies;
+            }
+            catch (System.Exception ex)
+            {
+                _logger.LogError("Taxonomy: Something went wrong - " + ex.Message);
+                return null;
+            }
         }
 
         public IList<TaxonomyResultDTO> GetTaxonomySearchHits(string taxonomyType, string searchTerm)

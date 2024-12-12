@@ -19,6 +19,8 @@ using COLID.Graph.Metadata.DataModels.Resources;
 using Newtonsoft.Json;
 using COLID.Graph.TripleStore.DataModels.Resources;
 using System.Collections.Generic;
+using COLID.AWS.Interface;
+using COLID.AWS.Implementation;
 
 namespace COLID.RegistrationService.Services.Implementation
 {
@@ -30,15 +32,18 @@ namespace COLID.RegistrationService.Services.Implementation
         private readonly IConfiguration _configuration;
         private readonly ITokenService<ColidIndexingCrawlerServiceTokenOptions> _tokenService;        
         private readonly string IndexingCrawlerServiceReindexApi;
+        private readonly string _indexingResourceDTOInputQueueUrl;
         private readonly bool _bypassProxy;
         public Action<string, string, BasicProperty> PublishMessage { get; set; }
+        private readonly IAmazonSQSService _amazonSQSService;
 
         public ReindexingService(
             IOptionsMonitor<ColidMessageQueueOptions> messageQueuingOptionsAccessor,
             ITokenService<ColidIndexingCrawlerServiceTokenOptions> tokenService,
             IHttpContextAccessor httpContextAccessor,
             IHttpClientFactory clientFactory,
-            IConfiguration configuration
+            IConfiguration configuration,
+            IAmazonSQSService amazonSQSService
             )
         {
             _mqOptions = messageQueuingOptionsAccessor.CurrentValue;
@@ -46,10 +51,12 @@ namespace COLID.RegistrationService.Services.Implementation
             _clientFactory = clientFactory;
             _configuration = configuration;
             _cancellationToken = httpContextAccessor?.HttpContext?.RequestAborted ?? CancellationToken.None;
-           
-            var serverUrl = _configuration.GetConnectionString("indexingCrawlerServiceUrl");
+            _amazonSQSService = amazonSQSService;
+
+             var serverUrl = _configuration.GetConnectionString("indexingCrawlerServiceUrl");
             IndexingCrawlerServiceReindexApi = $"{serverUrl}/api/reindex";
             _bypassProxy = configuration.GetValue<bool>("BypassProxy");
+            _indexingResourceDTOInputQueueUrl = _configuration.GetConnectionString("IndexingResourceDTOInputQueueUrl");
         }
 
         public async Task Reindex()
@@ -114,20 +121,24 @@ namespace COLID.RegistrationService.Services.Implementation
             IndexResource(resourceIndex);
         }        
 
-        private void IndexResource(ResourceIndexingDTO resourceIndexingDto)
+        private async void IndexResource(ResourceIndexingDTO resourceIndexingDto)
         {
             Guard.ArgumentNotNull(resourceIndexingDto, nameof(resourceIndexingDto));
 
             try
             {
                 var jsonString = JsonConvert.SerializeObject(resourceIndexingDto);
-                PublishMessage(_mqOptions.Topics["IndexingResources"], jsonString, null);
+
+                //Should be enabled for Docker Environment in appsettings
+                if (_mqOptions.Enabled) 
+                    PublishMessage(_mqOptions.Topics["IndexingResources"], jsonString, null);
+                else
+                    await _amazonSQSService.SendMessageAsync(_indexingResourceDTOInputQueueUrl, jsonString);                
             }
             catch (System.Exception ex)
             {
-                //TODO: Log error
-                Console.WriteLine($"Something went wrong while publishing resource {resourceIndexingDto.PidUri} by message queue. Exception: {ex}");
-            }
+                Console.WriteLine($"ReindexingService: Something went wrong while publishing resource {resourceIndexingDto.PidUri}. Exception: {ex.Message}");
+            }            
         }        
     }
 }

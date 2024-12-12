@@ -34,9 +34,9 @@ namespace COLID.AWS
             }
             
             services.AddTransient<IAmazonDynamoDB, AmazonDynamoDbService>();
-            services.AddAWSService<IAmazonSQS>();
+            //services.AddAWSService<IAmazonSQS>();
             services.AddSingleton<IAmazonSQSService, AmazonSQSService>();
-
+            services.AddSingleton<IAmazonSQSExtendedService, AmazonSQSExtendedService>();
             return services;
         }
 

@@ -248,3 +248,7 @@ ModelManifest.xml
 src/COLID.RegistrationService.WebApi/Properties/serviceDependencies.json
 
 src/COLID.RegistrationService.WebApi/Properties/serviceDependencies.local.json
+
+# Code Coverage Report Folder
+**/coveragereport
+**/lcov.info

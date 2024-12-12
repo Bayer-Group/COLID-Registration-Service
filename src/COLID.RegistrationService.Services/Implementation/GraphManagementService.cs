@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -22,6 +22,7 @@ using COLID.RegistrationService.Services.Interface;
 using COLID.StatisticsLog.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
+using VDS.RDF;
 using VDS.RDF.Writing;
 
 namespace COLID.RegistrationService.Services.Implementation
@@ -210,34 +211,39 @@ namespace COLID.RegistrationService.Services.Implementation
             
             return changes.SaveAsGraph;
         }
+        public IGraph GetGraph(Uri namedGraph)
+        {
+            return _graphManagementRepo.GetGraph(namedGraph);
+        }
 
-        ///// <summary>
-        ///// Generate a new Version name of the graph
-        ///// </summary>
-        ///// <param name="curGraphName">current graph Name</param>
-        ///// <param name="appendText">a text to append</param>
-        ///// <param name="appendVersion">a version number to append</param>
-        ///// <returns>New graph Name</returns>
-        //private static Uri ConstructNewVersionGraphName(Uri curGraphName, string appendText, int appendVersion )
-        //{
-        //    string newGraphName = "";
-            
-        //    string[] splitGraphName = curGraphName.ToString().Split('/');
+            ///// <summary>
+            ///// Generate a new Version name of the graph
+            ///// </summary>
+            ///// <param name="curGraphName">current graph Name</param>
+            ///// <param name="appendText">a text to append</param>
+            ///// <param name="appendVersion">a version number to append</param>
+            ///// <returns>New graph Name</returns>
+            //private static Uri ConstructNewVersionGraphName(Uri curGraphName, string appendText, int appendVersion )
+            //{
+            //    string newGraphName = "";
 
-        //    if (splitGraphName.Length > 0)
-        //    {
-        //        if (splitGraphName[splitGraphName.Length - 2] == appendText)
-        //        {
-        //            splitGraphName[splitGraphName.Length - 1] = appendVersion.ToString();                    
-        //            newGraphName = String.Join("/", splitGraphName);
-        //        }
-        //        else
-        //        {
-        //            newGraphName = curGraphName.ToString() + "/" + appendText + "/" + appendVersion;
-        //        }
-        //    }
+            //    string[] splitGraphName = curGraphName.ToString().Split('/');
 
-        //    return new Uri(newGraphName);
-        //}
-    }
+            //    if (splitGraphName.Length > 0)
+            //    {
+            //        if (splitGraphName[splitGraphName.Length - 2] == appendText)
+            //        {
+            //            splitGraphName[splitGraphName.Length - 1] = appendVersion.ToString();                    
+            //            newGraphName = String.Join("/", splitGraphName);
+            //        }
+            //        else
+            //        {
+            //            newGraphName = curGraphName.ToString() + "/" + appendText + "/" + appendVersion;
+            //        }
+            //    }
+
+            //    return new Uri(newGraphName);
+            //}
+
+        }
 }

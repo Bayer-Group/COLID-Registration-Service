@@ -15,6 +15,7 @@ namespace COLID.Graph.Metadata.Constants
         public static readonly string HasLifecycleStatus = ServiceUrl + "kos/19050/hasConsumerGroupLifecycleStatus";
         public static readonly string HasContactPerson = ServiceUrl + "kos/19050/hasConsumerGroupContactPerson";
         public static readonly string DefaultDeprecationTime = ServiceUrl + "kos/19050/hasDefaultDeprecationTime";
+        public static readonly string HasResourceTemplates = ServiceUrl + "kos/19050/hasResourceTemplates";
 
         public static class LifecycleStatus
         {

@@ -731,7 +731,7 @@ namespace COLID.RegistrationService.Services.Implementation
             try
             {
                 var delResponse = _amazonDynamoDbService.DeleteItemAsync(_nginxConfigDynamoDbTable, attributes).Result;
-                _logger.LogInformation($"ProxyConfigService: Delete {pidUri} with status {delResponse.HttpStatusCode}", pidUri, delResponse);
+                //_logger.LogInformation($"ProxyConfigService: Delete {pidUri} with status {delResponse.HttpStatusCode}", pidUri, delResponse);
             }
             catch (System.Exception ex)
             {
@@ -754,7 +754,7 @@ namespace COLID.RegistrationService.Services.Implementation
             try
             {
                 var addResponse = _amazonDynamoDbService.PutItemAsync(_nginxConfigDynamoDbTable, attributes).Result;                
-                _logger.LogInformation($"ProxyConfigService: Nginx Config Added/Updated for : {pidUri} with status {addResponse.HttpStatusCode}", pidUri, addResponse);
+                //_logger.LogInformation($"ProxyConfigService: Nginx Config Added/Updated for : {pidUri} with status {addResponse.HttpStatusCode}", pidUri, addResponse);
             }
             catch (System.Exception ex)
             {
@@ -777,11 +777,11 @@ namespace COLID.RegistrationService.Services.Implementation
             try
             {
                 var delResponse = _amazonDynamoDbService.DeleteItemAsync(_nginxConfigDynamoDbTable, attributes).Result;
-                _logger.LogInformation($"ProxyConfigService: Delete {pidUri} with status {delResponse.HttpStatusCode}", pidUri, delResponse);
+                //_logger.LogInformation($"ProxyConfigService: Delete {pidUri} with status {delResponse.HttpStatusCode}", pidUri, delResponse);
             }
             catch (System.Exception ex)
             {
-                _logger.LogInformation($"ProxyConfigServiceError: could not delete Nginx Config before Added/Updated for : {pidUri} Error {ex.StackTrace}", pidUri, ex);
+                _logger.LogError($"ProxyConfigServiceError: could not delete Nginx Config before Added/Updated for : {pidUri} Error {ex.StackTrace}", pidUri, ex);
                 return false;
             }
 
@@ -800,7 +800,7 @@ namespace COLID.RegistrationService.Services.Implementation
             try
             {
                 var addResponse = _amazonDynamoDbService.PutItemAsync(_nginxConfigDynamoDbTable, attributes).Result;
-                _logger.LogInformation($"ProxyConfigService: Nginx Config Added/Updated for : {pidUri} with status {addResponse.HttpStatusCode}", pidUri, addResponse);
+                //_logger.LogInformation($"ProxyConfigService: Nginx Config Added/Updated for : {pidUri} with status {addResponse.HttpStatusCode}", pidUri, addResponse);
             }
             catch (System.Exception ex)
             {
@@ -818,7 +818,7 @@ namespace COLID.RegistrationService.Services.Implementation
             try
             {
                 var delResponse = await _amazonDynamoDbService.DeleteItemAsync(_nginxConfigDynamoDbTable, attributes);
-                _logger.LogInformation($"ProxyConfigService: Nginx Config deleted for : {pidUri}", pidUri);
+                //_logger.LogInformation($"ProxyConfigService: Nginx Config deleted for : {pidUri}", pidUri);
             }
             catch (System.Exception ex)
             {
@@ -833,7 +833,7 @@ namespace COLID.RegistrationService.Services.Implementation
             var pidUriList = _resourceRepository.GetAllPidUris(_metadataService.GetInstanceGraph(PIDO.PidConcept), _metadataService.GetMetadataGraphs());
             
             var numberOfResults = pidUriList.Count;
-            _logger.LogInformation($"ProxyConfigService: Number of pid Uris : {numberOfResults}", numberOfResults);
+            //_logger.LogInformation($"ProxyConfigService: Number of pid Uris : {numberOfResults}", numberOfResults);
 
             foreach (string pidUri in pidUriList)
             {
@@ -880,7 +880,7 @@ namespace COLID.RegistrationService.Services.Implementation
             } while (lastKeyEvaluated != null && lastKeyEvaluated.Count != 0);
 
             var numberOfResults = resultList.Count;
-            _logger.LogInformation($"Number of dynamo items : {numberOfResults}", numberOfResults);
+            //_logger.LogInformation($"Number of dynamo items : {numberOfResults}", numberOfResults);
 
 
             foreach (var item in resultList)
@@ -1096,7 +1096,7 @@ namespace COLID.RegistrationService.Services.Implementation
             try
             {
                 _amazonDynamoDbService.PutItemAsync(_nginxConfigDynamoDbTable, attributes);
-                _logger.LogInformation($"ProxyConfigService: Nginx Config Added/Updated for searchfilter : {searchFilterProxyDTO.PidUri}", searchFilterProxyDTO.PidUri);
+                //_logger.LogInformation($"ProxyConfigService: Nginx Config Added/Updated for searchfilter : {searchFilterProxyDTO.PidUri}", searchFilterProxyDTO.PidUri);
             }
             catch (System.Exception ex)
             {
@@ -1126,7 +1126,7 @@ namespace COLID.RegistrationService.Services.Implementation
                 }
                 catch (System.Exception ex)
                 {
-                    _logger.LogInformation($"ProxyConfigService: could not delete Nginx Config for searchfilter: {pidUri} Error {ex.StackTrace}", pidUri, ex);
+                    _logger.LogError($"ProxyConfigService: could not delete Nginx Config for searchfilter: {pidUri} Error {ex.StackTrace}", pidUri, ex);
                     throw;
                 }
             }
@@ -1165,7 +1165,7 @@ namespace COLID.RegistrationService.Services.Implementation
             try
             {
                 _amazonDynamoDbService.PutItemAsync(_nginxConfigDynamoDbTable, attributes);
-                _logger.LogInformation($"ProxyConfigService: Nginx Config Added/Updated for rrmMaps : {mapProxyDTO.MapId}", mapProxyDTO.MapId);
+                //_logger.LogInformation($"ProxyConfigService: Nginx Config Added/Updated for rrmMaps : {mapProxyDTO.MapId}", mapProxyDTO.MapId);
             }
             catch (System.Exception ex)
             {

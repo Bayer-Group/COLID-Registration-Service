@@ -14,15 +14,17 @@ namespace COLID.RegistrationService.Services.Validation.Validators.Keys
         {
             if (validationFacade.ResourceCrudAction == ResourceCrudAction.Create)
             {
-                validationFacade.RequestResource.Properties[property.Key] = new List<dynamic>() { property.Value[0].ToString("o") };// { DateTime.UtcNow.ToString("o") };
+                if (property.Value == null || DateTime.TryParse(property.Value[0].ToString(), out DateTime val) == false)
+                {
+                    validationFacade.RequestResource.Properties[property.Key] = new List<dynamic>() { DateTime.UtcNow.ToString("o") };
+                }
+                else
+                {
+                    validationFacade.RequestResource.Properties[property.Key] = new List<dynamic>() { property.Value[0].ToString("o") };
+                }                    
                 return;
             }
-            else if (validationFacade.ResourceCrudAction == ResourceCrudAction.Create && property.Value==null)
-            {
-                validationFacade.RequestResource.Properties[property.Key] = new List<dynamic>()  { DateTime.UtcNow.ToString("o") };
-                return;
-            }
-
+            
             var repoResource = validationFacade.ResourcesCTO.GetDraftOrPublishedVersion();
             // If the entry is created, the value is overwritten with the current date, otherwise the creation date from the database is used.
             validationFacade.RequestResource.Properties[property.Key] = repoResource.Properties.GetValueOrNull(Graph.Metadata.Constants.Resource.DateCreated, false);

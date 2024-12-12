@@ -40,6 +40,7 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
         [HttpGet]
         [ValidateActionParameters]
         [Route("taxonomyList")]
+        [ResponseCache(Duration = 60, Location = ResponseCacheLocation.Any, VaryByHeader = "taxonomyType")]
         public IActionResult GetTaxonomies([FromQuery] string taxonomyType)
         {
             var taxonomies = _taxonomyService.GetTaxonomies(taxonomyType);
