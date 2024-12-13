@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Reflection;
+using System.Threading;
 using COLID.Exception;
 using COLID.Identity;
 using COLID.Maintenance;
@@ -19,6 +20,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 
@@ -126,6 +128,7 @@ namespace COLID.RegistrationService.WebApi
             app.UseColidSwaggerUI(Configuration, GetApiVersionsByReflection());
 
             app.UseMessageQueueModule(Configuration);
+            ThreadPool.SetMinThreads(250, 250);
         }
 
         private static string[] GetApiVersionsByReflection()

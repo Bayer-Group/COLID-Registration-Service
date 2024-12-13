@@ -83,6 +83,18 @@
             public const string SameTemplateExists = "A pid uri template with the same properties already exists. Please change the properties or if the same template is deprecated reactivate it.";
         }
 
+        public static class ResourceTemplateMsg
+        {
+            public const string DeleteSuccessful = "The Resource Template has been deleted successfully.";
+            public const string DeleteUnsuccessfulConsumerGroupReference = "The Resource Template cannot be deleted, because it is used in a consumer group.";
+            public const string MatchedFailed = "The Resource Template does not match the given uri.";
+            public const string ForbiddenTemplate = "The specified Resource Template is not allowed to use. Check your consumer groups and rights.";
+            public const string NotExists = "The specified Resource Template does not exist.";
+            public const string InvalidFormat = "The Resource Template was not specified in the correct format.";
+            public const string SameTemplateExists = "A Resource template with the same properties already exists. Please change the properties or if the same template is deprecated reactivate it.";
+            public const string TypeMismatch = "The provided PID Uri doesn't match with the resource type. Please use the correct resource type.";
+        }
+
         public static class Proxy
         {
             public const string ResourceProxy = "An error occurred while generating the config section for a resource with {proxyConfig}.";

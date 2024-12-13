@@ -830,6 +830,55 @@ namespace COLID.RegistrationService.WebApi.Controllers.V3
             var linkHistory = _resourceService.SearchLinkHistory(searchParam);
             return Ok(linkHistory);
         }
+
+        /// <summary>
+        /// Eligible Collibra Data Types      
+        /// </summary>
+        /// <param> </param>             
+        /// <returns>List of eligible Resource types</returns>
+        /// <response code="200">Returns list of eligible resource types</response>
+        [HttpGet]
+        [Route("eligibleCollibraDataTypes")]
+        [ValidateActionParameters]
+        [ProducesResponseType(typeof(IList<string>), StatusCodes.Status200OK)]
+        public IActionResult GetEligibleCollibraDataTypes()
+        {
+            var results = _resourceService.GetEligibleCollibraDataTypes();
+            return Ok(results);
+        }
+
+        /// <summary>
+        /// Fetch resource PID Uris for Collibra      
+        /// </summary>
+        /// <param> </param>             
+        /// <returns>List of eligible pid URIs</returns>
+        /// <response code="200">Returns list of eligible resource types</response>
+        [HttpGet]
+        [Route("PIDURIsForCollibra")]
+        [ValidateActionParameters]
+        [ProducesResponseType(typeof(IList<string>), StatusCodes.Status200OK)]
+        public IActionResult GetPIDURIsForCollibra()
+        {
+            var results = _resourceService.GetPIDURIsForCollibra();
+            return Ok(results);
+        }
+
+        /// <summary>
+        /// Processes PID Uris for Collibra      
+        /// </summary>
+        /// <param> </param>             
+        /// <returns>List of eligible pid URIs</returns>
+        /// <response code="200">Returns list of eligible resource types</response>
+        [HttpPost]
+        [Route("PIDURIsForCollibra")]
+        [ValidateActionParameters]
+        [ProducesResponseType(typeof(IList<string>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> PostPIDURIsForCollibra()
+        {
+          await _resourceService.PostPIDURIsForCollibra();
+          return Ok();
+
+        }
     }
 }
 

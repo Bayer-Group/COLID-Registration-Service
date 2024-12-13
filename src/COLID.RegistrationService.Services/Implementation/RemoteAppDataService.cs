@@ -128,10 +128,10 @@ namespace COLID.RegistrationService.Services.Implementation
 
         public async Task NotifyInvalidDistributionEndpoint(InvalidDistributionEndpointMessage message)
         {
-            _logger.LogInformation("NotifyInvalidDistributionEndpoint: we entered the task with the message: ", message);
+            //_logger.LogInformation("NotifyInvalidDistributionEndpoint: we entered the task with the message: ", message);
             using (var httpClient = (_bypassProxy ? _clientFactory.CreateClient("NoProxy") : _clientFactory.CreateClient()))
             {
-                _logger.LogWarning($"TargetURL:Sending request to {AppDataServiceNotifyInvalidDistributionEndpointApi}");
+                //_logger.LogWarning($"TargetURL:Sending request to {AppDataServiceNotifyInvalidDistributionEndpointApi}");
                 var response = await AquireTokenAndSendToAppDataService(
                     httpClient, 
                     HttpMethod.Post, 
@@ -278,7 +278,7 @@ namespace COLID.RegistrationService.Services.Implementation
 
         public async Task<IList<AdUserDto>> CheckUsersValidity(ISet<string> userEmails)
         {
-            _logger.LogInformation("Following emails will be checked {Emails}", JsonConvert.SerializeObject(userEmails));
+            //_logger.LogInformation("Following emails will be checked {Emails}", JsonConvert.SerializeObject(userEmails));
             using (var httpClient = (_bypassProxy ? _clientFactory.CreateClient("NoProxy") : _clientFactory.CreateClient()))
             {
                 var response = await AquireTokenAndSendToAppDataService(httpClient, HttpMethod.Post, AppDataServiceCheckUsersAreValid, userEmails);
@@ -296,8 +296,8 @@ namespace COLID.RegistrationService.Services.Implementation
             var accessToken = await _tokenService.GetAccessTokenForWebApiAsync();
             var response = await httpClient.SendRequestWithOptionsAsync(httpMethod, endpointUrl,
                 requestBody, accessToken, _cancellationToken);
-            _logger.LogInformation("AquireTokenAndSendToAppDataService: with the response: ", response);
-            Console.WriteLine("in remotAppDataServ/AquireTokenAnd... response: "+response);
+            //_logger.LogInformation("AquireTokenAndSendToAppDataService: with the response: ", response);
+            //Console.WriteLine("in remotAppDataServ/AquireTokenAnd... response: "+response);
             return response;
         }
 

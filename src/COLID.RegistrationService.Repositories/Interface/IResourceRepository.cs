@@ -490,5 +490,7 @@ namespace COLID.RegistrationService.Repositories.Interface
         /// <param name="resourceGraph">Named graph for current resource</param>
         /// <returns></returns>
         string GetResourceLabel(Uri piUri, Uri resourceGraph);
+
+        IList<string> GetPIDURIsForCollibra(Uri resourceNamedGraph);
     }
 }

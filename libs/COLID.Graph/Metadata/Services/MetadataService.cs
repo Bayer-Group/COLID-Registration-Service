@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using COLID.Cache.Services;
 using COLID.Graph.Metadata.Constants;
@@ -279,6 +279,10 @@ namespace COLID.Graph.Metadata.Services
                     return GetInstanceGraphByConfig(MetadataGraphConfiguration.HasResourcesDraftGraph); //resource named graph mit <https://pid.bayer.com/resource/4.0/Draft>
                 else if (entityType == "linkHistory")
                     return GetInstanceGraphByConfig(MetadataGraphConfiguration.HasLinkHistoryGraph); //resource named graph mit <https://pid.bayer.com/resource/4.0/Draft>
+                else if (entityType == ResourceTemplate.Type)
+                    return GetInstanceGraphByConfig(MetadataGraphConfiguration.HasResourceTemplateGraph);
+                else if (entityType == CollibraDataTypes.Type)
+                    return GetInstanceGraphByConfig(MetadataGraphConfiguration.HasCollibraDatatypesGraph);
                 else if (entityType == MetadataGraphConfiguration.Type)
                     return new Uri(MetadataGraphConfiguration.Type);
                 else

@@ -32,7 +32,7 @@ namespace COLID.StatisticsLog.Services
         protected readonly string _productName;
         protected readonly string _layerName;
         protected readonly string _anonymizerKey;
-        protected readonly AwsSigV4HttpConnection _awsHttpConnection;
+        //protected readonly AwsSigV4HttpConnection _awsHttpConnection;
         protected readonly SHA256 _sha256;
         private readonly IHostEnvironment _environment;
 
@@ -49,28 +49,28 @@ namespace COLID.StatisticsLog.Services
             _anonymizerKey = options.AnonymizerKey;
             _sha256 = SHA256.Create();
             _environment = environment;
-            if (options.Enabled)
-            {
-                var region = RegionEndpoint.GetBySystemName(options.AwsRegion);
-                // if accessKey and secretKey are provided via configuration, use them. otherwise try to
-                // determine by default AWS credentials resolution process see https://docs.aws.amazon.com/sdk-for-net/v3/developer-guide/net-dg-config-creds.html#creds-assign
-                if (!string.IsNullOrWhiteSpace(options.AccessKey) && !string.IsNullOrWhiteSpace(options.SecretKey))
-                {
-                    var creds = new BasicAWSCredentials(options.AccessKey, options.SecretKey);
-                    _awsHttpConnection = new AwsSigV4HttpConnection(creds, region);
-                }
-                else
-                {
-                    try
-                    {
-                        _awsHttpConnection = new AwsSigV4HttpConnection(region);
-                    }
-                    catch (System.ArgumentException exception) //catch case where an invalid endpoint is provided. Sometimes happens on local Docker
-                    {
-                        Console.WriteLine("Error: Unable to establish region connection " + exception.Message);
-                    }
-                }
-            }
+            ////if (options.Enabled)
+            ////{
+            ////    var region = RegionEndpoint.GetBySystemName(options.AwsRegion);
+            ////    // if accessKey and secretKey are provided via configuration, use them. otherwise try to
+            ////    // determine by default AWS credentials resolution process see https://docs.aws.amazon.com/sdk-for-net/v3/developer-guide/net-dg-config-creds.html#creds-assign
+            ////    if (!string.IsNullOrWhiteSpace(options.AccessKey) && !string.IsNullOrWhiteSpace(options.SecretKey))
+            ////    {
+            ////        var creds = new BasicAWSCredentials(options.AccessKey, options.SecretKey);
+            ////        _awsHttpConnection = new AwsSigV4HttpConnection(creds, region);
+            ////    }
+            ////    else
+            ////    {
+            ////        try
+            ////        {
+            ////            _awsHttpConnection = new AwsSigV4HttpConnection(region);
+            ////        }
+            ////        catch (System.ArgumentException exception) //catch case where an invalid endpoint is provided. Sometimes happens on local Docker
+            ////        {
+            ////            Console.WriteLine("Error: Unable to establish region connection " + exception.Message);
+            ////        }
+            ////    }
+            ////}
 
             _logger = GetLogger(options);
         }
@@ -94,35 +94,12 @@ namespace COLID.StatisticsLog.Services
                   ModifyConnectionSettings = conn =>
                   {
                       var pool = new SingleNodeConnectionPool(options.BaseUri);
-                      switch (_environment.EnvironmentName)
-                      {
-                          case LogConstants.EnvironmentLocal:
-                              {
-                                  //Connect Local to AWS Opensearch
-                                  var cred = new SessionAWSCredentials("ASIAYZLCAZR6JBGCN5H7", "eF8VcOpZfzUTj+hmxTw6GhoCkvTmN2AFXcjd/kmS", "FwoGZXIvYXdzEBwaDEcMU4YLkLkkd1izVSK9AcZq/JCFnMH0/S8r0r8ezTyFgm18NRooawhHiKJRQp6QUAKSNaeLjfN9lIvopcBdFjcIZJg+MlI98rKh0jC7pwt8HVIszmlq9HEneLrFCZrJZ8Dy9th6rgir4IJ3aAGW9ILu9xAffoxzn9/RSVpxUafbFpSQBgf+kee+7AXYlyRDHa3dUQnluBpa2u/Fzh/p0O2s739pI1hxYy0z+Kl71/XGZgyYBNpeuTM/C9FvUqaH48dXOHR9qYrRfxHpyyii5MGnBjItJd7S/BbyYkzCUYfpTzNfuL8HIAUa4hTlKId4HwpLw0ywpeXXhYyIM0xqvz8Z");
-                                  var httpConnection = new AwsSigV4HttpConnection(cred, RegionEndpoint.GetBySystemName(options.AwsRegion));                                  
-                                  var conConfig = new ConnectionConfiguration(pool, httpConnection).PrettyJson();
-                                  conConfig.ServerCertificateValidationCallback(CertificateValidations.AllowAll);
-                                  return conConfig;
-                                  break;
-                              }
-                          case LogConstants.EnvironmentDocker:
-                              {
-                                  //Connect to Docker Opensearch
-                                  var conConfig = new ConnectionConfiguration(pool);                                  
-                                  conConfig.BasicAuthentication("admin", "admin");
-                                  conConfig.ServerCertificateValidationCallback(CertificateValidations.AllowAll);
-                                  conConfig.DisableAutomaticProxyDetection(true);
-                                  return conConfig;                                  
-                                  break;
-                              }
-                          default:
-                              {
-                                  //Connect to AWS DEV/QA/Prod
-                                  return new ConnectionConfiguration(pool, _awsHttpConnection);
-                              }
-                      }
-                      
+                      var conConfig = new ConnectionConfiguration(pool);
+                      conConfig.BasicAuthentication(options.Username, options.Password);
+                      conConfig.ServerCertificateValidationCallback(CertificateValidations.AllowAll);
+                      conConfig.DisableAutomaticProxyDetection(true);
+                      return conConfig;
+
                   },
                   IndexFormat = IndexFormat(options),
                   FailureCallback = e =>
@@ -264,7 +241,7 @@ namespace COLID.StatisticsLog.Services
         {
             if (disposing)
             {
-                ((IDisposable)_awsHttpConnection)?.Dispose();
+                //((IDisposable)_awsHttpConnection)?.Dispose();
                 _sha256?.Dispose();
             }
         }

@@ -8,6 +8,7 @@ using COLID.Graph.Triplestore.Exceptions;
 using COLID.RegistrationService.Common.DataModel.Graph;
 using COLID.RegistrationService.Common.DataModels.Graph;
 using Microsoft.AspNetCore.Http;
+using VDS.RDF;
 
 namespace COLID.RegistrationService.Services.Interface
 {
@@ -78,6 +79,8 @@ namespace COLID.RegistrationService.Services.Interface
         /// </summary>
         /// <param name="changes">changes to be done in the Graph.</param>
         /// <response>name of the newly created graph</response>        
-        public Uri ModifyKeyWordGraph(UpdateKeyWordGraph changes);       
+        public Uri ModifyKeyWordGraph(UpdateKeyWordGraph changes);
+
+        public IGraph GetGraph(Uri namedGraph);
     }
 }

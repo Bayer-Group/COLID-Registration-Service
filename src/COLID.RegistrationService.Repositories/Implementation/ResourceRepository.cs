@@ -3474,5 +3474,35 @@ VALUES ?resourceTypes {@resourceTypes}.
 
             return retrnString;
         }
+
+        public IList<string> GetPIDURIsForCollibra(Uri resourceNamedGraph)
+        {
+            var pidURIs = new List<string>();
+            SparqlParameterizedString parameterizedString = new SparqlParameterizedString
+            {
+                CommandText =
+                @"
+                  SELECT DISTINCT ?pidURI 
+                  FROM @resourceNamedGraph
+                  WHERE { 
+                     ?subject @hasPid ?pidURI.
+                     ?subject @registerInCollibra true.
+                    }
+                "
+            };
+
+            parameterizedString.SetUri("hasPid", new Uri(Graph.Metadata.Constants.EnterpriseCore.PidUri));
+            parameterizedString.SetUri("resourceNamedGraph", resourceNamedGraph);
+            parameterizedString.SetUri("registerInCollibra", new Uri(Graph.Metadata.Constants.Resource.RegisterInCollibra));
+            
+            var results = _tripleStoreRepository.QueryTripleStoreResultSet(parameterizedString);
+
+            if (results.Count > 0)
+            {
+                pidURIs = results.Select(x => x.GetNodeValuesFromSparqlResult("pidURI").Value).ToList();
+            }
+
+            return pidURIs;
+        }
     }
 }

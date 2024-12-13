@@ -125,11 +125,13 @@ namespace COLID.Cache.Services
         public void Delete(string key, Action method)
         {
             // do nothing
+            method.Invoke();
         }
 
         public void Delete(object o, Action method)
         {
             // do nothing
+            method.Invoke();
         }
 
         #endregion Delete

@@ -38,9 +38,17 @@ using COLID.MessageQueue.Configuration;
 using Microsoft.Extensions.Options;
 using COLID.MessageQueue.Datamodel;
 using COLID.Identity.Constants;
-using COLID.RegistrationService.Common.DataModels.Contacts;
-using ColidConstants = COLID.RegistrationService.Common.Constants;
-
+using COLID.RegistrationService.Common.DataModels.Contacts;
+
+using ColidConstants = COLID.RegistrationService.Common.Constants;
+using System.Text.RegularExpressions;
+using COLID.AWS.Interface;
+using Amazon.SQS.Model;
+using DocumentFormat.OpenXml;
+using System.Collections;
+using COLID.Common.Extensions;
+using Microsoft.Extensions.Configuration;
+
 namespace COLID.RegistrationService.Services.Implementation
 {
     public class ResourceService : IResourceService, IMessageQueuePublisher, IMessageQueueReceiver
@@ -65,6 +73,9 @@ namespace COLID.RegistrationService.Services.Implementation
         private readonly IGraphManagementService _graphManagementService;
         private readonly IProxyConfigService _proxyConfigService;
         private readonly ColidMessageQueueOptions _mqOptions;
+        private readonly IAmazonSQSService _amazonSQSService;
+        private readonly ITaxonomyService _taxonomyService;
+        private readonly string _casItemQueueUrl;
 
         public Action<string, string, BasicProperty> PublishMessage { get; set; }
 
@@ -94,7 +105,10 @@ namespace COLID.RegistrationService.Services.Implementation
             IRevisionService revisionService,
             IAttachmentService attachmentService,
             IGraphManagementService graphManagementService,
-            IProxyConfigService proxyConfigService)
+            IProxyConfigService proxyConfigService,
+            IAmazonSQSService amazonSQSService,
+            IConfiguration configuration,
+            ITaxonomyService taxonomyService)
         {
             _mqOptions = messageQueuingOptionsAccessor.CurrentValue;
             _mapper = mapper;
@@ -116,6 +130,10 @@ namespace COLID.RegistrationService.Services.Implementation
             _revisionService = revisionService;
             _graphManagementService = graphManagementService;
             _proxyConfigService = proxyConfigService;
+            _amazonSQSService = amazonSQSService;
+
+            _casItemQueueUrl = configuration.GetConnectionString("CASItemQueueUrl");
+            _taxonomyService = taxonomyService;
         }
 
         public Resource GetById(string id, Uri namedGraph)
@@ -1231,6 +1249,11 @@ namespace COLID.RegistrationService.Services.Implementation
 
                     var resourcesCTO = GetResourcesByPidUri(pidUri);
 
+                    if (resourcesCTO.HasPublishedAndNoDraft)
+                    {
+                        throw new BusinessException("The resource has already been published");
+                    }
+
                     //set next review Date
                     var reviewPolicy = resourcesCTO.Draft.Properties.GetValueOrNull(Graph.Metadata.Constants.Resource.HasResourceReviewCyclePolicy, true);
                     if (reviewPolicy != null)
@@ -1244,13 +1267,8 @@ namespace COLID.RegistrationService.Services.Implementation
                         {
                             resourcesCTO.Draft.Properties.Add(Graph.Metadata.Constants.Resource.HasNextReviewDueDate, nextReviewDate);
                         }
-                     }
-
-                    if (resourcesCTO.HasPublishedAndNoDraft)
-                        {
-                            throw new BusinessException("The resource has already been published");
-                        }
-
+                     }
+
                     var requestResource = _mapper.Map<ResourceRequestDTO>(resourcesCTO.Draft);
                     var draftId = resourcesCTO.Draft.Id;  //da selbe id , nur in unterschiedlichen graphen
 
@@ -1294,13 +1312,18 @@ namespace COLID.RegistrationService.Services.Implementation
                                 List<KeyValuePair<string, List<string>>> incompatibleLinks = oldLinks.Where(x => !newLinkMetadata.Contains(x.Key)).Select(x => new KeyValuePair<string, List<string>>(x.Key, x.Value.Select(y => y.PidUri).ToList())).ToList();
                                 var tasks = incompatibleLinks.SelectMany(link => link.Value.Select(targetURI => SetLinkHistoryEntryStatusToDeleted(new Uri(resourcesCTO.Published.Id), new Uri(link.Key), new Uri(targetURI), changeRequester)));
                                 await Task.WhenAll(tasks);
-                            }
-
-                            //Füge die neue resource mit den aktualisierten werten in den resource graphen
-                            //Füge additionals und removals in seperate graphen --> Verlinke die resource zu der Änderungstabelle
+                            }
+
+
+
+                            //Füge die neue resource mit den aktualisierten werten in den resource graphen
+
+                            //Füge additionals und removals in seperate graphen --> Verlinke die resource zu der Änderungstabelle
+
                             Resource updatedResource = await _revisionService.AddAdditionalsAndRemovals(resourcesCTO.Published, resourcesCTO.Draft);
                             resourceToBeIndexed = getResourceToBeIndexedBySettingLinks(updatedResource, metadata, null);  // mitPidUri
-                            // remove invalidDataStewardContact flag on publishing resource
+                            // remove invalidDataStewardContact flag on publishing resource
+
                             resourceToBeIndexed.Properties.Remove(ColidConstants.ContactValidityCheck.BrokenDataStewards);   
 
                             Resource LatVersionIdResources = (Resource) SetHasLaterVersionResourceId(resourceToBeIndexed);
@@ -1538,10 +1561,14 @@ namespace COLID.RegistrationService.Services.Implementation
                 y => y.Value.Select(x => x.PidUri).ToList<dynamic>());
             _resourceLinkingService.UnlinkResourceFromList(pidUri, true, out message);  // Bleibt gleich
             // add outbound links to resource properties so that the indexing crawler service can find the correspoding resources and adjust the inbound links
-            foreach (var links in outboundlinks)
-            {
-                var linksOfALinkType = outboundlinks[links.Key].Select(x => x.PidUri).Cast<dynamic>().ToList();
-                resource.Properties.Add(links.Key, linksOfALinkType);
+            foreach (var links in outboundlinks)
+
+            {
+
+                var linksOfALinkType = outboundlinks[links.Key].Select(x => x.PidUri).Cast<dynamic>().ToList();
+
+                resource.Properties.Add(links.Key, linksOfALinkType);
+
             }
             string entityType = resource.Properties.GetValueOrNull(Graph.Metadata.Constants.RDF.Type, true).ToString();
             var metadata = _metadataService.GetMetadataForEntityType(entityType);
@@ -1977,7 +2004,7 @@ namespace COLID.RegistrationService.Services.Implementation
         /// <returns></returns> 
         public async Task IndexNewResource(Uri pidUri)
         {
-            _logger.LogInformation("Indexing: About to Index New resource: {pidUri}", pidUri.ToString());
+            //_logger.LogInformation("Indexing: About to Index New resource: {pidUri}", pidUri.ToString());
             try
             {
                 int tryConter = 3;
@@ -1990,7 +2017,7 @@ namespace COLID.RegistrationService.Services.Implementation
 
                         if (newResource != null)
                         {
-                            _logger.LogInformation("Indexing: found new resource {pidUri}", pidUri.ToString());
+                            //_logger.LogInformation("Indexing: found new resource {pidUri}", pidUri.ToString());
                             break;
                         }
                     }
@@ -2028,7 +2055,7 @@ namespace COLID.RegistrationService.Services.Implementation
         /// <returns></returns> 
         public async Task IndexUpdatedResource(Uri pidUri)
         {
-            _logger.LogInformation("Indexing: About to Index Updated resource: {pidUri}", pidUri.ToString());
+            //_logger.LogInformation("Indexing: About to Index Updated resource: {pidUri}", pidUri.ToString());
             Resource newResource = GetByPidUri(pidUri);
             if (newResource != null)
             {
@@ -2063,7 +2090,8 @@ namespace COLID.RegistrationService.Services.Implementation
                 };
 
                 bool deprecated = false;
-                if (resource.Properties.ContainsKey(COLID.Graph.Metadata.Constants.Resource.HasNextReviewDueDate) && consumerGroupDeprecatedValue!=null && consumerGroupDeprecatedValue != 0)
+                if (resource.Properties.ContainsKey(COLID.Graph.Metadata.Constants.Resource.HasNextReviewDueDate) && consumerGroupDeprecatedValue!=null && consumerGroupDeprecatedValue != 0)
+
                 {
                     var HasNextReviewDueDate = resource.Properties.GetValueOrNull(Graph.Metadata.Constants.Resource.HasNextReviewDueDate, true);
                     var date = DateTime.Parse(HasNextReviewDueDate);
@@ -2160,6 +2188,171 @@ namespace COLID.RegistrationService.Services.Implementation
         {
             Uri instanceGraphUri = GetResourceInstanceGraph();
             return _resourceRepository.GetResourceLabel(piUri, instanceGraphUri);
+        }
+
+        public IList<string> GetEligibleCollibraDataTypes()
+        {
+            IList<string> resourceTypes = new List<string>();
+            try
+            {
+                var collibraGraphUri = _metadataService.GetInstanceGraph(CollibraDataTypes.Type);
+                var graphResults = _graphManagementService.GetGraph(collibraGraphUri);
+
+                resourceTypes = graphResults.Triples.ObjectNodes.Select(x => ((VDS.RDF.INode)x).ToString()).ToList();
+
+            }
+            catch (GraphNotFoundException ex)
+            {
+                _logger.LogError(ex, "Graph not found: {NamedGraph}", ex.Message);
+            }
+            catch (System.Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get graph from graph management service.");
+            }
+
+            return resourceTypes;
+        }
+
+        public IList<string> GetPIDURIsForCollibra()
+        {
+            var pidURIsForCollibra = _resourceRepository.GetPIDURIsForCollibra(GetResourceInstanceGraph());
+
+            return pidURIsForCollibra;
+        }
+
+        public async Task PostPIDURIsForCollibra()
+        {
+            var pidURIsForCollibra = GetPIDURIsForCollibra();
+
+            foreach (string pidUri in pidURIsForCollibra)
+            {
+                Match match = Regex.Match(pidUri, @".*/([^/]+)/?$");
+
+                var resource = GetResourcesByPidUri(new Uri(pidUri));
+                //resource.Published.Properties.Remove(COLID.Graph.Metadata.Constants.Resource.Distribution);
+                //resource.Published.Properties.Remove(COLID.Graph.Metadata.Constants.Resource.MainDistribution);
+                resource.Published.Properties.Remove(COLID.RegistrationService.Common.Constants.ContactValidityCheck.BrokenDataStewards);
+                resource.Published.Properties.Remove(COLID.Graph.Metadata.Constants.Resource.hasPID);
+                resource.Published.Properties.Add(COLID.Graph.Metadata.Constants.Resource.hasPID, new List<dynamic> {pidUri});
+                //resource.Published.Properties.RemoveRange(COLID.Graph.Metadata.Constants.Resource.LinkTypes.AllLinkTypes.ToList()); //TODO
+
+                var resourceProperties = PreProcessResourceProperty(resource.Published.Properties, COLID.Graph.Metadata.Constants.Resource.Keyword, COLID.Graph.Metadata.Constants.Keyword.Type);
+                resourceProperties = PreProcessResourceProperty(resourceProperties, COLID.Graph.Metadata.Constants.Resource.HasConsumerGroup, COLID.Graph.Metadata.Constants.ConsumerGroup.Type);
+                resourceProperties = PreProcessResourceProperty(resourceProperties, COLID.Graph.Metadata.Constants.Resource.HasInformationClassification, COLID.Graph.Metadata.Constants.Resource.Type.InformationClassification);
+                resourceProperties = PreProcessResourceProperty(resourceProperties, COLID.Graph.Metadata.Constants.Resource.LifecycleStatus, COLID.Graph.Metadata.Constants.Resource.Type.LifecycleStatus);
+
+
+                var messageAttributes = new Dictionary<string, MessageAttributeValue>();
+                messageAttributes.Add("source_system", new MessageAttributeValue
+                {
+                    DataType = "String",
+                    StringValue = "colid"
+                });
+                messageAttributes.Add("date_crawled", new MessageAttributeValue
+                {
+                    DataType = "String",
+                    StringValue = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffffff"),
+                });
+                messageAttributes.Add("source_id", new MessageAttributeValue
+                {
+                    DataType = "String",
+                    StringValue = match.Groups["1"].Value,
+                });
+                messageAttributes.Add("crawl_id", new MessageAttributeValue
+                {
+                    DataType = "String",
+                    StringValue = "COL-"+Guid.NewGuid().ToString().Substring(0, 8) 
+                });
+
+                //SendMessageRequest sendMessageRequest = new SendMessageRequest
+                //{
+                //    MessageBody = JsonConvert.SerializeObject(resource.Published.Properties),
+                //    MessageAttributes = messageAttributes
+                //};
+                // Preprocess the dynamic object
+                var processedProperties = new Dictionary<string, string>();
+
+                foreach (var kvp in resourceProperties)
+                {
+                    // Extract the part after the last '/' in the key
+                    string key = kvp.Key.Split('/', '#').Last();
+                    // Convert the list of dynamic objects to a list of strings
+                    var listAsString = kvp.Value.Select(value =>
+                    {
+                        if (value is COLID.Graph.TripleStore.DataModels.Base.Entity entity) 
+                        {
+                            // If the value is an Entity, extract the Id property as string
+                            var entityStrings = entity.Properties.Select(properties =>
+                            {
+                                var label = entity.Properties.ContainsKey(COLID.Graph.Metadata.Constants.Resource.DistributionEndpoints.HasNetworkedResourceLabel) ?
+                                            entity.Properties[COLID.Graph.Metadata.Constants.Resource.DistributionEndpoints.HasNetworkedResourceLabel][0].ToString() :
+                                    string.Empty;
+
+                                // Extracting the URL
+                                var url = entity.Properties.ContainsKey(COLID.Graph.Metadata.Constants.Resource.DistributionEndpoints.HasNetworkAddress) ?
+                                            entity.Properties[COLID.Graph.Metadata.Constants.Resource.DistributionEndpoints.HasNetworkAddress][0].ToString() :
+                                            string.Empty;
+
+                                return $"{label}, {url}"; // Adjust format as needed
+                            });
+                            return string.Join(", ", entityStrings.Distinct()); // Join the label and URL strings for each entity
+                        }
+                        else
+                        {
+                            // Otherwise, convert the value directly to string
+                            return value.ToString();
+                        }
+                    }).ToList();
+                    if (listAsString.Count == 1)
+                    {
+                        // If there's only one element in the list, extract it as a string
+                        processedProperties[key] = listAsString[0];
+                    }
+                    else
+                    {
+                        // If there are multiple elements in the list, concatenate them into a comma-separated string
+                        processedProperties[key] = string.Join(",", listAsString);
+                    }
+                }
+
+                //Add new Entry
+                try
+                {
+                    await _amazonSQSService.SendMessageAsync(_casItemQueueUrl, processedProperties, messageAttributes, isFifoQueue: false);
+                    _logger.LogInformation($"ResourceService: Message sent to cas queue for {_casItemQueueUrl} : {pidUri}", pidUri, _casItemQueueUrl);
+                }
+                catch (System.Exception ex)
+                {
+                    _logger.LogError($"ResourceService: Error occured while sending Request to CAS QUEUE {_casItemQueueUrl}  for: {pidUri} Message {(ex.InnerException != null ? ex.InnerException.Message : ex.Message)} Error {ex.StackTrace}", pidUri, ex, _casItemQueueUrl);
+                }
+                //var msg = await _amazonSQSService.ReceiveMessageAsync(_casItemQueueUrl, 10, 10);
+
+            }
+        }
+
+        private IDictionary<string, List<dynamic>> PreProcessResourceProperty(IDictionary<string, List<dynamic>> resource, string property, string taxonomyType)
+        {
+            try
+            {
+                if (resource.ContainsKey(property))
+                {
+                    var colidKeywords = _taxonomyService.GetTaxonomies(taxonomyType);
+                    // Iterate over each value in resourceProperty[key] and replace URIs with labels
+                    resource[property] = resource[property]
+                        .Select(uri =>
+                        {
+                            var keyword = colidKeywords.FirstOrDefault(kw => kw.Id == uri);
+                            var label = keyword.Properties[COLID.Graph.Metadata.Constants.RDFS.Label]?.FirstOrDefault()?.ToString();
+                            return label;
+                        })
+                        .ToList();
+                }
+            }
+            catch (System.Exception ex)
+            {
+                _logger.LogError($"ResourceService: Error while preprocessing resource for CAS Queue Message {(ex.Message)} ", ex);
+            }
+            return resource;
         }
     }
 }

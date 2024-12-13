@@ -16,11 +16,12 @@
   </PropertyGroup>
   
   <ItemGroup>
+    <PackageReference Include="Amazon.SQS.ExtendedClient" Version="1.7.0" />
     <PackageReference Include="AutoMapper" Version="9.0.0" />
     <PackageReference Include="AWSSDK.DynamoDBv2" Version="3.7.200.1" />
     <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="3.7.300" />
-    <PackageReference Include="AWSSDK.S3" Version="3.7.200.1" />
-    <PackageReference Include="AWSSDK.SQS" Version="3.7.300.22" />
+    <PackageReference Include="AWSSDK.S3" Version="3.7.406.4" />
+    <PackageReference Include="AWSSDK.SQS" Version="3.7.400.55" />
     <PackageReference Include="dotNetRDF" Version="2.7.2" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Newtonsoft.Json.Schema" Version="3.0.15" />

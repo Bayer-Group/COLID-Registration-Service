@@ -70,6 +70,7 @@ namespace COLID.RegistrationService.Repositories
             services.AddTransient<IResourceRepository, ResourceRepository>();
             services.AddTransient<IConsumerGroupRepository, ConsumerGroupRepository>();
             services.AddTransient<IPidUriTemplateRepository, PidUriTemplateRepository>();
+            services.AddTransient<IResourceTemplateRepository, ResourceTemplateRepository>();
             services.AddTransient<IExtendedUriTemplateRepository, ExtendedUriTemplateRepository>();
             services.AddTransient<IEntityRepository, EntityRepository>();
             services.AddTransient<IIdentifierRepository, IdentifierRepository>();

@@ -124,40 +124,36 @@ namespace COLID.AWS.Implementation
             }
         }
 
-        public async Task<Dictionary<string, Stream>> GetAllFileAsync(string bucketName)
-        {
-            Guard.ArgumentNotNullOrWhiteSpace(bucketName, "bucket name can not be null");
-
+        public async Task<Dictionary<string, Stream>> GetAllFileAsync(string bucketName)
+        {
+            Guard.ArgumentNotNullOrWhiteSpace(bucketName, "bucket name can not be null");
             Dictionary<string, Stream> fileContents = new Dictionary<string, Stream>();
-            try
-            {
-                //Get S3 Client
-                using var client = await GetAmazonS3Client();
-                
-                //Get List of Files from S3
-                ListObjectsResponse response = await client.ListObjectsAsync(new ListObjectsRequest
-                {
-                    BucketName = bucketName
-                });
-                
-                //Loop through each file
-                foreach (S3Object obj in response.S3Objects)
-                {                    
-                    //Read files
-                    GetObjectResponse objResponse = await client.GetObjectAsync(new GetObjectRequest
-                    {
-                        BucketName = bucketName,
-                        Key = obj.Key
-                    });
-                        
-                    fileContents.Add(obj.Key, objResponse.ResponseStream);                    
+            try
+            {
+                //Get S3 Client
+                using var client = await GetAmazonS3Client();                
+                //Get List of Files from S3
+                ListObjectsResponse response = await client.ListObjectsAsync(new ListObjectsRequest
+                {
+                    BucketName = bucketName
+                });                
+                //Loop through each file
+                foreach (S3Object obj in response.S3Objects)
+                {                    
+                    //Read files
+                    GetObjectResponse objResponse = await client.GetObjectAsync(new GetObjectRequest
+                    {
+                        BucketName = bucketName,
+                        Key = obj.Key
+                    });                        
+                    fileContents.Add(obj.Key, objResponse.ResponseStream);                    
                 }
-                return fileContents;
-            }
-            catch (AmazonS3Exception ex)
-            {
-                throw HandleAmazonServiceException(ex);
-            }
+                return fileContents;
+            }
+            catch (AmazonS3Exception ex)
+            {
+                throw HandleAmazonServiceException(ex);
+            }
         }
 
         public async Task<AmazonS3FileUploadInfoDto> UploadFileAsync(string bucketName, IFormFile file) => await UploadFileAsync(bucketName, string.Empty, file);

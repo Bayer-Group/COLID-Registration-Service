@@ -93,7 +93,8 @@ namespace COLID.RegistrationService.Services
                 typeof(ExtendedUriTemplateProfile),
                 typeof(MetadataGraphConfigurationProfile),
                 typeof(MetadataPropertyProfile),
-                typeof(PidUriTemplateProfile));
+                typeof(PidUriTemplateProfile),
+                typeof(ResourceTemplateProfile));
 
             services.Configure<ColidAppDataServiceTokenOptions>(configuration.GetSection("ColidAppDataServiceTokenOptions"));
             services.Configure<ColidRRMServiceTokenOptions>(configuration.GetSection("ColidRRMServiceTokenOptions"));
@@ -120,6 +121,7 @@ namespace COLID.RegistrationService.Services
             services.AddTransient<IAttachmentService, AttachmentService>();
             services.AddTransient<IConsumerGroupService, ConsumerGroupService>();
             services.AddTransient<IPidUriTemplateService, PidUriTemplateService>();
+            services.AddTransient<IResourceTemplateService, ResourceTemplateService>();
             services.AddTransient<IExtendedUriTemplateService, ExtendedUriTemplateService>();
             services.AddTransient<IResourcePreprocessService, ResourcePreprocessService>();
             services.AddTransient<IEntityService, EntityService>();

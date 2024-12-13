@@ -6,7 +6,7 @@ namespace COLID.RegistrationService.Services.Authorization.UserInfo
     {
         public string GetEmail()
         {
-            return "anonymous@anonymous.com";
+            return "superadmin@bayer.com";
         }
 
         public IList<string> GetRoles()

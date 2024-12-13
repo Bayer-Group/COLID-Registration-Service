@@ -1,25 +1,29 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using COLID.AWS.Interface;
-using Amazon.SQS;
-using Amazon.SQS.Model;
-using Microsoft.Extensions.Options;
-using System.Text.Json;
-using COLID.AWS.DataModels;
-using Microsoft.Extensions.Logging;
-using Amazon.Runtime;
-using Amazon;
 using System.Net;
 using System.Security;
+using System.Text;
+using System.Threading.Tasks;
+using Amazon;
+using Amazon.Runtime;
+using Amazon.SQS.Model;
+using Amazon.SQS;
+using COLID.AWS.DataModels;
+using COLID.AWS.Interface;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Amazon.SQS.ExtendedClient;
+using Amazon.S3;
 using Amazon.Runtime.Internal.Util;
+using System.Text.Json;
+using System.Xml.Linq;
 
 namespace COLID.AWS.Implementation
 {
-    public class AmazonSQSService : IAmazonSQSService
+    public class AmazonSQSExtendedService : IAmazonSQSExtendedService
     {
+
         private readonly AmazonWebServicesOptions _awsConfig;
         private readonly ILogger<AmazonSQSService> _logger;
 
@@ -28,40 +32,10 @@ namespace COLID.AWS.Implementation
         /// </summary>
         /// <param name="sqs"></param>
         /// <param name="settings"></param>
-        public AmazonSQSService(IOptionsMonitor<AmazonWebServicesOptions> awsConfig, ILogger<AmazonSQSService> logger)
+        public AmazonSQSExtendedService(IOptionsMonitor<AmazonWebServicesOptions> awsConfig, ILogger<AmazonSQSService> logger)
         {
             _awsConfig = awsConfig.CurrentValue;
             _logger = logger;
-        }
-
-        protected virtual async Task<AmazonSQSClient> GetAmazonS3Client()
-        {            
-            if (_awsConfig.UseLocalCredentials)
-            {
-                if (String.IsNullOrEmpty(_awsConfig.AccessKeyId))
-                {
-                    //For Local Stack
-                    AmazonSQSConfig config = new AmazonSQSConfig
-                    {
-                        ServiceURL = _awsConfig.S3ServiceUrl,
-                        UseHttp = true,
-                        AuthenticationRegion = _awsConfig.S3Region,
-                    };
-                    AWSCredentials creds = new AnonymousAWSCredentials();
-                    return new AmazonSQSClient(creds, config);
-                }
-                else
-                {
-                    //TO connect with AWS from Dev machine
-                    return new AmazonSQSClient(_awsConfig.AccessKeyId, _awsConfig.SecretAccessKey);
-                }
-            }
-            else
-            {
-                //To connect from ECS to sqs
-                var awsCredentials = await GetECSCredentials();
-                return new AmazonSQSClient(awsCredentials.AccessKeyId, awsCredentials.SecretAccessKey, awsCredentials.Token);
-            }
         }
 
         private async Task<AmazonWebServicesSecurityCredentials> GetECSCredentials()
@@ -95,13 +69,63 @@ namespace COLID.AWS.Implementation
             };
         }
 
+        protected virtual async Task<AmazonS3Client> GetAmazonS3Client()
+        {
+            var awsCredentials = await GetECSCredentials();
+            if (!_awsConfig.UseLocalCredentials)
+            {
+
+                return new AmazonS3Client(awsCredentials.AccessKeyId, awsCredentials.SecretAccessKey, awsCredentials.Token);
+            }
+            return new AmazonS3Client(awsCredentials.AccessKeyId, awsCredentials.SecretAccessKey, RegionEndpoint.GetBySystemName(_awsConfig.S3Region));
+        }
+
+        protected virtual async Task<AmazonSQSClient> GetAmazonSQSClient()
+        {
+            if (_awsConfig.UseLocalCredentials)
+            {
+                if (String.IsNullOrEmpty(_awsConfig.AccessKeyId))
+                {
+                    //For Local Stack
+                    AmazonSQSConfig config = new AmazonSQSConfig
+                    {
+                        ServiceURL = _awsConfig.S3ServiceUrl,
+                        UseHttp = true,
+                        AuthenticationRegion = _awsConfig.S3Region,
+                    };
+                    AWSCredentials creds = new AnonymousAWSCredentials();
+                    return new AmazonSQSClient(creds, config);
+                }
+                else
+                {
+                    //TO connect with AWS from Dev machine
+                    return new AmazonSQSClient(_awsConfig.AccessKeyId, _awsConfig.SecretAccessKey);
+                }
+            }
+            else
+            {
+                //To connect from ECS to sqs
+                var awsCredentials = await GetECSCredentials();
+                return new AmazonSQSClient(awsCredentials.AccessKeyId, awsCredentials.SecretAccessKey, awsCredentials.Token);
+            }
+        }
+
+        protected virtual async Task<AmazonSQSExtendedClient> GetAmazonSQSExtendedClient(string S3BucketName)
+        {
+            var sqsClient = await GetAmazonSQSClient();
+            var s3Client = await GetAmazonS3Client();
+         
+            return new AmazonSQSExtendedClient(sqsClient, new ExtendedClientConfiguration().WithLargePayloadSupportEnabled(s3Client, S3BucketName));
+        }
+
         /// <summary>
         /// Post resource message to queue
         /// </summary>
         /// <param name="queueUrl">url of the AWS SQS</param>
+        /// <param name="s3Name">S3 bucket to store large msg</param>
         /// <param name="messageBody">message</param>         
         /// <returns></returns>
-        public async Task<bool> SendMessageAsync(string queueUrl, object messageBody, Dictionary<string, MessageAttributeValue> messageAttributes = null, bool isFifoQueue = true)
+        public async Task<bool> SendMessageAsync(string queueUrl, string s3Name, object messageBody, Dictionary<string, MessageAttributeValue> messageAttributes = null, bool isFifoQueue = true)
         {
             string message = JsonSerializer.Serialize(messageBody);
             var sendRequest = new SendMessageRequest(queueUrl, message);
@@ -110,15 +134,21 @@ namespace COLID.AWS.Implementation
                 sendRequest.MessageGroupId = Guid.NewGuid().ToString();
                 sendRequest.MessageDeduplicationId = Guid.NewGuid().ToString();
             }
-            sendRequest.MessageAttributes = messageAttributes;
-            
+            var msgAttributes = new Dictionary<string, MessageAttributeValue>();
+            msgAttributes.Add("MessageAttribute1", new MessageAttributeValue
+            {
+                DataType = "String",
+                StringValue = "String"
+            });
+            sendRequest.MessageAttributes = msgAttributes;
+
             // Post message or payload to queue  
-            using (AmazonSQSClient sqsClient = await GetAmazonS3Client())
+            using (AmazonSQSExtendedClient sqsExtClient = await GetAmazonSQSExtendedClient(s3Name))
             {
                 var sendResult = new SendMessageResponse();
                 try
                 {
-                    sendResult = await sqsClient.SendMessageAsync(sendRequest);
+                    sendResult = await sqsExtClient.SendMessageAsync(sendRequest);
                     return sendResult.HttpStatusCode == System.Net.HttpStatusCode.OK;
                 }
                 catch (AmazonSQSException ex)
@@ -141,10 +171,11 @@ namespace COLID.AWS.Implementation
         /// Receives resource message
         /// </summary>
         /// <param name="queueUrl">url of the AWS SQS</param>
+        /// <param name="s3Name">S3 bucket to store large msg</param>
         /// <param name="maxMsg">max number of message to fetch at once</param>
         /// <param name="waitSeconds">seconds to wait if there is no message</param>
         /// <returns></returns>
-        public async Task<List<Message>> ReceiveMessageAsync(string queueUrl, int maxMsg, int waitSeconds)
+        public async Task<List<Message>> ReceiveMessageAsync(string queueUrl, string s3Name, int maxMsg, int waitSeconds)
         {
             //Create New instance  
             var request = new ReceiveMessageRequest
@@ -154,9 +185,9 @@ namespace COLID.AWS.Implementation
                 WaitTimeSeconds = waitSeconds
             };
             //CheckIs there any new message available to process  
-            using (AmazonSQSClient sqsClient = await GetAmazonS3Client())
+            using (AmazonSQSExtendedClient sqsExtClient = await GetAmazonSQSExtendedClient(s3Name))
             {
-                var result = await sqsClient.ReceiveMessageAsync(request);
+                var result = await sqsExtClient.ReceiveMessageAsync(request);
 
                 return result.Messages.Any() ? result.Messages : new List<Message>();
             }
@@ -166,13 +197,14 @@ namespace COLID.AWS.Implementation
         /// Deletes the resource message from the resource queue 
         /// </summary>
         /// <param name="queueUrl">url of the AWS SQS</param>
+        /// <param name="s3Name">S3 bucket to store large msg</param>
         /// <param name="messageReceiptHandle"></param>
         /// <returns></returns>
-        public async Task<bool> DeleteMessageAsync(string queueUrl, string messageReceiptHandle)
+        public async Task<bool> DeleteMessageAsync(string queueUrl, string s3Name, string messageReceiptHandle)
         {
-            using (AmazonSQSClient sqsClient = await GetAmazonS3Client())
+            using (AmazonSQSExtendedClient sqsExtClient = await GetAmazonSQSExtendedClient(s3Name))
             {
-                var deleteResult = await sqsClient.DeleteMessageAsync(queueUrl, messageReceiptHandle);
+                var deleteResult = await sqsExtClient.DeleteMessageAsync(queueUrl, messageReceiptHandle);
                 return deleteResult.HttpStatusCode == System.Net.HttpStatusCode.OK;
             }
         }
@@ -181,15 +213,16 @@ namespace COLID.AWS.Implementation
         /// Get approx message count in the queue
         /// </summary>
         /// <param name="queueUrl">url of the AWS SQS</param>
+        /// <param name="s3Name">S3 bucket to store large msg</param>
         /// <returns></returns>
-        public async Task<int> GetMessageCountAsync(string queueUrl)
+        public async Task<int> GetMessageCountAsync(string queueUrl, string s3Name)
         {
             GetQueueAttributesRequest attReq = new GetQueueAttributesRequest();
             attReq.QueueUrl = queueUrl;
             attReq.AttributeNames.Add("ApproximateNumberOfMessages");
-            using (AmazonSQSClient sqsClient = await GetAmazonS3Client())
+            using (AmazonSQSExtendedClient sqsExtClient = await GetAmazonSQSExtendedClient(s3Name))
             {
-                GetQueueAttributesResponse response = await sqsClient.GetQueueAttributesAsync(attReq);
+                GetQueueAttributesResponse response = await sqsExtClient.GetQueueAttributesAsync(attReq);
 
                 return response.ApproximateNumberOfMessages;
             }

@@ -9,6 +9,8 @@ namespace COLID.Graph.Metadata.DataModels.Validation
         public string PidUri { get; set; }
         public string LinkType  { get; set; }
         public string PidUriToLink { get; set; }
-        public string Requester { get; set; }        
+        public string Requester { get; set; }
+        public string Action { get; set; }
+
     }
 }

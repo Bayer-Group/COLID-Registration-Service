@@ -413,7 +413,7 @@ namespace COLID.RegistrationService.Services.Implementation
                                 }
 
 
-                                _logger.LogInformation("BackgroundService: {sparqlQuery}", transaction.GetSparqlString());
+                                //_logger.LogInformation("BackgroundService: {sparqlQuery}", transaction.GetSparqlString());
 
                                 //transaction.Commit();
                                 //Index resource
@@ -454,7 +454,7 @@ namespace COLID.RegistrationService.Services.Implementation
                         }
                         catch (System.Exception ex)
                         {
-                            _logger.LogInformation("BackgroundService:  Error while updating - {msg} ", ex.Message);
+                            _logger.LogError("BackgroundService:  Error while updating - {msg} ", ex.Message);
                             //Collect result
                             totalValidationResult.Add(new BulkUploadResult
                             {
@@ -487,7 +487,7 @@ namespace COLID.RegistrationService.Services.Implementation
             }
             catch (System.Exception ex)
             {
-                _logger.LogInformation(ex.Message);
+                _logger.LogError(ex.Message);
                 throw new TechnicalException(ex.Message);
             }
 
@@ -680,12 +680,19 @@ namespace COLID.RegistrationService.Services.Implementation
                         ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     };
 
-                    await _awsS3Service.UploadFileAsync(_awsConfig.S3BucketForImportExcelInput, Guid.NewGuid().ToString(), formFile);
+                    if (_awsConfig.S3UseMinIo)
+                    {
+                        await ExecuteImportExcel(inputStream);                       
+                    }
+                    else
+                    {
+                        await _awsS3Service.UploadFileAsync(_awsConfig.S3BucketForImportExcelInput, Guid.NewGuid().ToString(), formFile);
+                    }                   
                 }
             }
             catch (System.Exception ex)
             {
-                _logger.LogInformation("ImportService: " + (ex.InnerException == null ? ex.Message : ex.InnerException.Message));
+                _logger.LogError("ImportService: " + (ex.InnerException == null ? ex.Message : ex.InnerException.Message));
                 SendNotification(null, "Unable to upload Excel file - " + (ex.InnerException == null ? ex.Message : ex.InnerException.Message), userEmail);
             }
            
@@ -716,13 +723,13 @@ namespace COLID.RegistrationService.Services.Implementation
                     }
                     catch (System.Exception ex)
                     {
-                        _logger.LogInformation("ImportService: " + (ex.InnerException == null ? ex.Message : ex.InnerException.Message));
+                        _logger.LogError("ImportService: " + (ex.InnerException == null ? ex.Message : ex.InnerException.Message));
                     }
                 }                
             }
             catch (System.Exception ex)
             {
-                _logger.LogWarning("ImportService: " + (ex.InnerException == null ? ex.Message : ex.InnerException.Message));
+                _logger.LogError("ImportService: " + (ex.InnerException == null ? ex.Message : ex.InnerException.Message));
             }
         }
 

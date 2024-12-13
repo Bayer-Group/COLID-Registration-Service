@@ -21,6 +21,8 @@ namespace COLID.Graph.Metadata.Constants
         public static readonly string HasLinkHistoryGraph = ServiceUrl + "kos/19050/852149";
         public static readonly string HasResourceHistoryGraph = ServiceUrl + "kos/19050/844122";
         public static readonly string HasInstanceGraph = ServiceUrl + "kos/19050/852810";
+        public static readonly string HasResourceTemplateGraph = ServiceUrl + "kos/19050/852166";
+        public static readonly string HasCollibraDatatypesGraph = ServiceUrl + "kos/19050/852168";
 
         public static readonly ISet<string> Graphs = new HashSet<string>() { 
             HasConsumerGroupGraph, 
@@ -32,7 +34,9 @@ namespace COLID.Graph.Metadata.Constants
             HasResourcesDraftGraph,
             HasLinkHistoryGraph,
             HasResourceHistoryGraph,
-            HasInstanceGraph
+            HasInstanceGraph,
+            HasResourceTemplateGraph,
+            HasCollibraDatatypesGraph
         };
     }
 }

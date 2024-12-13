@@ -15,6 +15,7 @@ namespace COLID.Graph.Metadata.Constants
         public static readonly string HasLaterVersion = ServiceUrl + "kos/19050/hasLaterVersion";
         public static readonly string IsFacet = ServiceUrl + "kos/19050#isFacet";
         public static readonly string ControlledVocabulary = ServiceUrl + "kos/19050#ControlledVocabulary";
+        public static readonly string RegisterInCollibra = ServiceUrl + "kos/19050#registerInCollibra";
 
         public static class Type
         {
@@ -26,6 +27,7 @@ namespace COLID.Graph.Metadata.Constants
             public static readonly string MathematicalModelCategory = ServiceUrl + "kos/19050/MathematicalModelCategory";
             public static readonly string InformationClassification = ServiceUrl + "kos/19050/InformationClassification";
             public static readonly string PIDEntryLifecycleStatus = ServiceUrl + "kos/19050/PIDEntryLifecycleStatus";
+            public static readonly string LifecycleStatus = ServiceUrl + "kos/19050/LifeCycleStatus";
             public static readonly string Mapping = ServiceUrl + "kos/19050/Mapping";
             public static readonly string CropScience = ServiceUrl + "kos/19050/CropScienceDataset";
             public static readonly string Document = HttpServiceUrl + "kos/19014/Document";
@@ -88,6 +90,12 @@ namespace COLID.Graph.Metadata.Constants
             public static readonly string IsReplacedBy = ServiceUrl + "kos/19050/225896";
             public static readonly string IsNestedColumn = ServiceUrl + "kos/19050/444505";
             public static readonly string HasLinkToStudy = HttpServiceUrl + "dinos/ontologies/KUMO_Ontology#hasLinkToStudy";
+            public static readonly string SendsDataTo = HttpServiceUrl + "kos/19050/sendsDataTo";
+            public static readonly string Contains = ServiceUrl + "kos/19050/hasContains";
+            public static readonly string ReferencesObject = ServiceUrl + "kos/19050/hasreferencesObject";
+            public static readonly string HasField = ServiceUrl + "kos/19050/hasField";
+            public static readonly string HasUtilizes = ServiceUrl + "kos/19050/hasUtilizes";
+
 
             public static readonly ISet<string> AllLinkTypes = new HashSet<string>() {
                 IsCopyOfDataset ,
@@ -112,7 +120,11 @@ namespace COLID.Graph.Metadata.Constants
                 UsesApplication,
                 IsReplacedBy,
                 IsNestedColumn,
-                HasLinkToStudy
+                HasLinkToStudy,
+                Contains,
+                ReferencesObject,
+                HasField,
+                HasUtilizes
             };
         }
 

@@ -23,6 +23,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using static COLID.Graph.Metadata.Constants.Resource;
+using static COLID.RegistrationService.Common.Constants.Messages.Resource;
 
 namespace COLID.RegistrationService.Services.Implementation
 {
@@ -87,11 +88,13 @@ namespace COLID.RegistrationService.Services.Implementation
             //await Task.Yield();
             while (!stoppingToken.IsCancellationRequested)
             {
+                //_logger.LogInformation("BackgroundService: Running");
                 await AddUpdateResources();
                 await LinkResources();
                 await ImportExcel();
                 await Task.Delay(10000, stoppingToken);
             }
+            _logger.LogInformation("BackgroundService: Stopped for some reason");
         }
 
         /// <summary>
@@ -114,12 +117,14 @@ namespace COLID.RegistrationService.Services.Implementation
             stpWatch.Start();
             //Check for msgs in a loop           
             int msgcount, totalMsgCount = 0;
+            //_logger.LogInformation("BackgroundService: Inside of AddUpdateResources trying to fetch from " + _resourceInputQueueUrl);
             try
             {
                 do
                 {
                     //Check msgs available in SQS  
                     var msgs = await _amazonSQSService.ReceiveMessageAsync(_resourceInputQueueUrl,10,10);
+                    //_logger.LogInformation("BackgroundService: SQS endpoint triggered and messages received {msgs}", msgs);
                     msgcount = msgs.Count;
                     totalMsgCount += msgs.Count;
 
@@ -163,7 +168,7 @@ namespace COLID.RegistrationService.Services.Implementation
                                 // Delete msg from input Queue
                                 if (DeleteMessageFromSQS(msg.ReceiptHandle).Result == false)
                                 {
-                                    _logger.LogInformation("BackgroundService: Could not delete meessage");
+                                    _logger.LogInformation("BackgroundService: Could not delete message");
                                 }
                                 continue;
                             }
@@ -198,7 +203,7 @@ namespace COLID.RegistrationService.Services.Implementation
                                 // Delete msg from input Queue
                                 if (DeleteMessageFromSQS(msg.ReceiptHandle).Result == false)
                                 {
-                                    _logger.LogInformation("BackgroundService: Could not delete meessage");
+                                    _logger.LogInformation("BackgroundService: Could not delete message");
                                 }
                                 continue;
                             }
@@ -225,7 +230,7 @@ namespace COLID.RegistrationService.Services.Implementation
                                 // Delete msg from input Queue
                                 if (DeleteMessageFromSQS(msg.ReceiptHandle).Result == false)
                                 {
-                                    _logger.LogInformation("BackgroundService: Could not delete meessage for sourceId {sourceId} ", srcId);
+                                    _logger.LogInformation("BackgroundService: Could not delete message for sourceId {sourceId} ", srcId);
                                 }
                                 continue;
                             }
@@ -325,7 +330,7 @@ namespace COLID.RegistrationService.Services.Implementation
                                     // Delete msg from input Queue
                                     if (DeleteMessageFromSQS(msg.ReceiptHandle).Result == false)
                                     {
-                                        _logger.LogInformation("BackgroundService: Could not delete meessage for sourceId {sourceId} ", srcId);
+                                        _logger.LogInformation("BackgroundService: Could not delete message for sourceId {sourceId} ", srcId);
                                     }
                                     continue;
                                 }
@@ -372,7 +377,7 @@ namespace COLID.RegistrationService.Services.Implementation
                                         // Delete msg from input Queue
                                         if (DeleteMessageFromSQS(msg.ReceiptHandle).Result == false)
                                         {
-                                            _logger.LogInformation("BackgroundService: Could not delete meessage for sourceId {sourceId} ", srcId);
+                                            _logger.LogInformation("BackgroundService: Could not delete message for sourceId {sourceId} ", srcId);
                                         }
                                         continue;
                                     }
@@ -395,7 +400,7 @@ namespace COLID.RegistrationService.Services.Implementation
                                         // Delete msg from input Queue
                                         if (DeleteMessageFromSQS(msg.ReceiptHandle).Result == false)
                                         {
-                                            _logger.LogInformation("BackgroundService: Could not delete meessage for sourceId {sourceId} ", srcId);
+                                            _logger.LogInformation("BackgroundService: Could not delete message for sourceId {sourceId} ", srcId);
                                         }
                                         continue;
                                     }
@@ -451,7 +456,7 @@ namespace COLID.RegistrationService.Services.Implementation
                                             Graph.Metadata.DataModels.Resources.Resource updatedResource = await _revisionService.AddAdditionalsAndRemovals(resourcesCTO.Published, validationFacade.RequestResource);
                                         }
 
-                                        _logger.LogInformation("BackgroundService: Commit - {sparqlQuery}", transaction.GetSparqlString());
+                                        //_logger.LogInformation("BackgroundService: Commit - {sparqlQuery}", transaction.GetSparqlString());
 
                                         transaction.Commit();
                                         //Index resource
@@ -511,7 +516,7 @@ namespace COLID.RegistrationService.Services.Implementation
                                     // Delete msg from input Queue
                                     if (DeleteMessageFromSQS(msg.ReceiptHandle).Result == false)
                                     {
-                                        _logger.LogInformation("BackgroundService: Could not delete meessage for sourceId {sourceId} ", srcId);
+                                        _logger.LogInformation("BackgroundService: Could not delete message for sourceId {sourceId} ", srcId);
                                     }
                                     continue;
                                 }
@@ -521,7 +526,7 @@ namespace COLID.RegistrationService.Services.Implementation
                             // Delete msg from input Queue
                             if (DeleteMessageFromSQS(msg.ReceiptHandle).Result == false)
                             {                                
-                                _logger.LogInformation("BackgroundService: Could not delete meessage for sourceId {sourceId} ", srcId);
+                                _logger.LogInformation("BackgroundService: Could not delete message for sourceId {sourceId} ", srcId);
                             }                            
                         }
 
@@ -532,7 +537,7 @@ namespace COLID.RegistrationService.Services.Implementation
                         }
                         catch(System.Exception ex)
                         {
-                            _logger.LogInformation("BackgroundService: Could not send meessage to output queue {msg} ", ex.Message);
+                            _logger.LogInformation("BackgroundService: Could not send message to output queue {msg} ", ex.Message);
                         }
                         
                     }
@@ -560,65 +565,90 @@ namespace COLID.RegistrationService.Services.Implementation
             stpWatch.Start();
             //Check for msgs in a loop           
             int msgcount, totalMsgCount = 0;
-
-            do
+            //_logger.LogInformation("BackgroundService: Inside of LinkResources trying to fetch from " + _linkingInputQueueUrl);
+            try
             {
-                //Check msgs available in SQS  
-                var msgs = await _amazonSQSService.ReceiveMessageAsync(_linkingInputQueueUrl, 10, 10);
-                msgcount = msgs.Count;
-                totalMsgCount += msgs.Count;
-
-                //Iterate on each msg which will contain list of resource
-                foreach (var msg in msgs)
+                do
                 {
-                    //Get reources from the msg
-                    List<ResourceLinkingInformation> resourceLinkingInfos = JsonConvert.DeserializeObject<List<ResourceLinkingInformation>>(msg.Body);
+                    //Check msgs available in SQS  
+                    var msgs = await _amazonSQSService.ReceiveMessageAsync(_linkingInputQueueUrl, 10, 10);
+                    msgcount = msgs.Count;
+                    totalMsgCount += msgs.Count;
 
-                    //List to collect ValidationFacade of each resource
-                    List<ResourceLinkingResult> totalLinkingResult = new List<ResourceLinkingResult>();
-
-                    var tasks = resourceLinkingInfos.Select(async linkInfo =>
-                    //foreach (ResourceRequestDTO resource in resources)
+                    //Iterate on each msg which will contain list of resource
+                    foreach (var msg in msgs)
                     {
-                        ResourceLinkingResult curlinkingResult = new ResourceLinkingResult
-                        {
-                            PidUri = linkInfo.PidUri,
-                            LinkType = linkInfo.LinkType,
-                            PidUriToLink = linkInfo.PidUriToLink,
-                            Requester = linkInfo.Requester
-                        };
+                        //Get reources from the msg
+                        List<ResourceLinkingInformation> resourceLinkingInfos = JsonConvert.DeserializeObject<List<ResourceLinkingInformation>>(msg.Body);
+                        _logger.LogInformation("Message received", resourceLinkingInfos);
 
-                        try
-                        {
-                            //Add link                            
-                            await _resourceService.AddResourceLink(linkInfo.PidUri, linkInfo.LinkType, linkInfo.PidUriToLink, linkInfo.Requester);
+                        //List to collect ValidationFacade of each resource
+                        List<ResourceLinkingResult> totalLinkingResult = new List<ResourceLinkingResult>();
 
-                            //Collect result
-                            curlinkingResult.Status = "Linked";
-                            curlinkingResult.TimeTaken = stpWatch.ElapsedMilliseconds.ToString();
-                            curlinkingResult.Message = "Linked Successfully";
+                        var tasks = resourceLinkingInfos.Select(async linkInfo =>
+                        //foreach (ResourceRequestDTO resource in resources)
+                        {
+                            ResourceLinkingResult curlinkingResult = new ResourceLinkingResult
+                            {
+                                PidUri = linkInfo.PidUri,
+                                LinkType = linkInfo.LinkType,
+                                PidUriToLink = linkInfo.PidUriToLink,
+                                Requester = linkInfo.Requester,
+                                Action = linkInfo.Action,
+                            };
+
+                            try
+                            {
+                                if (linkInfo.Action == "add")
+                                {
+                                    _logger.LogInformation("adding Link", linkInfo.PidUri);
+
+                                    //Add link                            
+                                    await _resourceService.AddResourceLink(linkInfo.PidUri, linkInfo.LinkType, linkInfo.PidUriToLink, linkInfo.Requester);
+
+                                    //Collect result
+                                    curlinkingResult.Status = "Linked";
+                                    curlinkingResult.TimeTaken = stpWatch.ElapsedMilliseconds.ToString();
+                                    curlinkingResult.Message = "Linked Successfully";
+                                }
+                                else {
+
+                                    //Remove link                            
+                                    await _resourceService.RemoveResourceLink(linkInfo.PidUri, linkInfo.LinkType, linkInfo.PidUriToLink, false, linkInfo.Requester);
+
+                                    //Collect result
+                                    curlinkingResult.Status = "Unlinked";
+                                    curlinkingResult.TimeTaken = stpWatch.ElapsedMilliseconds.ToString();
+                                    curlinkingResult.Message = "Link Removed Successfully";
+                                }
+                            }
+                            catch (System.Exception ex)
+                            {
+                                //Collect result
+                                curlinkingResult.Status = "Error";
+                                curlinkingResult.TimeTaken = stpWatch.ElapsedMilliseconds.ToString();
+                                curlinkingResult.Message = ex.Message;
+                            }
+
+                            totalLinkingResult.Add(curlinkingResult);
+                        });
+                        await Task.WhenAll(tasks);
+
+                        //Send msg to output queue and delete message from input queue 
+                        if (await _amazonSQSService.SendMessageAsync(_linkingOutputQueueUrl, totalLinkingResult, isFifoQueue: false))
+                        {
+                            _logger.LogInformation("sending msg to output queue");
+
+                            await _amazonSQSService.DeleteMessageAsync(_linkingInputQueueUrl, msg.ReceiptHandle);
                         }
-                        catch (System.Exception ex)
-                        {
-                            //Collect result
-                            curlinkingResult.Status = "Error";
-                            curlinkingResult.TimeTaken = stpWatch.ElapsedMilliseconds.ToString();
-                            curlinkingResult.Message = ex.Message;
-                        }
-
-                        totalLinkingResult.Add(curlinkingResult);
-                    });
-                    await Task.WhenAll(tasks);
-
-                    //Send msg to output queue and delete message from input queue 
-                    if (await _amazonSQSService.SendMessageAsync(_linkingOutputQueueUrl, totalLinkingResult))
-                    {
-                        await _amazonSQSService.DeleteMessageAsync(_linkingInputQueueUrl, msg.ReceiptHandle);
                     }
-                }
 
-            } while (msgcount > 0);
-
+                } while (msgcount > 0);
+            }
+            catch (System.Exception ex)
+            {
+                _logger.LogError("BackgroundService: " + (ex.InnerException == null ? ex.Message : ex.InnerException.Message));
+            }
             stpWatch.Stop();
             if (totalMsgCount > 0)
             {
@@ -676,6 +706,7 @@ namespace COLID.RegistrationService.Services.Implementation
 
         private async Task ImportExcel()
         {
+            //_logger.LogInformation("BackgroundService: Inside ImportExcel");
             try
             {
                 await _importService.ImportExcel();

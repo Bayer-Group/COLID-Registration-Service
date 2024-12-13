@@ -13,6 +13,7 @@ namespace COLID.Graph.Metadata.Constants
         public const string PermanentIdentifier = "PermanentIdentifier";
         public const string MetadataGraphConfiguration = "MetadataGraphConfiguration";
         public const string PidUriTemplate = "PidUriTemplate";
+        public const string ResourceTemplate = "ResourceTemplate";
         public const string Keyword = "Keyword";
         /// <summary>
         /// Get Value of the types
@@ -37,6 +38,8 @@ namespace COLID.Graph.Metadata.Constants
                     return Constants.PidUriTemplate.Type;
                 case Keyword:
                     return Constants.Keyword.Type;
+                case ResourceTemplate:
+                    return Constants.ResourceTemplate.Type;
                 default:
                    return "";
             }

@@ -333,9 +333,9 @@ namespace COLID.AWS.Implementation
         {
             try
             {
-                AmazonDynamoDBClient client = GetAmazonDynamoDbClient();
+                //AmazonDynamoDBClient client = GetAmazonDynamoDbClient();
 
-                client.Dispose();
+                //client.Dispose();
             }
 
             catch (AmazonDynamoDBException ex)
